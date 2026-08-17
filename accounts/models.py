@@ -1,0 +1,76 @@
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+
+
+class CustomUser(AbstractUser):
+    """
+    Estensione del modello utente Django.
+
+    Tutte le informazioni organizzative (ufficio, gruppi, ecc.)
+    provengono dalla Directory Aziendale e NON vengono salvate qui.
+    """
+
+    class StatoPresenza(models.TextChoices):
+        NON_VERIFICATA = "UNK", "Non verificata"
+        PRESENTE = "PRE", "Presente"
+        ASSENTE = "ASS", "Assente"
+
+    class TipoAttivita(models.TextChoices):
+        SPORTELLISTA = "SPO", "Sportellista"
+        AMMINISTRATIVISTA = "AMM", "Amministrativista"
+
+    tipo_attivita = models.CharField(
+        max_length=3,
+        choices=TipoAttivita.choices,
+        default=TipoAttivita.AMMINISTRATIVISTA,
+        db_index=True,
+        verbose_name="Tipo di attività",
+    )
+
+    livello_sicurezza = models.PositiveSmallIntegerField(
+        default=1,
+        verbose_name="Livello di sicurezza"
+    )
+
+    stato_presenza = models.CharField(
+        max_length=3,
+        choices=StatoPresenza.choices,
+        default=StatoPresenza.NON_VERIFICATA,
+        db_index=True,
+        verbose_name="Stato presenza",
+    )
+
+    presenza_verificata_il = models.DateTimeField(
+        null=True,
+        blank=True,
+        editable=False,
+        verbose_name="Ultima verifica presenza",
+    )
+
+    presenza_fonte = models.CharField(
+        max_length=100,
+        blank=True,
+        editable=False,
+        verbose_name="Fonte della presenza",
+    )
+
+    class Meta:
+        verbose_name = "Utente"
+        verbose_name_plural = "Utenti"
+
+    def __str__(self):
+        return f"{self.get_full_name()} ({self.username})"
+
+    @property
+    def presente_in_servizio(self):
+        return (
+                self.stato_presenza
+                == self.StatoPresenza.PRESENTE
+        )
+
+    @property
+    def puo_ricevere_pubblico(self):
+        return (
+                self.tipo_attivita
+                == self.TipoAttivita.SPORTELLISTA
+        )

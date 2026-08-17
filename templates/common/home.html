@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+
+{% block title %}
+Controllo Accessi - Seleziona area
+{% endblock %}
+
+{% block content %}
+
+<div class="container py-5">
+
+    {% if messages %}
+        {% for message in messages %}
+
+            <div
+                class="alert alert-{{ message.tags|default:'info' }}
+                       alert-dismissible fade show"
+                role="alert"
+            >
+                {{ message }}
+
+                <button
+                    type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert"
+                    aria-label="Chiudi"
+                ></button>
+            </div>
+
+        {% endfor %}
+    {% endif %}
+
+    <!-- INTESTAZIONE -->
+
+    <div
+        class="d-flex flex-column flex-md-row
+               justify-content-between
+               align-items-md-center
+               gap-3 mb-5"
+    >
+        <div>
+
+            <h1 class="display-6 fw-semibold mb-2">
+                Sistema di controllo accessi
+            </h1>
+
+            <p class="text-muted fs-5 mb-0">
+                Seleziona l’area applicativa alla quale vuoi accedere.
+            </p>
+
+        </div>
+
+        <div class="text-md-end">
+
+            <div class="fw-semibold">
+                {% firstof request.user.get_full_name request.user.username %}
+            </div>
+
+            <div class="small text-muted">
+                Utente autenticato
+            </div>
+
+            <form
+                method="post"
+                action="{% url 'logout' %}"
+                class="mt-2"
+            >
+                {% csrf_token %}
+
+                <button
+                    type="submit"
+                    class="btn btn-sm btn-outline-secondary"
+                >
+                    Esci
+                </button>
+
+            </form>
+
+        </div>
+
+    </div>
+
+    <!-- SELEZIONE AREA -->
+
+    <div class="row g-4">
+
+        <!-- PORTINERIA -->
+
+        <div class="col-md-6 col-xl-4">
+
+            <a
+                href="{% url 'dashboard:home' %}"
+                class="card h-100 shadow-sm
+                       text-decoration-none text-body"
+            >
+                <div class="card-body p-4">
+
+                    <div
+                        class="rounded-circle bg-primary-subtle
+                               text-primary
+                               d-flex align-items-center
+                               justify-content-center mb-4"
+                        style="width: 64px; height: 64px;"
+                    >
+                        <span class="fs-2">
+                            P
+                        </span>
+                    </div>
+
+                    <h2 class="h4">
+                        Portineria
+                    </h2>
+
+                    <p class="text-muted">
+                        Registrazione dei visitatori, consegna badge,
+                        stampa ticket e registrazione delle uscite.
+                    </p>
+
+                    <span class="btn btn-primary">
+                        Accedi alla portineria
+                    </span>
+
+                </div>
+            </a>
+
+        </div>
+
+        <!-- UFFICI -->
+
+        <div class="col-md-6 col-xl-4">
+
+            <a
+                href="{% url 'uffici:selezione' %}"
+                class="card h-100 shadow-sm
+                       text-decoration-none text-body"
+            >
+                <div class="card-body p-4">
+
+                    <div
+                        class="rounded-circle bg-success-subtle
+                               text-success
+                               d-flex align-items-center
+                               justify-content-center mb-4"
+                        style="width: 64px; height: 64px;"
+                    >
+                        <span class="fs-2">
+                            U
+                        </span>
+                    </div>
+
+                    <h2 class="h4">
+                        Gestione uffici
+                    </h2>
+
+                    <p class="text-muted">
+                        Gestione delle code, chiamata del prossimo
+                        visitatore e conclusione delle visite.
+                    </p>
+
+                    <span class="btn btn-success">
+                        Seleziona un ufficio
+                    </span>
+
+                </div>
+            </a>
+
+        </div>
+
+        <!-- MONITOR -->
+
+        <div class="col-md-6 col-xl-4">
+
+            <a
+                href="{% url 'monitor_home' %}"
+                class="card h-100 shadow-sm
+                       text-decoration-none text-body"
+            >
+                <div class="card-body p-4">
+
+                    <div
+                        class="rounded-circle bg-info-subtle
+                               text-info
+                               d-flex align-items-center
+                               justify-content-center mb-4"
+                        style="width: 64px; height: 64px;"
+                    >
+                        <span class="fs-2">
+                            M
+                        </span>
+                    </div>
+
+                    <h2 class="h4">
+                        Monitor pubblico
+                    </h2>
+
+                    <p class="text-muted">
+                        Visualizzazione a tutto schermo dei numeri
+                        chiamati dagli uffici, senza dati personali.
+                    </p>
+
+                    <span class="btn btn-info">
+                        Apri il monitor
+                    </span>
+
+                </div>
+            </a>
+
+        </div>
+
+        <!-- AMMINISTRAZIONE -->
+
+        {% if request.user.is_staff %}
+
+            <div class="col-md-6 col-xl-4">
+
+                <a
+                    href="{% url 'admin:index' %}"
+                    class="card h-100 shadow-sm
+                           text-decoration-none text-body"
+                >
+                    <div class="card-body p-4">
+
+                        <div
+                            class="rounded-circle bg-secondary-subtle
+                                   text-secondary
+                                   d-flex align-items-center
+                                   justify-content-center mb-4"
+                            style="width: 64px; height: 64px;"
+                        >
+                            <span class="fs-2">
+                                A
+                            </span>
+                        </div>
+
+                        <h2 class="h4">
+                            Amministrazione
+                        </h2>
+
+                        <p class="text-muted">
+                            Configurazione degli uffici, utenti,
+                            calendari, badge e parametri applicativi.
+                        </p>
+
+                        <span class="btn btn-secondary">
+                            Apri amministrazione
+                        </span>
+
+                    </div>
+                </a>
+
+            </div>
+
+        {% endif %}
+
+    </div>
+
+    <div class="alert alert-light border mt-5 mb-0">
+
+        <strong>Autorizzazioni:</strong>
+
+        la selezione di un’area non garantisce automaticamente
+        l’accesso. Il sistema verifica le autorizzazioni dell’utente
+        prima di mostrare la relativa dashboard.
+
+    </div>
+
+</div>
+
+{% endblock %}

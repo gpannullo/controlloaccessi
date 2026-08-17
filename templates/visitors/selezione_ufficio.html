@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}
+Seleziona ufficio
+{% endblock %}
+
+{% block content %}
+
+<div class="container py-5">
+
+    <div class="mb-4">
+
+        <h1 class="h3 mb-1">
+            Gestione ricevimento
+        </h1>
+
+        <p class="text-muted mb-0">
+            Seleziona l’ufficio sul quale desideri operare.
+        </p>
+
+    </div>
+
+    {% if uffici %}
+
+        <div class="row g-4">
+
+            {% for ufficio in uffici %}
+
+                <div class="col-md-6 col-xl-4">
+
+                    <a
+                        href="{% url 'uffici:dashboard' ufficio.pk %}"
+                        class="card h-100 shadow-sm
+                               text-decoration-none text-body"
+                    >
+                        <div class="card-body p-4">
+
+                            <h2 class="h4">
+                                {{ ufficio.nome }}
+                            </h2>
+
+                            {% if ufficio.piano or ufficio.stanza %}
+
+                                <p class="text-muted mb-3">
+
+                                    {% if ufficio.piano %}
+                                        Piano {{ ufficio.piano }}
+                                    {% endif %}
+
+                                    {% if ufficio.stanza %}
+                                        · Stanza {{ ufficio.stanza }}
+                                    {% endif %}
+
+                                </p>
+
+                            {% endif %}
+
+                            <span class="btn btn-primary">
+                                Accedi all’ufficio
+                            </span>
+
+                        </div>
+                    </a>
+
+                </div>
+
+            {% endfor %}
+
+        </div>
+
+    {% else %}
+
+        <div class="alert alert-warning">
+
+            <h2 class="h5">
+                Nessun ufficio assegnato
+            </h2>
+
+            <p class="mb-0">
+                Il tuo account non risulta associato
+                ad alcun ufficio attivo.
+            </p>
+
+        </div>
+
+    {% endif %}
+
+</div>
+
+{% endblock %}

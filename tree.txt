@@ -1,0 +1,169 @@
+Elenco del percorso delle cartelle
+Numero di serie del volume: 5C4A-DB25
+C:.
+�   db.sqlite3
+�   manage.py
+�
+����access_control
+�   �   admin.py
+�   �   apps.py
+�   �   forms.py
+�   �   models.py
+�   �   rbac.py
+�   �   services.py
+�   �   tests.py
+�   �   views.py
+�   �   __init__.py
+�   �   
+�   ����migrations
+�   �   �   0001_initial.py
+�   �   �   0002_initial.py
+�   �   �   __init__.py
+�   �   �
+�   �           
+�   ����services
+�   �       gruppo_service.py
+�   �       office_service.py
+�   �       ufficio_service.py
+�   �       __init__.py
+�   �
+�           
+����accounts
+�   �   admin.py
+�   �   ad_auth.py
+�   �   apps.py
+�   �   models.py
+�   �   tests.py
+�   �   views.py
+�   �   __init__.py
+�   �   
+�   ����authentication
+�   �   �   backend.py
+�   �   �   __init__.py
+�   �   �
+�   �           
+�   ����managment
+�   �   �   __init__.py
+�   �   �   
+�   �   ����commands
+�   �           sync_directory.py
+�   �           __init__.py
+�   �           
+�   ����migrations
+�   �   �   0001_initial.py
+�   �   �   __init__.py
+�   �   �
+�   �           
+�   ����services
+�   �   �   active_directory_service.py
+�   �   �   directory_service.py
+�   �   �   factory.py
+�   �   �   group_sync_service.py
+�   �   �   ldap_service.py
+�   �   �   membership_sync_service.py
+�   �   �   synchronization_service.py
+�   �   �   sync_directory.py
+�   �   �   sync_result.py
+�   �   �   user_sync_service.py
+�   �   �   __init__.py
+�   �   �
+�   �
+�           
+����audit
+�   �   admin.py
+�   �   apps.py
+�   �   models.py
+�   �   tests.py
+�   �   views.py
+�   �   __init__.py
+�   �   
+�   ����migrations
+�   �   �   0001_initial.py
+�   �   �   0002_auditevent_delete_auditlog.py
+�   �   �   __init__.py
+�   �   �
+�   �           
+�   ����services
+�   �       audit_service.py
+�   �
+�           
+����common
+�   �   admin.py
+�   �   apps.py
+�   �   constants.py
+�   �   exceptions.py
+�   �   logging.py
+�   �   models.py
+�   �   permissions.py
+�   �   tests.py
+�   �   utils.py
+�   �   views.py
+�   �   __init__.py
+�   �   
+�   ����forms
+�   �       base.py
+�   �       
+�   ����migrations
+�   �   �   __init__.py
+�   �   �
+�   �           
+�   ����views
+�   �       create.py
+�   �       delete.py
+�   �       detail.py
+�   �       list.py
+�   �       update.py
+�   �       __init__.py
+�   �
+�           
+����ControlloAccessi
+�   �   asgi.py
+�   �   settings.py
+�   �   urls.py
+�   �   wsgi.py
+�   �   __init__.py
+�   �
+�           
+����dashboard
+�   �   admin.py
+�   �   apps.py
+�   �   models.py
+�   �   tests.py
+�   �   urls.py
+�   �   views.py
+�   �   __init__.py
+�   �   
+�   ����migrations
+�   �   �   __init__.py
+�   �   �
+�   �
+�           
+����templates
+�   �   base.html
+�   �   
+�   ����dashboard
+�           home.html
+�
+����visitors
+    �   admin.py
+    �   apps.py
+    �   models.py
+    �   services.py
+    �   tests.py
+    �   utils.py
+    �   views.py
+    �   __init__.py
+    �   
+    ����migrations
+    �   �   0001_initial.py
+    �   �   0002_appuntamento.py
+    �   �   __init__.py
+    �   �
+    �           
+    ����services
+    �       appointment_service.py
+    �       portineria_service.py
+    �       reception_service.py
+    �       visitor_service.py
+    �
+            

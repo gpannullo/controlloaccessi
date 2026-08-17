@@ -1,0 +1,883 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Ricevimento {{ ufficio.nome }}
+{% endblock %}
+
+{% block content %}
+
+    <div class="container-fluid py-4">
+
+        {% if messages %}
+            {% for message in messages %}
+                <div
+                        class="alert alert-{{ message.tags|default:'info' }}
+                       alert-dismissible fade show"
+                        role="alert"
+                >
+                    {{ message }}
+
+                    <button
+                            type="button"
+                            class="btn-close"
+                            data-bs-dismiss="alert"
+                            aria-label="Chiudi"
+                    ></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- INTESTAZIONE -->
+
+        <div
+                class="d-flex flex-column flex-lg-row
+               justify-content-between
+               align-items-lg-center gap-3 mb-4"
+        >
+            <div>
+                <h1 class="h3 mb-1">
+                    {{ ufficio.nome }}
+                </h1>
+
+                <p class="text-muted mb-0">
+                    Operatore:
+                    {% firstof request.user.get_full_name request.user.username %}
+                </p>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2">
+
+                {% if uffici|length > 1 %}
+                    <div class="dropdown">
+
+                        <button
+                                class="btn btn-outline-primary dropdown-toggle"
+                                type="button"
+                                data-bs-toggle="dropdown"
+                        >
+                            Cambia ufficio
+                        </button>
+
+                        <ul class="dropdown-menu dropdown-menu-end">
+
+                            {% for ufficio_utente in uffici %}
+
+                                <li>
+                                    <a
+                                            class="dropdown-item
+                                           {% if ufficio_utente.pk == ufficio.pk %}
+                                               active
+                                           {% endif %}"
+                                            href="{% url 'uffici:dashboard' ufficio_utente.pk %}"
+                                    >
+                                        {{ ufficio_utente.nome }}
+                                    </a>
+                                </li>
+
+                            {% endfor %}
+
+                        </ul>
+
+                    </div>
+                {% endif %}
+
+                <a
+                        href="{% url 'home' %}"
+                        class="btn btn-outline-secondary"
+                >
+                    Cambia area
+                </a>
+
+            </div>
+        </div>
+
+        <!-- CONTATORI -->
+
+        <div class="row g-3 mb-4">
+
+            <div class="col-sm-6 col-xl-3">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+
+                        <div class="text-muted">
+                            Prioritari in hall
+                        </div>
+
+                        <div
+                                class="display-6 fw-semibold text-danger"
+                                id="numero-prioritari"
+                        >
+                            {{ numero_prioritari }}
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-sm-6 col-xl-3">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+
+                        <div class="text-muted">
+                            Hall ordinaria
+                        </div>
+
+                        <div
+                                class="display-6 fw-semibold"
+                                id="numero-hall"
+                        >
+                            {{ numero_hall }}
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-sm-6 col-xl-3">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+
+                        <div class="text-muted">
+                            Fuori dalla porta
+                        </div>
+
+                        <div class="display-6 fw-semibold text-primary" id="numero-fuori">
+                            {{ numero_fuori }}
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-sm-6 col-xl-3">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+
+                        <div class="text-muted">
+                            Dentro l'ufficio
+                        </div>
+
+                        <div class="display-6 fw-semibold text-success" id="numero-in-ufficio">
+                            {{ numero_in_ufficio }}
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- VISITA CORRENTE -->
+
+        {% if visita_corrente %}
+
+            <div class="card border-success shadow-sm mb-4">
+
+                <div
+                        class="card-header bg-success text-white
+                       d-flex justify-content-between
+                       align-items-center"
+                >
+                    <strong>
+                        Visita attualmente in corso
+                    </strong>
+
+                    <span class="badge bg-light text-success fs-6">
+                    {{ visita_corrente.numero_coda_formattato }}
+                </span>
+                </div>
+
+                <div class="card-body p-4">
+
+                    <div class="row g-4">
+
+                        <div class="col-lg-7">
+
+                            <dl class="row mb-0">
+
+                                <dt class="col-sm-4">
+                                    Visitatore
+                                </dt>
+
+                                <dd class="col-sm-8">
+                                    {{ visita_corrente.visitatore }}
+                                </dd>
+
+                                <dt class="col-sm-4">
+                                    Motivo
+                                </dt>
+
+                                <dd class="col-sm-8">
+                                    {{ visita_corrente.motivo|default:"—" }}
+                                </dd>
+
+                                <dt class="col-sm-4">
+                                    Telefono
+                                </dt>
+
+                                <dd class="col-sm-8">
+                                    {{ visita_corrente.visitatore.telefono|default:"—" }}
+                                </dd>
+
+                                <dt class="col-sm-4">
+                                    Ingresso in ufficio
+                                </dt>
+
+                                <dd class="col-sm-8">
+                                    {{ visita_corrente.ingresso_ufficio_il|date:"H:i" }}
+                                </dd>
+
+                                <dt class="col-sm-4">
+                                    Prenotazione
+                                </dt>
+
+                                <dd class="col-sm-8">
+                                    {% if visita_corrente.appuntamento %}
+                                        <span class="badge bg-danger">
+                                        Prenotato
+                                    </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">
+                                        Accesso ordinario
+                                    </span>
+                                    {% endif %}
+                                </dd>
+
+                            </dl>
+
+                        </div>
+
+                        <div class="col-lg-5">
+
+                            <form
+                                    method="post"
+                                    action="{% url 'uffici:concludi_visita' ufficio.pk visita_corrente.pk %}"
+                            >
+                                {% csrf_token %}
+
+                                <div class="mb-3">
+
+                                    <label
+                                            for="note_conclusione"
+                                            class="form-label"
+                                    >
+                                        Note sulla visita
+                                    </label>
+
+                                    <textarea
+                                            name="note_conclusione"
+                                            id="note_conclusione"
+                                            rows="3"
+                                            class="form-control"
+                                            placeholder="Esito, documenti consegnati o altre informazioni"
+                                    ></textarea>
+
+                                </div>
+
+                                <button
+                                        type="submit"
+                                        class="btn btn-success btn-lg w-100"
+                                >
+                                    Concludi visita
+                                </button>
+
+                            </form>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        {% else %}
+
+            <div class="card border-primary shadow-sm mb-4">
+
+                <div class="card-body p-4 text-center">
+
+                    <h2 class="h4 mb-3">
+                        Nessuna visita in corso
+                    </h2>
+
+                    <p class="text-muted">
+                        Il primo visitatore della coda fuori
+                        dalla porta verrà assegnato a te.
+                    </p>
+
+                    <form
+                            method="post"
+                            action="{% url 'uffici:fai_entrare_prossimo' ufficio.pk %}"
+                    >
+                        {% csrf_token %}
+
+                        <button
+                                type="submit"
+                                class="btn btn-primary btn-lg px-5"
+                                {% if not ha_ricevimenti_fuori %}
+                                disabled
+                                {% endif %}
+                        >
+                            Fai entrare il prossimo
+                        </button>
+
+                    </form>
+
+                    {% if not ha_ricevimenti_fuori %}
+                        <div class="small text-muted mt-2">
+                            Non ci sono ricevimenti/appuntamenti da far entrare.
+                        </div>
+                    {% endif %}
+
+                </div>
+
+            </div>
+
+        {% endif %}
+
+        <div class="row g-4">
+
+            <!-- CODA FUORI DALL'UFFICIO -->
+
+            <div class="col-xl-7">
+
+                <div class="card shadow-sm h-100">
+
+                    <div
+                            class="card-header d-flex flex-wrap
+           justify-content-between
+           align-items-center gap-2"
+                    >
+                        <div>
+                            <strong>
+                                Coda fuori dall'ufficio
+                            </strong>
+
+                            <span class="badge bg-primary ms-2" data-counter="numero-fuori">
+            {{ numero_fuori }}
+        </span>
+                        </div>
+
+                        <form
+                                method="post"
+                                action="{% url 'uffici:aggiorna_coda_fuori' ufficio.pk %}"
+                        >
+                            {% csrf_token %}
+
+                            <button
+                                    type="submit"
+                                    class="btn btn-sm btn-outline-primary"
+                            >
+                                Aggiorna coda fuori ufficio
+                            </button>
+                        </form>
+                    </div>
+
+
+                    <div class="table-responsive">
+
+                        <table class="table table-hover align-middle mb-0">
+
+                            <thead>
+                            <tr>
+                                <th>Posizione</th>
+                                <th>Coda</th>
+                                <th>Tipo</th>
+                                <th>Visitatore</th>
+                                <th>Motivo</th>
+                                <th>Attesa dal</th>
+                                <th class="text-end">Azione</th>
+                            </tr>
+                            </thead>
+
+                            <tbody>
+
+                            {% for accesso in coda_fuori %}
+
+                                <tr>
+                                    <td>
+                                        {{ forloop.counter }}
+                                    </td>
+
+                                    <td>
+                                        <strong>
+                                            {{ accesso.numero_coda_formattato }}
+                                        </strong>
+                                    </td>
+
+                                    <td>
+                                        {% if accesso.tipo_accesso == "VIS" %}
+                                            <span class="badge bg-success">Visita</span>
+                                        {% elif accesso.appuntamento %}
+                                            <span class="badge bg-danger">Appuntamento</span>
+                                        {% else %}
+                                            <span class="badge bg-primary">Ricevimento</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <td>
+                                        {{ accesso.visitatore }}
+                                    </td>
+
+                                    <td>
+                                        {{ accesso.motivo|default:"—" }}
+                                    </td>
+
+                                    <td>
+                                        {{ accesso.spostato_fuori_ufficio_il|date:"H:i" }}
+                                    </td>
+
+                                    <td class="text-end">
+                                        {% if accesso.tipo_accesso == "VIS" and not visita_corrente %}
+                                            <form
+                                                method="post"
+                                                action="{% url 'uffici:fai_entrare_visitatore' ufficio.pk accesso.pk %}"
+                                            >
+                                                {% csrf_token %}
+                                                <button
+                                                    type="submit"
+                                                    class="btn btn-sm btn-success"
+                                                >
+                                                    Fai entrare visitatore
+                                                </button>
+                                            </form>
+                                        {% elif accesso.tipo_accesso == "VIS" %}
+                                            <span class="small text-muted">
+                                                Concludi prima la visita corrente
+                                            </span>
+                                        {% else %}
+                                            <span class="small text-muted">
+                                                Usa “Fai entrare il prossimo”
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+
+                            {% empty %}
+
+                                <tr>
+                                    <td
+                                            colspan="6"
+                                            class="text-center text-muted py-4"
+                                    >
+                                        Nessun visitatore fuori dall'ufficio.
+                                    </td>
+                                </tr>
+
+                            {% endfor %}
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- VISITE DEI COLLEGHI -->
+
+            <div class="col-xl-5">
+
+                <div class="card shadow-sm h-100">
+
+                    <div
+                            class="card-header d-flex
+                           justify-content-between
+                           align-items-center"
+                    >
+                        <strong>
+                            Visitatori dentro l'ufficio
+                        </strong>
+
+                        <span class="badge bg-success" data-counter="numero-in-ufficio">
+                        {{ numero_in_ufficio }}
+                    </span>
+                    </div>
+
+                    <div class="list-group list-group-flush">
+
+                        {% for accesso in visite_in_corso %}
+
+                            <div class="list-group-item">
+
+                                <div
+                                        class="d-flex
+                                       justify-content-between
+                                       align-items-start gap-3"
+                                >
+                                    <div>
+
+                                        <div class="fw-semibold">
+                                            {{ accesso.numero_coda_formattato }}
+                                            –
+                                            {{ accesso.visitatore }}
+                                        </div>
+
+                                        <div class="small text-muted">
+                                            Operatore:
+                                            {% if accesso.operatore_assegnato %}
+                                                {% firstof accesso.operatore_assegnato.get_full_name accesso.operatore_assegnato.username %}
+                                            {% else %}
+                                                —
+                                            {% endif %}
+                                        </div>
+
+                                    </div>
+
+                                    <span class="badge bg-success">
+                                    In visita
+                                </span>
+
+                                </div>
+
+                            </div>
+
+                        {% empty %}
+
+                            <div class="list-group-item text-muted text-center py-4">
+                                Nessuna visita in corso nell'ufficio.
+                            </div>
+
+                        {% endfor %}
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- CODE NELLA HALL -->
+
+        <div class="row g-4 mt-1">
+
+            <div class="col-xl-6">
+
+                <div class="card border-danger shadow-sm">
+
+                    <div
+                            class="card-header d-flex
+                           justify-content-between
+                           align-items-center"
+                    >
+                        <strong>
+                            Coda prioritaria nella hall
+                        </strong>
+
+                        <span class="badge bg-danger" data-counter="numero-prioritari">
+                        {{ numero_prioritari }}
+                    </span>
+                    </div>
+
+                    <div class="table-responsive">
+
+                        <table class="table table-sm align-middle mb-0">
+
+                            <thead>
+                            <tr>
+                                <th>Coda</th>
+                                <th>Visitatore</th>
+                                <th>Appuntamento</th>
+                                <th>Arrivo</th>
+                            </tr>
+                            </thead>
+
+                            <tbody>
+
+                            {% for accesso in coda_prioritaria %}
+
+                                <tr>
+                                    <td>
+                                        <strong>
+                                            {{ accesso.numero_coda_formattato }}
+                                        </strong>
+                                    </td>
+
+                                    <td>
+                                        {{ accesso.visitatore }}
+                                    </td>
+
+                                    <td>
+                                        {{ accesso.appuntamento.data_ora|date:"H:i" }}
+                                    </td>
+
+                                    <td>
+                                        {{ accesso.ingresso|date:"H:i" }}
+                                    </td>
+                                </tr>
+
+                            {% empty %}
+
+                                <tr>
+                                    <td
+                                            colspan="4"
+                                            class="text-center text-muted py-4"
+                                    >
+                                        Nessun prenotato in attesa.
+                                    </td>
+                                </tr>
+
+                            {% endfor %}
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="col-xl-6">
+
+                <div class="card shadow-sm">
+
+                    <div
+                            class="card-header d-flex
+                           justify-content-between
+                           align-items-center"
+                    >
+                        <strong>
+                            Coda nella hall
+                        </strong>
+
+                        <span class="badge bg-secondary" data-counter="numero-hall">
+                        {{ numero_hall }}
+                    </span>
+                    </div>
+
+                    <div class="table-responsive">
+
+                        <table class="table table-sm align-middle mb-0">
+
+                            <thead>
+                            <tr>
+                                <th>Coda</th>
+                                <th>Tipo</th>
+                                <th>Visitatore</th>
+                                <th>Motivo</th>
+                                <th>Arrivo</th>
+                                <th class="text-end">Azione</th>
+                            </tr>
+                            </thead>
+
+                            <tbody>
+
+                            {% for accesso in coda_hall %}
+
+                                <tr>
+                                    <td>
+                                        <strong>
+                                            {{ accesso.numero_coda_formattato }}
+                                        </strong>
+                                    </td>
+
+                                    <td>
+                                        {% if accesso.tipo_accesso == "VIS" %}
+                                            <span class="badge bg-success">Visita</span>
+                                        {% else %}
+                                            <span class="badge bg-primary">Ricevimento</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <td>
+                                        {{ accesso.visitatore }}
+                                    </td>
+
+                                    <td>
+                                        {{ accesso.motivo|default:"—" }}
+                                    </td>
+
+                                    <td>
+                                        {{ accesso.ingresso|date:"H:i" }}
+                                    </td>
+
+                                    <td class="text-end">
+                                        {% if accesso.tipo_accesso == "VIS" %}
+                                            <form
+                                                method="post"
+                                                action="{% url 'uffici:autorizza_salita_visita' ufficio.pk accesso.pk %}"
+                                            >
+                                                {% csrf_token %}
+                                                <button
+                                                    type="submit"
+                                                    class="btn btn-sm btn-outline-success"
+                                                >
+                                                    Autorizza salita
+                                                </button>
+                                            </form>
+                                        {% else %}
+                                            <span class="small text-muted">
+                                                Gestione automatica
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+
+                            {% empty %}
+
+                                <tr>
+                                    <td
+                                            colspan="6"
+                                            class="text-center text-muted py-4"
+                                    >
+                                        Nessun visitatore nella hall.
+                                    </td>
+                                </tr>
+
+                            {% endfor %}
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const refreshUrl =
+        "{% url 'uffici:stato_live' ufficio.pk %}";
+
+    const refreshInterval = 10000;
+
+    let refreshInProgress = false;
+    let currentVisitId = (
+        {% if visita_corrente %}
+            {{ visita_corrente.pk }}
+        {% else %}
+            null
+        {% endif %}
+    );
+
+    function updateText(selector, value) {
+        document
+            .querySelectorAll(selector)
+            .forEach(function (element) {
+                element.textContent = value;
+            });
+    }
+
+    async function refreshOfficeCounters() {
+        if (
+            refreshInProgress ||
+            document.hidden
+        ) {
+            return;
+        }
+
+        refreshInProgress = true;
+
+        try {
+            const response = await fetch(
+                refreshUrl,
+                {
+                    headers: {
+                        "X-Requested-With": "XMLHttpRequest"
+                    },
+                    cache: "no-store"
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error(
+                    `Errore HTTP ${response.status}`
+                );
+            }
+
+            const data = await response.json();
+
+            if (!data.success) {
+                return;
+            }
+
+            updateText(
+                "#numero-prioritari",
+                data.numero_prioritari
+            );
+
+            updateText(
+                '[data-counter="numero-prioritari"]',
+                data.numero_prioritari
+            );
+
+            updateText(
+                "#numero-hall",
+                data.numero_hall
+            );
+
+            updateText(
+                '[data-counter="numero-hall"]',
+                data.numero_hall
+            );
+
+            updateText(
+                "#numero-fuori",
+                data.numero_fuori
+            );
+
+            updateText(
+                '[data-counter="numero-fuori"]',
+                data.numero_fuori
+            );
+
+            updateText(
+                "#numero-in-ufficio",
+                data.numero_in_ufficio
+            );
+
+            updateText(
+                '[data-counter="numero-in-ufficio"]',
+                data.numero_in_ufficio
+            );
+
+            const newVisitId = data.visita_corrente
+                ? data.visita_corrente.id
+                : null;
+
+            /*
+             * Se cambia la visita corrente, ricarichiamo
+             * l'intera pagina perché devono cambiare anche
+             * pulsanti, nominativo e form di conclusione.
+             */
+            if (newVisitId !== currentVisitId) {
+                window.location.reload();
+            }
+
+        } catch (error) {
+            console.error(
+                "Aggiornamento ufficio non riuscito:",
+                error
+            );
+        } finally {
+            refreshInProgress = false;
+        }
+    }
+
+    window.setInterval(
+        refreshOfficeCounters,
+        refreshInterval
+    );
+
+    document.addEventListener(
+        "visibilitychange",
+        function () {
+            if (!document.hidden) {
+                refreshOfficeCounters();
+            }
+        }
+    );
+});
+</script>
+{% endblock %}

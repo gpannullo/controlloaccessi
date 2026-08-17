@@ -1,0 +1,555 @@
+{% extends "base.html" %}
+
+{% block title %}
+{{ titolo_registrazione }}
+{% endblock %}
+
+{% block content %}
+
+<div class="container py-4">
+
+    <div
+        class="d-flex flex-column flex-md-row
+               justify-content-between
+               align-items-md-center
+               gap-3 mb-4"
+    >
+        <div>
+            <h1 class="h3 mb-1">
+                {{ titolo_registrazione }}
+            </h1>
+
+            <p class="text-muted mb-0">
+                {{ testo_registrazione }}
+            </p>
+        </div>
+
+        <a
+            href="{% url 'dashboard:home' %}"
+            class="btn btn-outline-secondary"
+        >
+            Torna alla dashboard
+        </a>
+    </div>
+
+    {% if is_visita %}
+        <div class="alert alert-success">
+            <strong>Visita:</strong> vengono mostrati solo gli uffici
+            con almeno un dipendente presente. Il visitatore rimarrà
+            nella hall finché un dipendente dell'ufficio non autorizza
+            la salita.
+        </div>
+    {% endif %}
+
+    <div class="card shadow-sm">
+
+        <div class="card-body p-4">
+
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {% for error in form.non_field_errors %}
+                        <div>{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <form
+                method="post"
+                novalidate
+            >
+                {% csrf_token %}
+
+                <section class="mb-4">
+
+                    <h2 class="h5 border-bottom pb-2">
+                        Documento e identificazione
+                    </h2>
+
+                    <div class="form-check form-switch mb-3">
+
+                        {{ form.documento_presentato }}
+
+                        <label
+                            class="form-check-label"
+                            for="{{ form.documento_presentato.id_for_label }}"
+                        >
+                            {{ form.documento_presentato.label }}
+                        </label>
+
+                    </div>
+
+                    <div
+                        id="document-fields"
+                        class="row g-3"
+                    >
+
+                        <div class="col-md-4">
+                            <label
+                                class="form-label"
+                                for="{{ form.documento_tipo.id_for_label }}"
+                            >
+                                {{ form.documento_tipo.label }}
+                            </label>
+
+                            {{ form.documento_tipo }}
+
+                            {% for error in form.documento_tipo.errors %}
+                                <div class="text-danger small mt-1">
+                                    {{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-4">
+                            <label
+                                class="form-label"
+                                for="{{ form.documento_numero.id_for_label }}"
+                            >
+                                {{ form.documento_numero.label }}
+                            </label>
+
+                            {{ form.documento_numero }}
+
+                            {% for error in form.documento_numero.errors %}
+                                <div class="text-danger small mt-1">
+                                    {{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-4">
+                            <label
+                                class="form-label"
+                                for="{{ form.documento_scadenza.id_for_label }}"
+                            >
+                                {{ form.documento_scadenza.label }}
+                            </label>
+
+                            {{ form.documento_scadenza }}
+                        </div>
+
+                    </div>
+
+                    <div class="row g-3 mt-1">
+
+                        <div class="col-md-6">
+                            <label
+                                class="form-label"
+                                for="{{ form.codice_fiscale.id_for_label }}"
+                            >
+                                {{ form.codice_fiscale.label }}
+                            </label>
+
+                            {{ form.codice_fiscale }}
+
+                            {% for error in form.codice_fiscale.errors %}
+                                <div class="text-danger small mt-1">
+                                    {{ error }}
+                                </div>
+                            {% endfor %}
+
+                            <div class="form-text">
+                                Il codice fiscale può essere utilizzato
+                                per recuperare un visitatore già registrato.
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <div
+                                id="visitor-search-status"
+                                class="alert d-none"
+                                role="alert"
+                            ></div>
+                        </div>
+
+                    </div>
+
+                </section>
+
+                <section class="mb-4">
+
+                    <h2 class="h5 border-bottom pb-2">
+                        Dati del visitatore
+                    </h2>
+
+                    <div class="row g-3">
+
+                        <div class="col-md-6">
+                            <label
+                                class="form-label"
+                                for="{{ form.nome.id_for_label }}"
+                            >
+                                {{ form.nome.label }}
+                                <span class="text-danger">*</span>
+                            </label>
+
+                            {{ form.nome }}
+
+                            {% for error in form.nome.errors %}
+                                <div class="text-danger small mt-1">
+                                    {{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label
+                                class="form-label"
+                                for="{{ form.cognome.id_for_label }}"
+                            >
+                                {{ form.cognome.label }}
+                                <span class="text-danger">*</span>
+                            </label>
+
+                            {{ form.cognome }}
+
+                            {% for error in form.cognome.errors %}
+                                <div class="text-danger small mt-1">
+                                    {{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label
+                                class="form-label"
+                                for="{{ form.telefono.id_for_label }}"
+                            >
+                                {{ form.telefono.label }}
+                                <span class="text-danger">*</span>
+                            </label>
+
+                            {{ form.telefono }}
+
+                            {% for error in form.telefono.errors %}
+                                <div class="text-danger small mt-1">
+                                    {{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                    </div>
+
+                </section>
+
+                <section class="mb-4">
+
+                    <h2 class="h5 border-bottom pb-2">
+                        Destinazione
+                    </h2>
+
+                    <div class="row g-3">
+
+                        <div class="col-md-6">
+                            <label
+                                class="form-label"
+                                for="{{ form.ufficio.id_for_label }}"
+                            >
+                                {{ form.ufficio.label }}
+                                <span class="text-danger">*</span>
+                            </label>
+
+                            {{ form.ufficio }}
+
+                            {% for error in form.ufficio.errors %}
+                                <div class="text-danger small mt-1">
+                                    {{ error }}
+                                </div>
+                            {% endfor %}
+
+                            <div class="form-text">
+                                Sono mostrati gli uffici che ricevono
+                                pubblico nella giornata corrente.
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label
+                                class="form-label"
+                                for="{{ form.motivo.id_for_label }}"
+                            >
+                                {{ form.motivo.label }}
+                                <span class="text-danger">*</span>
+                            </label>
+
+                            {{ form.motivo }}
+
+                            <datalist id="motivi-visita">
+                                {% for motivo in motivi_visita %}
+                                    <option value="{{ motivo }}"></option>
+                                {% endfor %}
+                            </datalist>
+
+                            {% for error in form.motivo.errors %}
+                                <div class="text-danger small mt-1">
+                                    {{ error }}
+                                </div>
+                            {% endfor %}
+
+                            <div class="form-text">
+                                Iniziare a digitare per riutilizzare
+                                una motivazione già inserita.
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <label
+                                class="form-label"
+                                for="{{ form.note.id_for_label }}"
+                            >
+                                {{ form.note.label }}
+                            </label>
+
+                            {{ form.note }}
+                        </div>
+
+                    </div>
+
+                </section>
+
+                <div
+                    class="d-flex flex-column flex-md-row
+                           justify-content-end gap-2"
+                >
+
+                    <a
+                        href="{% url 'dashboard:home' %}"
+                        class="btn btn-outline-secondary"
+                    >
+                        Annulla
+                    </a>
+
+                    <button
+                        type="submit"
+                        class="btn btn-primary px-4"
+                    >
+                        Registra visitatore
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const documentoPresentato = document.getElementById(
+        "id_documento_presentato"
+    );
+
+    const documentFields = document.getElementById(
+        "document-fields"
+    );
+
+    const tipoInput = document.getElementById(
+        "id_documento_tipo"
+    );
+
+    const numeroInput = document.getElementById(
+        "id_documento_numero"
+    );
+
+    const scadenzaInput = document.getElementById(
+        "id_documento_scadenza"
+    );
+
+    const codiceFiscaleInput = document.getElementById(
+        "id_codice_fiscale"
+    );
+
+    const nomeInput = document.getElementById(
+        "id_nome"
+    );
+
+    const cognomeInput = document.getElementById(
+        "id_cognome"
+    );
+
+    const telefonoInput = document.getElementById(
+        "id_telefono"
+    );
+
+    const statusBox = document.getElementById(
+        "visitor-search-status"
+    );
+
+    let ricercaTimeout = null;
+
+    function mostraMessaggio(tipo, testo) {
+        statusBox.className = `alert alert-${tipo}`;
+        statusBox.textContent = testo;
+    }
+
+    function nascondiMessaggio() {
+        statusBox.className = "alert d-none";
+        statusBox.textContent = "";
+    }
+
+    function aggiornaDocumento() {
+        const visibile = documentoPresentato.checked;
+
+        documentFields.classList.toggle(
+            "d-none",
+            !visibile
+        );
+
+        tipoInput.disabled = !visibile;
+        numeroInput.disabled = !visibile;
+        scadenzaInput.disabled = !visibile;
+
+        if (!visibile) {
+            tipoInput.value = "";
+            numeroInput.value = "";
+            scadenzaInput.value = "";
+        }
+    }
+
+    async function cercaVisitatore() {
+        const codiceFiscale = codiceFiscaleInput.value
+            .trim()
+            .toUpperCase();
+
+        const numeroDocumento = numeroInput.value
+            .trim()
+            .toUpperCase();
+
+        codiceFiscaleInput.value = codiceFiscale;
+        numeroInput.value = numeroDocumento;
+
+        if (
+            codiceFiscale.length < 6 &&
+            numeroDocumento.length < 3
+        ) {
+            nascondiMessaggio();
+            return;
+        }
+
+        const url = new URL(
+            "{% url 'portineria:cerca_visitatore' %}",
+            window.location.origin
+        );
+
+        if (codiceFiscale) {
+            url.searchParams.set(
+                "codice_fiscale",
+                codiceFiscale
+            );
+        }
+
+        if (numeroDocumento) {
+            url.searchParams.set(
+                "documento_numero",
+                numeroDocumento
+            );
+        }
+
+        mostraMessaggio(
+            "info",
+            "Ricerca del visitatore in corso…"
+        );
+
+        try {
+            const response = await fetch(
+                url.toString(),
+                {
+                    headers: {
+                        "X-Requested-With": "XMLHttpRequest"
+                    }
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error(
+                    "Errore durante la ricerca"
+                );
+            }
+
+            const data = await response.json();
+
+            if (!data.found) {
+                mostraMessaggio(
+                    "secondary",
+                    "Nuovo visitatore: compilare i dati."
+                );
+                return;
+            }
+
+            const visitatore = data.visitatore;
+
+            nomeInput.value = visitatore.nome || "";
+            cognomeInput.value = visitatore.cognome || "";
+            codiceFiscaleInput.value = (
+                visitatore.codice_fiscale || ""
+            );
+            tipoInput.value = (
+                visitatore.documento_tipo || ""
+            );
+            numeroInput.value = (
+                visitatore.documento_numero || ""
+            );
+            scadenzaInput.value = (
+                visitatore.documento_scadenza || ""
+            );
+            telefonoInput.value = (
+                visitatore.telefono || ""
+            );
+
+            mostraMessaggio(
+                "success",
+                (
+                    `Visitatore già registrato: ` +
+                    `${visitatore.nome} ` +
+                    `${visitatore.cognome}. ` +
+                    `Verificare i dati e il telefono.`
+                )
+            );
+
+            telefonoInput.focus();
+            telefonoInput.select();
+
+        } catch (error) {
+            console.error(error);
+
+            mostraMessaggio(
+                "danger",
+                "Impossibile eseguire la ricerca."
+            );
+        }
+    }
+
+    function pianificaRicerca() {
+        window.clearTimeout(
+            ricercaTimeout
+        );
+
+        ricercaTimeout = window.setTimeout(
+            cercaVisitatore,
+            450
+        );
+    }
+
+    documentoPresentato.addEventListener(
+        "change",
+        aggiornaDocumento
+    );
+
+    numeroInput.addEventListener(
+        "input",
+        pianificaRicerca
+    );
+
+    codiceFiscaleInput.addEventListener(
+        "input",
+        pianificaRicerca
+    );
+
+    aggiornaDocumento();
+});
+</script>
+
+{% endblock %}

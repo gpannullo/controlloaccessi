@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}
+Registra uscita
+{% endblock %}
+
+{% block content %}
+
+<div class="container py-5">
+
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+
+            <div class="card shadow-sm">
+
+                <div class="card-header">
+                    <h1 class="h4 mb-0">
+                        Registrazione dell’uscita
+                    </h1>
+                </div>
+
+                <div class="card-body p-4">
+
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {% for error in form.non_field_errors %}
+                                <div>{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <dl class="row mb-4">
+
+                        <dt class="col-sm-4">
+                            Numero di coda
+                        </dt>
+
+                        <dd class="col-sm-8">
+                            {{ accesso.numero_coda_formattato }}
+                        </dd>
+
+                        <dt class="col-sm-4">
+                            Badge
+                        </dt>
+
+                        <dd class="col-sm-8">
+                            {% if accesso.badge %}
+                                {{ accesso.badge.codice }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </dd>
+
+                        <dt class="col-sm-4">
+                            Ufficio
+                        </dt>
+
+                        <dd class="col-sm-8">
+                            {{ accesso.ufficio_destinazione.nome }}
+                        </dd>
+
+                        <dt class="col-sm-4">
+                            Ingresso
+                        </dt>
+
+                        <dd class="col-sm-8">
+                            {{ accesso.ingresso|date:"d/m/Y H:i" }}
+                        </dd>
+
+                    </dl>
+
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+
+                            <label
+                                for="{{ form.uscita.id_for_label }}"
+                                class="form-label"
+                            >
+                                {{ form.uscita.label }}
+                                <span class="text-danger">*</span>
+                            </label>
+
+                            {{ form.uscita }}
+
+                            {% for error in form.uscita.errors %}
+                                <div class="text-danger small mt-1">
+                                    {{ error }}
+                                </div>
+                            {% endfor %}
+
+                            <div class="form-text">
+                                Indicare l’orario effettivo in cui
+                                il visitatore ha lasciato la sede.
+                            </div>
+
+                        </div>
+
+                        <div class="mb-4">
+
+                            <label
+                                for="{{ form.note_chiusura.id_for_label }}"
+                                class="form-label"
+                            >
+                                {{ form.note_chiusura.label }}
+                            </label>
+
+                            {{ form.note_chiusura }}
+
+                        </div>
+
+                        <div
+                            class="d-flex flex-column flex-md-row
+                                   justify-content-end gap-2"
+                        >
+
+                            <a
+                                href="{% url 'dashboard:home' %}"
+                                class="btn btn-outline-secondary"
+                            >
+                                Annulla
+                            </a>
+
+                            <button
+                                type="submit"
+                                class="btn btn-danger px-4"
+                            >
+                                Conferma uscita
+                            </button>
+
+                        </div>
+
+                    </form>
+
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

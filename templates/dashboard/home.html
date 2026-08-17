@@ -1,0 +1,1322 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Portineria - Controllo Accessi
+{% endblock %}
+
+{% block content %}
+
+    <div class="container-fluid py-4">
+
+        {% if messages %}
+            {% for message in messages %}
+                <div
+                        class="alert alert-{{ message.tags|default:'info' }}
+                       alert-dismissible fade show"
+                        role="alert"
+                >
+                    {{ message }}
+
+                    <button
+                            type="button"
+                            class="btn-close"
+                            data-bs-dismiss="alert"
+                            aria-label="Chiudi"
+                    ></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- ================================================= -->
+        <!-- INTESTAZIONE                                      -->
+        <!-- ================================================= -->
+
+        <div
+                class="d-flex flex-column flex-md-row
+               justify-content-between
+               align-items-md-center
+               gap-3 mb-4"
+        >
+            <div>
+                <h1 class="h3 mb-1">
+                    Portineria
+                </h1>
+
+                <p class="text-muted mb-0">
+                    Benvenuto,
+                    {% firstof request.user.get_full_name request.user.username %}
+                </p>
+            </div>
+
+            <a
+                    href="{% url 'home' %}"
+                    class="btn btn-outline-primary"
+            >
+                Cambia area
+            </a>
+        </div>
+
+        <!-- ================================================= -->
+        <!-- RIQUADRI PRINCIPALI                               -->
+        <!-- ================================================= -->
+
+        <div class="row g-3 mb-4">
+
+            <!-- VISITATORI PRESENTI -->
+
+            <div class="col-sm-6 col-xl-4">
+
+                <button
+                        type="button"
+                        class="card h-100 shadow-sm
+                       border-0 text-start w-100"
+                        data-bs-toggle="modal"
+                        data-bs-target="#visitatoriPresentiModal"
+                >
+                    <div class="card-body w-100">
+
+                        <div class="text-muted">
+                            Visitatori presenti
+                        </div>
+
+                        <div
+                                class="display-6 fw-semibold"
+                                id="numero-visitatori-presenti"
+                        >
+                            {{ numero_visitatori_presenti }}
+                        </div>
+
+                        <div class="small text-primary mt-2">
+                            Visualizza i presenti
+                        </div>
+
+                    </div>
+                </button>
+
+            </div>
+
+            <!-- UFFICI ATTIVI -->
+
+            <div class="col-sm-6 col-xl-4">
+
+                <button
+                        type="button"
+                        class="card h-100 shadow-sm
+                       border-0 text-start w-100"
+                        data-bs-toggle="modal"
+                        data-bs-target="#ufficiAttiviModal"
+                >
+                    <div class="card-body w-100">
+
+                        <div class="text-muted">
+                            Uffici attivi
+                        </div>
+
+                        <div class="display-6 fw-semibold">
+                            {{ numero_uffici_attivi }}
+                        </div>
+
+                        <div class="small text-primary mt-2">
+                            Calendario settimanale
+                        </div>
+
+                    </div>
+                </button>
+
+            </div>
+
+            <!-- UFFICI CHE RICEVONO OGGI -->
+
+            <div class="col-sm-6 col-xl-4">
+
+                <button
+                        type="button"
+                        class="card h-100 shadow-sm
+                       border-0 text-start w-100"
+                        data-bs-toggle="modal"
+                        data-bs-target="#ufficiOggiModal"
+                >
+                    <div class="card-body w-100">
+
+                        <div class="text-muted">
+                            Uffici che ricevono oggi
+                        </div>
+
+                        <div
+                                class="display-6 fw-semibold"
+                                id="numero-uffici-ricevono"
+                        >
+                            {{ numero_uffici_che_ricevono }}
+                        </div>
+
+                        <div class="small text-primary mt-2">
+                            Orari, code e dipendenti
+                        </div>
+
+                    </div>
+                </button>
+
+            </div>
+
+        </div>
+
+        <!-- ================================================= -->
+        <!-- PULSANTI OPERATIVI                                -->
+        <!-- ================================================= -->
+
+        <div class="row g-3 mb-4">
+
+            <div class="col-md-4">
+
+                <a
+                        href="{% url 'portineria:nuovo_ricevimento' %}"
+                        class="btn btn-primary btn-lg w-100 py-4"
+                >
+                    Nuovo ricevimento
+                </a>
+
+            </div>
+
+            <div class="col-md-4">
+
+                <a
+                        href="{% url 'portineria:nuova_visita' %}"
+                        class="btn btn-success btn-lg w-100 py-4"
+                >
+                    Nuova visita
+                </a>
+
+            </div>
+
+            <div class="col-md-4">
+
+                <a
+                        href="#"
+                        class="btn btn-outline-primary btn-lg w-100 py-4"
+                >
+                    Ricerca visitatore
+                </a>
+
+            </div>
+
+        </div>
+
+        <!-- ================================================= -->
+        <!-- ACCESSI DEI GIORNI PRECEDENTI                     -->
+        <!-- ================================================= -->
+
+        {% if accessi_giorni_precedenti %}
+
+            <div class="card border-warning shadow-sm mb-4">
+
+                <div
+                        class="card-header bg-warning-subtle
+                       d-flex justify-content-between
+                       align-items-center"
+                >
+                    <strong>
+                        Accessi dei giorni precedenti da regolarizzare
+                    </strong>
+
+                    <span class="badge bg-warning text-dark">
+                    {{ numero_accessi_giorni_precedenti }}
+                </span>
+                </div>
+
+                <div class="card-body">
+
+                    <div class="alert alert-warning">
+                        Questi accessi risultano ancora aperti ma
+                        appartengono a giornate precedenti.
+                        Verificare l’uscita e procedere alla chiusura.
+                    </div>
+
+                    <div class="table-responsive">
+
+                        <table
+                                class="table table-hover
+                               align-middle mb-0"
+                        >
+                            <thead>
+                            <tr>
+                                <th>Data ingresso</th>
+                                <th>Coda</th>
+                                <th>Badge</th>
+                                <th>Ufficio</th>
+                                <th>Stato</th>
+                                <th>Azioni</th>
+                            </tr>
+                            </thead>
+
+                            <tbody>
+
+                            {% for accesso in accessi_giorni_precedenti %}
+
+                                <tr>
+
+                                    <td>
+                                        {{ accesso.ingresso|date:"d/m/Y H:i" }}
+                                    </td>
+
+                                    <td>
+                                        <strong>
+                                            {{ accesso.numero_coda_formattato }}
+                                        </strong>
+                                    </td>
+
+                                    <td>
+                                        {% if accesso.badge %}
+                                            {{ accesso.badge.codice }}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+
+                                    <td>
+                                        {{ accesso.ufficio_destinazione.nome }}
+                                    </td>
+
+                                    <td>
+                                        <span
+                                                class="badge bg-warning text-dark"
+                                        >
+                                            Da chiudere
+                                        </span>
+                                    </td>
+
+                                    <td>
+                                        <a
+                                                href="{% url 'portineria:chiudi_accesso' accesso.pk %}"
+                                                class="btn btn-sm btn-danger"
+                                        >
+                                            Regolarizza uscita
+                                        </a>
+                                    </td>
+
+                                </tr>
+
+                            {% endfor %}
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        {% endif %}
+
+        <!-- ================================================= -->
+        <!-- ULTIME REGISTRAZIONI DI OGGI                      -->
+        <!-- Nessun nominativo nella dashboard principale      -->
+        <!-- ================================================= -->
+
+        <div class="card shadow-sm">
+
+            <div class="card-header">
+                <strong>
+                    Ultime registrazioni di oggi
+                </strong>
+            </div>
+
+            <div class="table-responsive">
+
+                <table
+                        class="table table-sm
+                       align-middle mb-0"
+                >
+                    <thead>
+                    <tr>
+                        <th>Coda</th>
+                        <th>Badge</th>
+                        <th>Ufficio</th>
+                        <th>Ingresso</th>
+                        <th>Stato</th>
+                    </tr>
+                    </thead>
+
+                    <tbody>
+
+                    {% for accesso in ultime_registrazioni %}
+
+                        <tr>
+
+                            <td>
+                                <strong>
+                                    {{ accesso.numero_coda_formattato }}
+                                </strong>
+                            </td>
+
+                            <td>
+                                {% if accesso.badge %}
+                                    {{ accesso.badge.codice }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {{ accesso.ufficio_destinazione.nome }}
+                            </td>
+
+                            <td>
+                                {{ accesso.ingresso|date:"H:i" }}
+                            </td>
+
+                            <td>
+                                {{ accesso.get_stato_display }}
+                            </td>
+
+                        </tr>
+
+                    {% empty %}
+
+                        <tr>
+                            <td
+                                    colspan="5"
+                                    class="text-center
+                                       text-muted py-4"
+                            >
+                                Nessuna registrazione effettuata oggi.
+                            </td>
+                        </tr>
+
+                    {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ===================================================== -->
+    <!-- MODALE VISITATORI PRESENTI                            -->
+    <!-- ===================================================== -->
+
+    <div
+            class="modal fade"
+            id="visitatoriPresentiModal"
+            tabindex="-1"
+            aria-labelledby="visitatoriPresentiModalLabel"
+            aria-hidden="true"
+    >
+        <div
+                class="modal-dialog modal-xl
+               modal-dialog-scrollable"
+        >
+            <div class="modal-content">
+
+                <div class="modal-header">
+
+                    <div>
+                        <h2
+                                class="modal-title fs-5"
+                                id="visitatoriPresentiModalLabel"
+                        >
+                            Visitatori presenti oggi nella sede
+                        </h2>
+
+                        <div class="small text-muted">
+                            Totale presenti:
+                            {{ numero_visitatori_presenti }}
+                        </div>
+                    </div>
+
+                    <button
+                            type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Chiudi"
+                    ></button>
+
+                </div>
+
+                <div class="modal-body">
+
+                    {% if visitatori_per_ufficio %}
+
+                        <div
+                                class="accordion"
+                                id="visitatoriUfficiAccordion"
+                        >
+
+                            {% for gruppo in visitatori_per_ufficio %}
+
+                                <div class="accordion-item">
+
+                                    <h3
+                                            class="accordion-header"
+                                            id="headingUfficio{{ gruppo.ufficio.pk }}"
+                                    >
+                                        <button
+                                                class="accordion-button
+                                               {% if not forloop.first %}
+                                                   collapsed
+                                               {% endif %}"
+                                                type="button"
+                                                data-bs-toggle="collapse"
+                                                data-bs-target="#collapseUfficio{{ gruppo.ufficio.pk }}"
+                                                aria-controls="collapseUfficio{{ gruppo.ufficio.pk }}"
+                                                aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}"
+                                        >
+                                        <span class="fw-semibold">
+                                            {{ gruppo.ufficio.nome }}
+                                        </span>
+
+                                            <span class="badge bg-primary ms-3">
+                                            {{ gruppo.accessi|length }}
+                                        </span>
+                                        </button>
+                                    </h3>
+
+                                    <div
+                                            id="collapseUfficio{{ gruppo.ufficio.pk }}"
+                                            class="accordion-collapse collapse
+                                           {% if forloop.first %}
+                                               show
+                                           {% endif %}"
+                                            aria-labelledby="headingUfficio{{ gruppo.ufficio.pk }}"
+                                            data-bs-parent="#visitatoriUfficiAccordion"
+                                    >
+                                        <div class="accordion-body p-0">
+
+                                            <div class="table-responsive">
+
+                                                <table
+                                                        class="table table-hover
+                                                       align-middle mb-0"
+                                                >
+                                                    <thead>
+                                                    <tr>
+                                                        <th>Coda</th>
+                                                        <th>Visitatore</th>
+                                                        <th>Badge</th>
+                                                        <th>Ingresso</th>
+                                                        <th>Motivo</th>
+                                                        <th>Stato</th>
+                                                        <th>Azioni</th>
+                                                    </tr>
+                                                    </thead>
+
+                                                    <tbody>
+
+                                                    {% for accesso in gruppo.accessi %}
+
+                                                        <tr>
+
+                                                            <td>
+                                                                <strong>
+                                                                    {{ accesso.numero_coda_formattato }}
+                                                                </strong>
+                                                            </td>
+
+                                                            <td>
+                                                                {{ accesso.visitatore }}
+                                                            </td>
+
+                                                            <td>
+                                                                {% if accesso.badge %}
+                                                                    {{ accesso.badge.codice }}
+                                                                {% else %}
+                                                                    —
+                                                                {% endif %}
+                                                            </td>
+
+                                                            <td>
+                                                                {{ accesso.ingresso|date:"H:i" }}
+                                                            </td>
+
+                                                            <td>
+                                                                {{ accesso.motivo|default:"—" }}
+                                                            </td>
+
+                                                            <td>
+                                                                {% if accesso.visita_conclusa_il %}
+                                                                    <span class="badge bg-success">
+                                                                        Visita conclusa
+                                                                    </span>
+
+                                                                {% elif accesso.ingresso_ufficio_il %}
+                                                                    <span class="badge bg-primary">
+                                                                        Dentro l’ufficio
+                                                                    </span>
+
+                                                                {% elif accesso.spostato_fuori_ufficio_il %}
+                                                                    <span class="badge bg-info text-dark">
+                                                                        Fuori dall’ufficio
+                                                                    </span>
+
+                                                                {% else %}
+                                                                    <span class="badge bg-warning text-dark">
+                                                                        In hall
+                                                                    </span>
+                                                                {% endif %}
+                                                            </td>
+
+                                                            <td>
+                                                                <div
+                                                                        class="d-flex
+                                                                           flex-wrap gap-2"
+                                                                >
+
+                                                                    <a
+                                                                            href="{% url 'portineria:chiudi_accesso' accesso.pk %}"
+                                                                            class="btn btn-sm btn-danger"
+                                                                    >
+                                                                        Registra uscita
+                                                                    </a>
+
+                                                                    <form
+                                                                            method="post"
+                                                                            action="{% url 'portineria:ristampa_ticket' accesso.pk %}"
+                                                                    >
+                                                                        {% csrf_token %}
+
+                                                                        <button
+                                                                                type="submit"
+                                                                                class="btn btn-sm btn-outline-primary"
+                                                                        >
+                                                                            Ristampa
+                                                                        </button>
+                                                                    </form>
+
+                                                                </div>
+                                                            </td>
+
+                                                        </tr>
+
+                                                    {% endfor %}
+
+                                                    </tbody>
+
+                                                </table>
+
+                                            </div>
+
+                                        </div>
+                                    </div>
+
+                                </div>
+
+                            {% endfor %}
+
+                        </div>
+
+                    {% else %}
+
+                        <div class="alert alert-success mb-0">
+                            Non risultano visitatori presenti oggi nella sede.
+                        </div>
+
+                    {% endif %}
+
+                </div>
+
+                <div class="modal-footer">
+
+                    <button
+                            type="button"
+                            class="btn btn-secondary"
+                            data-bs-dismiss="modal"
+                    >
+                        Chiudi
+                    </button>
+
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ===================================================== -->
+    <!-- MODALE UFFICI CHE RICEVONO OGGI                       -->
+    <!-- ===================================================== -->
+
+    <div
+            class="modal fade"
+            id="ufficiOggiModal"
+            tabindex="-1"
+            aria-labelledby="ufficiOggiModalLabel"
+            aria-hidden="true"
+    >
+        <div
+                class="modal-dialog modal-xl
+               modal-dialog-scrollable"
+        >
+            <div class="modal-content">
+
+                <div class="modal-header">
+
+                    <div>
+                        <h2
+                                class="modal-title fs-5"
+                                id="ufficiOggiModalLabel"
+                        >
+                            Uffici che ricevono oggi
+                        </h2>
+
+                        <div class="small text-muted">
+                            {{ oggi|date:"d/m/Y" }}
+                        </div>
+                    </div>
+
+                    <button
+                            type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Chiudi"
+                    ></button>
+
+                </div>
+
+                <div class="modal-body">
+
+                    {% if uffici_oggi %}
+
+                        <div class="row g-3">
+
+                            {% for ufficio in uffici_oggi %}
+
+                                <div class="col-lg-6 col-xxl-4">
+
+                                    <div class="card h-100">
+
+                                        <div
+                                                class="card-header
+                                               d-flex
+                                               justify-content-between
+                                               align-items-center
+                                               gap-2"
+                                        >
+                                            <strong>
+                                                {{ ufficio.nome }}
+                                            </strong>
+
+                                            {% if ufficio.aperto_adesso %}
+
+                                                <span class="badge bg-success">
+                                                Aperto adesso
+                                            </span>
+
+                                            {% else %}
+
+                                                <span
+                                                        class="badge bg-warning text-dark"
+                                                >
+                                                Non aperto adesso
+                                            </span>
+
+                                            {% endif %}
+                                        </div>
+
+                                        <div class="card-body">
+
+                                            <!-- ORARI -->
+
+                                            <div class="mb-3">
+
+                                                <div class="small text-muted">
+                                                    Orari di oggi
+                                                </div>
+
+                                                {% for apertura in ufficio.aperture_di_oggi %}
+
+                                                    <div class="fw-semibold">
+
+                                                        {{ apertura.ora_inizio|time:"H:i" }}
+                                                        –
+                                                        {{ apertura.ora_fine|time:"H:i" }}
+
+                                                        {% if apertura.su_appuntamento %}
+
+                                                            <span
+                                                                    class="badge bg-info text-dark"
+                                                            >
+                                                            Su appuntamento
+                                                        </span>
+
+                                                        {% endif %}
+
+                                                    </div>
+
+                                                {% empty %}
+
+                                                    <div class="text-muted">
+                                                        Nessun orario configurato.
+                                                    </div>
+
+                                                {% endfor %}
+
+                                            </div>
+
+                                            <!-- CONTATORI -->
+
+                                            <div class="row text-center g-2 mb-3">
+
+                                                <div class="col-6">
+
+                                                    <div class="border rounded p-2">
+
+                                                        <div
+                                                                class="fs-3 fw-bold"
+                                                                data-office="{{ ufficio.pk }}"
+                                                                data-counter="visitatori-da-servire"
+                                                        >
+                                                            {{ ufficio.visitatori_in_coda }}
+                                                        </div>
+
+                                                        <div class="small text-muted">
+                                                            Visitatori da servire
+                                                        </div>
+
+                                                    </div>
+
+                                                </div>
+
+                                                <div class="col-6">
+
+                                                    <div class="border rounded p-2">
+
+                                                        <div
+                                                                class="fs-3 fw-bold"
+                                                                data-office="{{ ufficio.pk }}"
+                                                                data-counter="registrati-oggi"
+                                                        >
+                                                            {{ ufficio.accessi_registrati_oggi }}
+                                                        </div>
+
+                                                        <div class="small text-muted">
+                                                            Registrati oggi
+                                                        </div>
+
+                                                    </div>
+
+                                                </div>
+
+                                                <div class="col-6">
+
+                                                    <div class="border rounded p-2">
+
+                                                        <div class="fs-3 fw-bold">
+                                                            {{ ufficio.numero_dipendenti_assegnati }}
+                                                        </div>
+
+                                                        <div class="small text-muted">
+                                                            Dipendenti assegnati
+                                                        </div>
+
+                                                    </div>
+
+                                                </div>
+
+                                                <div class="col-6">
+
+                                                    <div class="border rounded p-2">
+
+                                                        <div
+                                                                class="fs-3 fw-bold text-success"
+                                                                data-office="{{ ufficio.pk }}"
+                                                                data-counter="operatori-disponibili"
+                                                        >
+                                                            {{ ufficio.numero_operatori_disponibili }}
+                                                        </div>
+
+                                                        <div class="small text-muted">
+                                                            Disponibili ora
+                                                        </div>
+
+                                                    </div>
+
+                                                </div>
+
+                                            </div>
+
+                                            <!-- ELENCO DIPENDENTI -->
+
+                                            <div class="border-top pt-3">
+
+                                                {% if request.user.is_staff %}
+
+                                                    <!-- ELENCO DIPENDENTI VISIBILE SOLO AGLI ADMIN -->
+
+                                                    <div class="border-top pt-3">
+
+                                                        <div class="small text-muted mb-2">
+                                                            Dipendenti assegnati
+                                                        </div>
+
+                                                        {% if ufficio.dipendenti_assegnati %}
+
+                                                            <ul class="list-group list-group-flush">
+
+                                                                {% for dipendente in ufficio.dipendenti_assegnati %}
+
+                                                                    <li
+                                                                            class="list-group-item
+                               px-0 py-2
+                               d-flex
+                               justify-content-between
+                               align-items-center
+                               gap-2"
+                                                                    >
+                        <span>
+                            {% firstof dipendente.get_full_name dipendente.username %}
+                        </span>
+
+                                                                        {% if dipendente in ufficio.operatori_disponibili %}
+
+                                                                            <span class="badge bg-success">
+                                Disponibile al ricevimento
+                            </span>
+
+                                                                        {% elif dipendente.stato_presenza == "ASS" %}
+
+                                                                            <span class="badge bg-danger">
+                                Assente
+                            </span>
+
+                                                                        {% elif dipendente.tipo_attivita == "AMM" %}
+
+                                                                            <span class="badge bg-secondary">
+                                Presente, non in ricevimento
+                            </span>
+
+                                                                        {% elif dipendente.stato_presenza == "PRE" %}
+
+                                                                            <span class="badge bg-warning text-dark">
+                                Sportellista non disponibile
+                            </span>
+
+                                                                        {% else %}
+
+                                                                            <span class="badge bg-secondary">
+                                Presenza non verificata
+                            </span>
+
+                                                                        {% endif %}
+
+                                                                    </li>
+
+                                                                {% endfor %}
+
+                                                            </ul>
+
+                                                        {% else %}
+
+                                                            <div class="text-muted">
+                                                                Nessun dipendente associato all’ufficio.
+                                                            </div>
+
+                                                        {% endif %}
+
+                                                    </div>
+
+                                                {% endif %}
+
+                                            </div>
+
+                                        </div>
+
+                                        {% if ufficio.piano or ufficio.stanza %}
+
+                                            <div class="card-footer small text-muted">
+
+                                                {% if ufficio.piano %}
+                                                    Piano:
+                                                    {{ ufficio.piano }}
+                                                {% endif %}
+
+                                                {% if ufficio.stanza %}
+                                                    · Stanza:
+                                                    {{ ufficio.stanza }}
+                                                {% endif %}
+
+                                            </div>
+
+                                        {% endif %}
+
+                                    </div>
+
+                                </div>
+
+                            {% endfor %}
+
+                        </div>
+
+                    {% else %}
+
+                        <div class="alert alert-warning mb-0">
+                            Nessun ufficio risulta configurato per
+                            ricevere pubblico nella giornata odierna.
+                        </div>
+
+                    {% endif %}
+
+                </div>
+
+                <div class="modal-footer">
+
+                    <button
+                            type="button"
+                            class="btn btn-secondary"
+                            data-bs-dismiss="modal"
+                    >
+                        Chiudi
+                    </button>
+
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ===================================================== -->
+    <!-- MODALE CALENDARIO SETTIMANALE UFFICI                  -->
+    <!-- ===================================================== -->
+
+    <div
+            class="modal fade"
+            id="ufficiAttiviModal"
+            tabindex="-1"
+            aria-labelledby="ufficiAttiviModalLabel"
+            aria-hidden="true"
+    >
+        <div
+                class="modal-dialog modal-xl
+               modal-dialog-scrollable"
+        >
+            <div class="modal-content">
+
+                <div class="modal-header">
+
+                    <h2
+                            class="modal-title fs-5"
+                            id="ufficiAttiviModalLabel"
+                    >
+                        Calendario settimanale degli uffici
+                    </h2>
+
+                    <button
+                            type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Chiudi"
+                    ></button>
+
+                </div>
+
+                <div class="modal-body">
+
+                    <ul
+                            class="nav nav-tabs"
+                            id="calendarioUfficiTabs"
+                            role="tablist"
+                    >
+
+                        {% for giorno in calendario_settimanale %}
+
+                            <li
+                                    class="nav-item"
+                                    role="presentation"
+                            >
+                                <button
+                                        class="nav-link
+                                       {% if giorno.numero == giorno_corrente %}
+                                           active
+                                       {% endif %}"
+                                        id="{{ giorno.slug }}-tab"
+                                        data-bs-toggle="tab"
+                                        data-bs-target="#{{ giorno.slug }}-pane"
+                                        type="button"
+                                        role="tab"
+                                        aria-controls="{{ giorno.slug }}-pane"
+                                        aria-selected="{% if giorno.numero == giorno_corrente %}true{% else %}false{% endif %}"
+                                >
+                                    {{ giorno.nome }}
+                                </button>
+                            </li>
+
+                        {% endfor %}
+
+                    </ul>
+
+                    <div
+                            class="tab-content
+                           border border-top-0
+                           rounded-bottom p-3"
+                            id="calendarioUfficiContent"
+                    >
+
+                        {% for giorno in calendario_settimanale %}
+
+                            <div
+                                    class="tab-pane fade
+                                   {% if giorno.numero == giorno_corrente %}
+                                       show active
+                                   {% endif %}"
+                                    id="{{ giorno.slug }}-pane"
+                                    role="tabpanel"
+                                    aria-labelledby="{{ giorno.slug }}-tab"
+                                    tabindex="0"
+                            >
+
+                                {% if giorno.uffici %}
+
+                                    <div class="table-responsive">
+
+                                        <table
+                                                class="table table-hover
+                                               align-middle mb-0"
+                                        >
+                                            <thead>
+                                            <tr>
+                                                <th>Ufficio</th>
+                                                <th>Orari</th>
+                                                <th>Ubicazione</th>
+                                                <th>Responsabile</th>
+                                            </tr>
+                                            </thead>
+
+                                            <tbody>
+
+                                            {% for ufficio in giorno.uffici %}
+
+                                                <tr>
+
+                                                    <td>
+                                                        <strong>
+                                                            {{ ufficio.nome }}
+                                                        </strong>
+                                                    </td>
+
+                                                    <td>
+
+                                                        {% for apertura in ufficio.aperture_del_giorno %}
+
+                                                            <div>
+
+                                                                {{ apertura.ora_inizio|time:"H:i" }}
+                                                                –
+                                                                {{ apertura.ora_fine|time:"H:i" }}
+
+                                                                {% if apertura.su_appuntamento %}
+
+                                                                    <span
+                                                                            class="badge bg-info text-dark"
+                                                                    >
+                                                                        Su appuntamento
+                                                                    </span>
+
+                                                                {% endif %}
+
+                                                            </div>
+
+                                                        {% empty %}
+
+                                                            —
+
+                                                        {% endfor %}
+
+                                                    </td>
+
+                                                    <td>
+
+                                                        {% if ufficio.piano %}
+                                                            Piano
+                                                            {{ ufficio.piano }}
+                                                        {% endif %}
+
+                                                        {% if ufficio.stanza %}
+                                                            · Stanza
+                                                            {{ ufficio.stanza }}
+                                                        {% endif %}
+
+                                                        {% if not ufficio.piano and not ufficio.stanza %}
+                                                            —
+                                                        {% endif %}
+
+                                                    </td>
+
+                                                    <td>
+
+                                                        {% if ufficio.responsabile %}
+
+                                                            {% firstof ufficio.responsabile.get_full_name ufficio.responsabile.username %}
+
+                                                        {% else %}
+
+                                                            —
+
+                                                        {% endif %}
+
+                                                    </td>
+
+                                                </tr>
+
+                                            {% endfor %}
+
+                                            </tbody>
+
+                                        </table>
+
+                                    </div>
+
+                                {% else %}
+
+                                    <div class="alert alert-secondary mb-0">
+                                        Nessun ufficio riceve pubblico
+                                        in questa giornata.
+                                    </div>
+
+                                {% endif %}
+
+                            </div>
+
+                        {% endfor %}
+
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+
+                    <button
+                            type="button"
+                            class="btn btn-secondary"
+                            data-bs-dismiss="modal"
+                    >
+                        Chiudi
+                    </button>
+
+                </div>
+
+            </div>
+        </div>
+    </div>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const refreshUrl = "{% url 'dashboard:stato_live' %}";
+    const refreshInterval = 15000;
+
+    let refreshInProgress = false;
+
+    function updateText(selector, value) {
+        const element = document.querySelector(selector);
+
+        if (element) {
+            element.textContent = value;
+        }
+    }
+
+    function updateOfficeCounter(
+        officeId,
+        counterName,
+        value
+    ) {
+        const selector =
+            `[data-office="${officeId}"]` +
+            `[data-counter="${counterName}"]`;
+
+        updateText(selector, value);
+    }
+
+    async function refreshDashboard() {
+        if (
+            refreshInProgress ||
+            document.hidden
+        ) {
+            return;
+        }
+
+        refreshInProgress = true;
+
+        try {
+            const response = await fetch(
+                refreshUrl,
+                {
+                    method: "GET",
+                    headers: {
+                        "X-Requested-With": "XMLHttpRequest"
+                    },
+                    cache: "no-store"
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error(
+                    `Errore HTTP ${response.status}`
+                );
+            }
+
+            const data = await response.json();
+
+            if (!data.success) {
+                return;
+            }
+
+            updateText(
+                "#numero-visitatori-presenti",
+                data.numero_visitatori_presenti
+            );
+
+            updateText(
+                "#numero-uffici-ricevono",
+                data.numero_uffici_che_ricevono
+            );
+
+            data.uffici.forEach(function (ufficio) {
+                updateOfficeCounter(
+                    ufficio.id,
+                    "visitatori-da-servire",
+                    ufficio.visitatori_da_servire
+                );
+
+                updateOfficeCounter(
+                    ufficio.id,
+                    "registrati-oggi",
+                    ufficio.registrati_oggi
+                );
+
+                updateOfficeCounter(
+                    ufficio.id,
+                    "operatori-disponibili",
+                    ufficio.operatori_disponibili
+                );
+            });
+
+        } catch (error) {
+            console.error(
+                "Aggiornamento dashboard non riuscito:",
+                error
+            );
+        } finally {
+            refreshInProgress = false;
+        }
+    }
+
+    window.setInterval(
+        refreshDashboard,
+        refreshInterval
+    );
+
+    document.addEventListener(
+        "visibilitychange",
+        function () {
+            if (!document.hidden) {
+                refreshDashboard();
+            }
+        }
+    );
+});
+</script>
+{% endblock %}

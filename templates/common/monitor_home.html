@@ -1,0 +1,931 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Monitor Hall
+{% endblock %}
+
+{% block content %}
+
+<style>
+    body {
+        background: #f2f4f7;
+    }
+
+    .monitor-page {
+        min-height: 100vh;
+    }
+
+    .monitor-header {
+        background: white;
+        border-radius: 1rem;
+    }
+
+    .monitor-title {
+        font-size: clamp(2rem, 4vw, 4rem);
+        font-weight: 700;
+    }
+
+    .monitor-clock {
+        font-size: clamp(2rem, 3vw, 3rem);
+        font-weight: 700;
+    }
+
+    .monitor-status {
+        font-size: .95rem;
+    }
+
+    .monitor-status-dot {
+        display: inline-block;
+        width: .65rem;
+        height: .65rem;
+        border-radius: 50%;
+        background: #198754;
+        margin-right: .35rem;
+    }
+
+    .monitor-status.offline .monitor-status-dot {
+        background: #dc3545;
+    }
+
+    .office-card {
+        border: 0;
+        border-radius: 1rem;
+        overflow: hidden;
+        min-height: 300px;
+    }
+
+    .office-name {
+        font-size: clamp(1.5rem, 2.5vw, 2.5rem);
+        font-weight: 700;
+    }
+
+    .hall-label {
+        font-size: 1.15rem;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        font-weight: 600;
+    }
+
+    .office-destination {
+        font-size: clamp(1.25rem, 2.2vw, 1.8rem);
+        font-weight: 700;
+        color: #495057;
+    }
+
+    .hall-number {
+        font-size: clamp(2.5rem, 6vw, 5rem);
+        padding: .25em .45em;
+    }
+
+    .hall-empty {
+        font-size: 2rem;
+    }
+
+    .next-section {
+        border-top: 1px solid #dee2e6;
+        margin-top: 2rem;
+        padding-top: 1.5rem;
+    }
+
+    .next-label {
+        font-size: 1rem;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        font-weight: 600;
+    }
+
+    .next-number {
+        font-size: clamp(1.5rem, 3vw, 2.2rem);
+        padding: .35em .6em;
+    }
+
+    .call-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(25, 135, 84, .98);
+        color: white;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        text-align: center;
+        padding: 2rem;
+    }
+
+    .call-overlay.visible {
+        display: flex;
+    }
+
+    .overlay-office {
+        font-size: clamp(2rem, 5vw, 5rem);
+        font-weight: 700;
+    }
+
+    .overlay-text {
+        font-size: clamp(1.5rem, 3vw, 3rem);
+        text-transform: uppercase;
+        margin-top: 2rem;
+    }
+
+    .overlay-number {
+        font-size: clamp(8rem, 22vw, 18rem);
+        font-weight: 900;
+        line-height: 1;
+        margin: 1rem 0;
+    }
+
+    .overlay-location {
+        font-size: clamp(1.5rem, 3vw, 3rem);
+    }
+
+    .new-destination-flash {
+        animation: newDestinationFlash 1s ease-in-out 3;
+    }
+
+    @keyframes newDestinationFlash {
+        0%, 100% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.03);
+            box-shadow: 0 0 0 8px rgba(25, 135, 84, .25);
+        }
+    }
+
+    .fullscreen-button {
+        position: fixed;
+        right: 1rem;
+        bottom: 1rem;
+        opacity: .4;
+        z-index: 100;
+    }
+
+    .fullscreen-button:hover,
+    .fullscreen-button:focus {
+        opacity: 1;
+    }
+</style>
+
+<div class="container-fluid monitor-page py-4">
+
+    <div class="monitor-header shadow-sm p-4 mb-4">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+
+            <div>
+                <div class="monitor-title">Comune di Aversa</div>
+                <div class="fs-4 text-muted">Indicazioni visitatori</div>
+            </div>
+
+            <div class="text-md-end">
+                <div class="monitor-clock" id="monitor-clock">--:--:--</div>
+                <div class="text-muted" id="monitor-date"></div>
+
+                <div class="monitor-status text-muted mt-2" id="monitor-status">
+                    <span class="monitor-status-dot"></span>
+                    <span id="monitor-status-text">Monitor attivo</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="row g-4" id="office-grid">
+
+        {% for ufficio in uffici_monitor %}
+            <div class="col-md-6 col-xl-4" id="office-wrapper-{{ ufficio.id }}">
+
+                <div
+                    class="card shadow office-card"
+                    id="office-card-{{ ufficio.id }}"
+                    data-office="{{ ufficio.id }}"
+                >
+                    <div class="card-header bg-primary text-white py-3">
+                        <div class="office-name">{{ ufficio.nome }}</div>
+                    </div>
+
+                    <div class="card-body text-center d-flex flex-column justify-content-center p-4">
+
+                        <div class="hall-label text-success mb-2">
+                            Numeri invitati a recarsi all'ufficio
+                        </div>
+
+                        {% if ufficio.piano or ufficio.stanza %}
+                            <div class="office-destination mb-4">
+                                {% if ufficio.piano %}
+                                    Piano {{ ufficio.piano }}
+                                {% endif %}
+
+                                {% if ufficio.piano and ufficio.stanza %}
+                                    ·
+                                {% endif %}
+
+                                {% if ufficio.stanza %}
+                                    Stanza {{ ufficio.stanza }}
+                                {% endif %}
+                            </div>
+                        {% else %}
+                            <div class="mb-4"></div>
+                        {% endif %}
+
+                        <div
+                            class="d-flex flex-wrap justify-content-center gap-3"
+                            data-field="al-piano"
+                        >
+                            {% for accesso in ufficio.numeri_al_piano %}
+                                <span
+                                    class="badge bg-success hall-number"
+                                    data-access-id="{{ accesso.id }}"
+                                >
+                                    {{ accesso.numero }}
+                                </span>
+                            {% empty %}
+                                <span class="text-muted hall-empty">
+                                    Nessun numero chiamato
+                                </span>
+                            {% endfor %}
+                        </div>
+
+                        <div class="next-section">
+                            <div class="next-label text-muted mb-3">
+                                Prossimi numeri in attesa
+                            </div>
+
+                            <div
+                                class="d-flex flex-wrap justify-content-center gap-3"
+                                data-field="prossimi"
+                            >
+                                {% for accesso in ufficio.prossimi_numeri %}
+                                    <span class="badge bg-light text-dark border next-number">
+                                        {{ accesso.numero }}
+                                        {% if accesso.prioritario %}
+                                            <small class="text-danger ms-1">P</small>
+                                        {% endif %}
+                                    </span>
+                                {% empty %}
+                                    <span class="text-muted">—</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+
+        {% empty %}
+            <div class="col-12">
+                <div class="alert alert-light border text-center py-5">
+                    <h2>Nessun ufficio in ricevimento</h2>
+                    <p class="text-muted mb-0">
+                        Al momento non risultano uffici in ricevimento.
+                    </p>
+                </div>
+            </div>
+        {% endfor %}
+
+    </div>
+</div>
+
+<div
+    class="call-overlay"
+    id="call-overlay"
+    aria-live="assertive"
+    aria-atomic="true"
+>
+    <div>
+        <div class="overlay-text">
+            Recarsi presso
+        </div>
+
+        <div class="overlay-office" id="overlay-office"></div>
+
+        <div class="overlay-number" id="overlay-number"></div>
+
+        <div class="overlay-location" id="overlay-location"></div>
+    </div>
+</div>
+
+<button
+    type="button"
+    class="btn btn-dark fullscreen-button"
+    id="fullscreen-button"
+>
+    Schermo intero
+</button>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const refreshUrl = "{% url 'monitor_stato_live' %}";
+    const refreshInterval = 2500;
+
+    let requestInProgress = false;
+    let audioContext = null;
+    let audioEnabled = false;
+
+    const knownAccessIds = new Map();
+    const notificationQueue = [];
+
+    let notificationRunning = false;
+    let overlayTimeout = null;
+
+    const overlay = document.getElementById("call-overlay");
+    const status = document.getElementById("monitor-status");
+    const statusText = document.getElementById("monitor-status-text");
+    const fullscreenButton = document.getElementById("fullscreen-button");
+
+    // =========================================================
+    // STATO INIZIALE
+    //
+    // I numeri già presenti quando la pagina viene caricata
+    // vengono registrati come conosciuti, senza far partire
+    // alcuna chiamata fullscreen.
+    // =========================================================
+
+    document.querySelectorAll("[data-office]").forEach(function (card) {
+
+        const officeId = String(card.dataset.office);
+        const ids = new Set();
+
+        card.querySelectorAll("[data-access-id]").forEach(function (element) {
+            ids.add(String(element.dataset.accessId));
+        });
+
+        knownAccessIds.set(officeId, ids);
+    });
+
+    // =========================================================
+    // OROLOGIO
+    // =========================================================
+
+    function updateClock() {
+
+        const now = new Date();
+
+        document.getElementById("monitor-clock").textContent =
+            now.toLocaleTimeString("it-IT", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit"
+            });
+
+        document.getElementById("monitor-date").textContent =
+            now.toLocaleDateString("it-IT", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric"
+            });
+    }
+
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    // =========================================================
+    // STATO CONNESSIONE
+    // =========================================================
+
+    function setOnline(online) {
+
+        status.classList.toggle("offline", !online);
+
+        statusText.textContent =
+            online
+                ? "Monitor attivo"
+                : "Connessione assente";
+    }
+
+    // =========================================================
+    // AUDIO
+    // =========================================================
+
+    function enableAudio() {
+
+        if (audioEnabled) {
+
+            if (
+                audioContext &&
+                audioContext.state === "suspended"
+            ) {
+                audioContext.resume().catch(() => {});
+            }
+
+            return;
+        }
+
+        try {
+
+            const AudioContextClass =
+                window.AudioContext ||
+                window.webkitAudioContext;
+
+            if (!AudioContextClass) {
+                return;
+            }
+
+            audioContext = new AudioContextClass();
+            audioEnabled = true;
+
+            if (audioContext.state === "suspended") {
+                audioContext.resume().catch(() => {});
+            }
+
+        } catch (error) {
+
+            console.warn(
+                "Audio non disponibile:",
+                error
+            );
+        }
+    }
+
+    document.addEventListener(
+        "click",
+        enableAudio,
+        { once: true }
+    );
+
+    function beep() {
+
+        if (!audioEnabled || !audioContext) {
+            return;
+        }
+
+        const oscillator =
+            audioContext.createOscillator();
+
+        const gain =
+            audioContext.createGain();
+
+        oscillator.connect(gain);
+        gain.connect(audioContext.destination);
+
+        oscillator.frequency.value = 900;
+
+        gain.gain.setValueAtTime(
+            0.2,
+            audioContext.currentTime
+        );
+
+        gain.gain.exponentialRampToValueAtTime(
+            0.001,
+            audioContext.currentTime + 0.6
+        );
+
+        oscillator.start();
+
+        oscillator.stop(
+            audioContext.currentTime + 0.6
+        );
+    }
+
+    // =========================================================
+    // TESTO DESTINAZIONE
+    // =========================================================
+
+    function getLocationText(office) {
+
+        const parts = [];
+
+        if (office.piano) {
+            parts.push(`Piano ${office.piano}`);
+        }
+
+        if (office.stanza) {
+            parts.push(`Stanza ${office.stanza}`);
+        }
+
+        return parts.join(" - ");
+    }
+
+    // =========================================================
+    // VOCE
+    // =========================================================
+
+    function speakDestination(office, accesso) {
+
+        if (!("speechSynthesis" in window)) {
+            return;
+        }
+
+        window.speechSynthesis.cancel();
+
+        let text =
+            `Numero ${accesso.numero}. ` +
+            `Recarsi presso ${office.nome}.`;
+
+        const location = getLocationText(office);
+
+        if (location) {
+            text += ` ${location}.`;
+        }
+
+        const message =
+            new SpeechSynthesisUtterance(text);
+
+        message.lang = "it-IT";
+        message.rate = 0.9;
+
+        window.speechSynthesis.speak(message);
+    }
+
+    // =========================================================
+    // CODA DELLE NOTIFICHE
+    // =========================================================
+
+    function enqueueDestination(office, accesso) {
+
+        notificationQueue.push({
+            office: office,
+            accesso: accesso
+        });
+
+        processNotificationQueue();
+    }
+
+    function processNotificationQueue() {
+
+        if (
+            notificationRunning ||
+            notificationQueue.length === 0
+        ) {
+            return;
+        }
+
+        notificationRunning = true;
+
+        const item =
+            notificationQueue.shift();
+
+        showDestination(
+            item.office,
+            item.accesso
+        );
+    }
+
+    function showDestination(office, accesso) {
+
+        document.getElementById(
+            "overlay-office"
+        ).textContent =
+            office.nome || "";
+
+        document.getElementById(
+            "overlay-number"
+        ).textContent =
+            accesso.numero || "";
+
+        document.getElementById(
+            "overlay-location"
+        ).textContent =
+            getLocationText(office);
+
+        overlay.classList.add("visible");
+
+        beep();
+        speakDestination(office, accesso);
+
+        if (overlayTimeout) {
+            clearTimeout(overlayTimeout);
+        }
+
+        overlayTimeout =
+            setTimeout(function () {
+
+                overlay.classList.remove(
+                    "visible"
+                );
+
+                notificationRunning = false;
+
+                setTimeout(
+                    processNotificationQueue,
+                    250
+                );
+
+            }, 5000);
+    }
+
+    // =========================================================
+    // RENDER NUMERI CHE DEVONO RECARSI ALL'UFFICIO
+    // =========================================================
+
+    function renderHallNumbers(container, items) {
+
+        if (!container) {
+            return;
+        }
+
+        container.innerHTML = "";
+
+        if (
+            !Array.isArray(items) ||
+            items.length === 0
+        ) {
+
+            container.innerHTML =
+                '<span class="text-muted hall-empty">' +
+                'Nessun numero chiamato' +
+                '</span>';
+
+            return;
+        }
+
+        items.forEach(function (item) {
+
+            const badge =
+                document.createElement("span");
+
+            badge.className =
+                "badge bg-success hall-number";
+
+            badge.dataset.accessId =
+                String(item.id);
+
+            badge.textContent =
+                item.numero || "";
+
+            container.appendChild(badge);
+        });
+    }
+
+
+    function renderNextNumbers(container, items) {
+
+        if (!container) {
+            return;
+        }
+
+        container.innerHTML = "";
+
+        if (
+            !Array.isArray(items) ||
+            items.length === 0
+        ) {
+
+            container.innerHTML =
+                '<span class="text-muted">—</span>';
+
+            return;
+        }
+
+        items.forEach(function (item) {
+
+            const badge =
+                document.createElement("span");
+
+            badge.className =
+                "badge bg-light text-dark border next-number";
+
+            badge.appendChild(
+                document.createTextNode(item.numero || "")
+            );
+
+            if (item.prioritario) {
+
+                const p =
+                    document.createElement("small");
+
+                p.className =
+                    "text-danger ms-1";
+
+                p.textContent = "P";
+
+                badge.appendChild(p);
+            }
+
+            container.appendChild(badge);
+        });
+    }
+
+    // =========================================================
+    // AGGIORNAMENTO UFFICIO
+    // =========================================================
+
+    function updateOffice(office) {
+
+        const card =
+            document.getElementById(
+                `office-card-${office.id}`
+            );
+
+        if (!card) {
+
+            window.location.reload();
+            return;
+        }
+
+        const officeId =
+            String(office.id);
+
+        const oldIds =
+            knownAccessIds.get(officeId) ||
+            new Set();
+
+        const currentItems =
+            Array.isArray(office.numeri_al_piano)
+                ? office.numeri_al_piano
+                : [];
+
+        const currentIds =
+            new Set(
+                currentItems.map(function (item) {
+                    return String(item.id);
+                })
+            );
+
+        const newItems =
+            currentItems.filter(function (item) {
+
+                return !oldIds.has(
+                    String(item.id)
+                );
+            });
+
+        const container =
+            card.querySelector(
+                '[data-field="al-piano"]'
+            );
+
+        const nextContainer =
+            card.querySelector(
+                '[data-field="prossimi"]'
+            );
+
+        renderHallNumbers(
+            container,
+            currentItems
+        );
+
+        renderNextNumbers(
+            nextContainer,
+            office.prossimi_numeri
+        );
+
+        knownAccessIds.set(
+            officeId,
+            currentIds
+        );
+
+        if (newItems.length > 0) {
+
+            card.classList.remove(
+                "new-destination-flash"
+            );
+
+            void card.offsetWidth;
+
+            card.classList.add(
+                "new-destination-flash"
+            );
+
+            newItems.forEach(function (accesso) {
+
+                enqueueDestination(
+                    office,
+                    accesso
+                );
+            });
+        }
+    }
+
+    // =========================================================
+    // POLLING
+    // =========================================================
+
+    async function refreshMonitor() {
+
+        if (
+            requestInProgress ||
+            document.hidden
+        ) {
+            return;
+        }
+
+        requestInProgress = true;
+
+        try {
+
+            const response =
+                await fetch(
+                    refreshUrl,
+                    {
+                        cache: "no-store",
+                        headers: {
+                            "X-Requested-With":
+                                "XMLHttpRequest"
+                        }
+                    }
+                );
+
+            if (!response.ok) {
+
+                throw new Error(
+                    `HTTP ${response.status}`
+                );
+            }
+
+            const data =
+                await response.json();
+
+            if (
+                !data.success ||
+                !Array.isArray(data.uffici)
+            ) {
+
+                throw new Error(
+                    "Risposta monitor non valida"
+                );
+            }
+
+            setOnline(true);
+
+            const cardCount =
+                document.querySelectorAll(
+                    "[data-office]"
+                ).length;
+
+            if (
+                cardCount !==
+                data.uffici.length
+            ) {
+
+                window.location.reload();
+                return;
+            }
+
+            data.uffici.forEach(
+                updateOffice
+            );
+
+        } catch (error) {
+
+            setOnline(false);
+
+            console.error(
+                "Errore monitor:",
+                error
+            );
+
+        } finally {
+
+            requestInProgress = false;
+        }
+    }
+
+    setInterval(
+        refreshMonitor,
+        refreshInterval
+    );
+
+    // =========================================================
+    // FULLSCREEN
+    // =========================================================
+
+    fullscreenButton.addEventListener(
+        "click",
+        async function () {
+
+            enableAudio();
+
+            try {
+
+                if (
+                    !document.fullscreenElement
+                ) {
+
+                    await document
+                        .documentElement
+                        .requestFullscreen();
+
+                } else {
+
+                    await document
+                        .exitFullscreen();
+                }
+
+            } catch (error) {
+
+                console.error(
+                    "Errore fullscreen:",
+                    error
+                );
+            }
+        }
+    );
+
+    document.addEventListener(
+        "fullscreenchange",
+        function () {
+
+            fullscreenButton.textContent =
+                document.fullscreenElement
+                    ? "Esci da schermo intero"
+                    : "Schermo intero";
+        }
+    );
+
+});
+</script>
+
+{% endblock %}
