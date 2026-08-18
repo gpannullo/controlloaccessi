@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Scheda visitatore{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+        <div>
+            <h1 class="h3 mb-1">{{ visitatore.cognome }} {{ visitatore.nome }}</h1>
+            <p class="text-muted mb-0">Scheda visitatore e storico accessi</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{% url 'portineria:ricerca_visitatori' %}" class="btn btn-outline-secondary">Nuova ricerca</a>
+            <a
+                href="{% url 'portineria:nuovo_ricevimento' %}?visitatore={{ visitatore.pk }}"
+                class="btn btn-primary"
+            >
+                Nuovo ricevimento
+            </a>
+            <a
+                href="{% url 'portineria:nuova_visita' %}?visitatore={{ visitatore.pk }}"
+                class="btn btn-success"
+            >
+                Nuova visita
+            </a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header"><strong>Dati anagrafici</strong></div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4"><div class="text-muted small">Nome</div><div>{{ visitatore.nome }}</div></div>
+                <div class="col-md-4"><div class="text-muted small">Cognome</div><div>{{ visitatore.cognome }}</div></div>
+                <div class="col-md-4"><div class="text-muted small">Telefono</div><div>{{ visitatore.telefono|default:"—" }}</div></div>
+                <div class="col-md-4"><div class="text-muted small">Codice fiscale</div><div>{{ visitatore.codice_fiscale|default:"—" }}</div></div>
+                <div class="col-md-4">
+                    <div class="text-muted small">Documento</div>
+                    <div>
+                        {% if visitatore.documento_numero %}
+                            {{ visitatore.documento_tipo|default:"Documento" }} {{ visitatore.documento_numero }}
+                        {% else %}—{% endif %}
+                    </div>
+                </div>
+                <div class="col-md-4"><div class="text-muted small">Scadenza documento</div><div>{{ visitatore.documento_scadenza|date:"d/m/Y"|default:"—" }}</div></div>
+                {% if visitatore.note %}
+                    <div class="col-12"><div class="text-muted small">Note</div><div>{{ visitatore.note|linebreaksbr }}</div></div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <strong>Storico accessi</strong>
+            <span class="badge bg-secondary">{{ numero_accessi }}</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Tipo</th>
+                        <th>Coda</th>
+                        <th>Badge</th>
+                        <th>Ufficio</th>
+                        <th>Motivo</th>
+                        <th>Stato</th>
+                        <th>Uscita</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for accesso in pagina %}
+                        <tr>
+                            <td>{{ accesso.ingresso|date:"d/m/Y H:i" }}</td>
+                            <td>
+                                {{ accesso.get_tipo_accesso_display }}
+                                {% if accesso.rientro_prioritario %}
+                                    <span class="badge bg-warning text-dark ms-1">Rientro</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ accesso.numero_coda_formattato|default:"—" }}</td>
+                            <td>{% if accesso.badge %}{{ accesso.badge.codice }}{% else %}—{% endif %}</td>
+                            <td>{{ accesso.ufficio_destinazione.nome }}</td>
+                            <td>{{ accesso.motivo|default:"—" }}</td>
+                            <td>{{ accesso.get_stato_coda_display }}</td>
+                            <td>{{ accesso.uscita|date:"d/m/Y H:i"|default:"—" }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="8" class="text-center text-muted py-4">Nessun accesso registrato.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if pagina.paginator.num_pages > 1 %}
+            <div class="card-footer">
+                <nav aria-label="Pagine storico">
+                    <ul class="pagination mb-0 justify-content-center">
+                        {% if pagina.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ pagina.previous_page_number }}">Precedente</a></li>{% endif %}
+                        <li class="page-item disabled"><span class="page-link">Pagina {{ pagina.number }} di {{ pagina.paginator.num_pages }}</span></li>
+                        {% if pagina.has_next %}<li class="page-item"><a class="page-link" href="?page={{ pagina.next_page_number }}">Successiva</a></li>{% endif %}
+                    </ul>
+                </nav>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

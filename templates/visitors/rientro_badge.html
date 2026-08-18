@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Rientro con badge{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <div class="row g-4">
+    <div class="col-lg-5">
+      <div class="card shadow-sm">
+        <div class="card-header"><h1 class="h4 mb-0">Rientro con badge</h1></div>
+        <div class="card-body">
+          <p class="text-muted">Il nuovo accesso eredita visitatore, ufficio, motivo e badge dal precedente e rientra nella hall con priorità.</p>
+          <form method="post">
+            {% csrf_token %}
+            <label class="form-label" for="{{ form.badge.id_for_label }}">{{ form.badge.label }}</label>
+            {{ form.badge }}
+            {% for error in form.badge.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            <button class="btn btn-primary w-100 mt-3" type="submit">Registra rientro</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-7">
+      <div class="card shadow-sm">
+        <div class="card-header"><strong>Badge riservati per rientro</strong></div>
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead><tr><th>Badge</th><th class="text-end">Azione</th></tr></thead>
+            <tbody>
+            {% for badge in badge_riservati %}
+              <tr><td><strong>{{ badge.codice }}</strong></td><td class="text-end">
+                <form method="post" action="{% url 'portineria:libera_badge_rientro' badge.pk %}">
+                  {% csrf_token %}<button class="btn btn-sm btn-outline-danger" type="submit">Libera badge</button>
+                </form>
+              </td></tr>
+            {% empty %}<tr><td colspan="2" class="text-center text-muted py-4">Nessun badge riservato.</td></tr>{% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

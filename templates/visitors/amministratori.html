@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Amministratori - Transiti{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+    <div
+        class="d-flex flex-column flex-md-row justify-content-between
+               align-items-md-center gap-3 mb-4"
+    >
+        <div>
+            <h1 class="h3 mb-1">Amministratori</h1>
+            <p class="text-muted mb-0">
+                Registrazione ingressi e uscite di Giunta e Consiglieri.
+            </p>
+        </div>
+
+        <a href="{% url 'dashboard:home' %}" class="btn btn-outline-secondary">
+            Torna alla dashboard
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <div class="text-muted">Amministratori presenti</div>
+                    <div class="display-6 fw-semibold">{{ numero_presenti }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% include "visitors/_gruppo_amministratori.html" with titolo="Giunta" persone=giunta %}
+    {% include "visitors/_gruppo_amministratori.html" with titolo="Consiglieri" persone=consiglieri %}
+
+    <div class="card shadow-sm mt-4">
+        <div class="card-header">
+            <strong>Transiti di oggi</strong>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Ora</th>
+                        <th>Amministratore</th>
+                        <th>Gruppo</th>
+                        <th>Transito</th>
+                        <th>Registrato da</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for transito in transiti_oggi %}
+                    <tr>
+                        <td>{{ transito.timestamp|date:"H:i" }}</td>
+                        <td>
+                            {% firstof transito.amministratore.utente.get_full_name transito.amministratore.utente.username "—" %}
+                        </td>
+                        <td>
+                            {% if transito.amministratore.utente.groups.all %}
+                                {% for gruppo in transito.amministratore.utente.groups.all %}
+                                    {% if gruppo.name == "Giunta" or gruppo.name == "Consiglieri" %}
+                                        <span class="badge bg-light text-dark border">
+                                            {{ gruppo.name }}
+                                        </span>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if transito.tipo == "IN" %}
+                                <span class="badge bg-success">Ingresso</span>
+                            {% else %}
+                                <span class="badge bg-danger">Uscita</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% firstof transito.operatore.get_full_name transito.operatore.username "—" %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">
+                            Nessun transito registrato oggi.
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
