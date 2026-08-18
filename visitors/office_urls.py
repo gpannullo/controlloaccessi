@@ -9,6 +9,7 @@ from visitors.office_views import (
     selezione_ufficio,
     stato_ufficio_live,
     ufficio_dashboard,
+    trasferisci_visitatore,
 )
 
 
@@ -63,5 +64,11 @@ urlpatterns = [
         "<int:accesso_id>/concludi/",
         concludi_visita,
         name="concludi_visita",
+    ),
+
+    path(
+        "<int:ufficio_id>/accessi/<int:accesso_id>/trasferisci/",
+        trasferisci_visitatore,
+        name="trasferisci_visitatore",
     ),
 ]

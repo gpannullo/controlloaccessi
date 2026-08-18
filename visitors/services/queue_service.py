@@ -12,7 +12,7 @@ from visitors.models import (
     AccessoVisitatore,
     SessioneRicevimento,
 )
-from django.db.models import Max
+from django.db.models import Max, Q
 
 
 class QueueService:
@@ -86,6 +86,7 @@ class QueueService:
                 ufficio_destinazione=ufficio,
                 uscita__isnull=True,
                 appuntamento__isnull=True,
+                rientro_prioritario=False,
                 spostato_fuori_ufficio_il__isnull=True,
                 ingresso_ufficio_il__isnull=True,
                 visita_conclusa_il__isnull=True,
@@ -103,14 +104,17 @@ class QueueService:
             .filter(
                 ufficio_destinazione=ufficio,
                 uscita__isnull=True,
-                appuntamento__isnull=False,
                 spostato_fuori_ufficio_il__isnull=True,
                 ingresso_ufficio_il__isnull=True,
                 visita_conclusa_il__isnull=True,
             )
+            .filter(
+                Q(rientro_prioritario=True)
+                | Q(appuntamento__isnull=False)
+            )
             .select_related("appuntamento")
             .order_by(
-                "appuntamento__data_ora",
+                "-rientro_prioritario",
                 "ingresso",
                 "numero_coda",
             )
@@ -199,9 +203,10 @@ class QueueService:
                 spostato_fuori_ufficio_il__isnull=False,
                 ingresso_ufficio_il__isnull=True,
                 visita_conclusa_il__isnull=True,
-                tipo_accesso=(
-                    AccessoVisitatore.TipoAccesso.RICEVIMENTO
-                ),
+            )
+            .filter(
+                Q(tipo_accesso=AccessoVisitatore.TipoAccesso.RICEVIMENTO)
+                | Q(rientro_prioritario=True)
             )
             .count()
         )
@@ -353,35 +358,45 @@ class QueueService:
             limite,
     ):
         """
-        Seleziona prima i prenotati arrivati,
-        poi i visitatori ordinari.
+        Priorità: rientri, poi appuntamenti, poi ricevimenti ordinari.
         """
-
-        prioritari = list(
+        rientri = list(
             AccessoVisitatore.objects
             .select_for_update()
             .filter(
                 ufficio_destinazione=ufficio,
                 uscita__isnull=True,
+                rientro_prioritario=True,
+                spostato_fuori_ufficio_il__isnull=True,
+                ingresso_ufficio_il__isnull=True,
+                visita_conclusa_il__isnull=True,
+            )
+            .order_by("ingresso", "numero_coda")[:limite]
+        )
+        residui = limite - len(rientri)
+        if residui <= 0:
+            return rientri
+
+        appuntamenti = list(
+            AccessoVisitatore.objects
+            .select_for_update()
+            .filter(
+                ufficio_destinazione=ufficio,
+                uscita__isnull=True,
+                rientro_prioritario=False,
                 appuntamento__isnull=False,
-                tipo_accesso=(
-                    AccessoVisitatore.TipoAccesso.RICEVIMENTO
-                ),
+                tipo_accesso=AccessoVisitatore.TipoAccesso.RICEVIMENTO,
                 spostato_fuori_ufficio_il__isnull=True,
                 ingresso_ufficio_il__isnull=True,
                 visita_conclusa_il__isnull=True,
             )
             .order_by(
-                "appuntamento__data_ora",
-                "ingresso",
-                "numero_coda",
-            )[:limite]
+                "appuntamento__data_ora", "ingresso", "numero_coda"
+            )[:residui]
         )
-
-        posti_residui = limite - len(prioritari)
-
-        if posti_residui <= 0:
-            return prioritari
+        residui -= len(appuntamenti)
+        if residui <= 0:
+            return rientri + appuntamenti
 
         ordinari = list(
             AccessoVisitatore.objects
@@ -389,21 +404,16 @@ class QueueService:
             .filter(
                 ufficio_destinazione=ufficio,
                 uscita__isnull=True,
+                rientro_prioritario=False,
                 appuntamento__isnull=True,
-                tipo_accesso=(
-                    AccessoVisitatore.TipoAccesso.RICEVIMENTO
-                ),
+                tipo_accesso=AccessoVisitatore.TipoAccesso.RICEVIMENTO,
                 spostato_fuori_ufficio_il__isnull=True,
                 ingresso_ufficio_il__isnull=True,
                 visita_conclusa_il__isnull=True,
             )
-            .order_by(
-                "ingresso",
-                "numero_coda",
-            )[:posti_residui]
+            .order_by("ingresso", "numero_coda")[:residui]
         )
-
-        return prioritari + ordinari
+        return rientri + appuntamenti + ordinari
 
     @classmethod
     @transaction.atomic

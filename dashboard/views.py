@@ -167,10 +167,11 @@ def dashboard_home(request):
         .order_by("-ingresso")[:10]
     )
 
-    uffici_attivi = (
-        Ufficio.objects
-        .filter(attivo=True)
-        .order_by("nome")
+    # Il contatore "Uffici attivi" deve riflettere gli uffici
+    # realmente selezionabili nel form "Nuovo ricevimento".
+    uffici_prenotabili = (
+        OfficeService
+        .get_offices_receiving_today(adesso)
     )
 
     aperture_odierne = (
@@ -281,7 +282,7 @@ def dashboard_home(request):
 
         "ultime_registrazioni": ultime_registrazioni,
 
-        "numero_uffici_attivi": uffici_attivi.count(),
+        "numero_uffici_attivi": uffici_prenotabili.count(),
         "numero_uffici_che_ricevono": len(uffici_oggi),
 
         "numero_utenti_attivi": (

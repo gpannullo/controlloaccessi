@@ -20,7 +20,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
+SECRET_KEY = os.getenv(
+    "DJANGO_SECRET_KEY",
+    "development-only-secret-key"
+)
 
 DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() in {
     "1", "true", "yes", "on"
@@ -90,7 +93,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.getenv("DB_NAME", "controlloaccessi"),
         "USER": os.getenv("DB_USER", "controlloaccessi"),
-        "PASSWORD": os.environ["DB_PASSWORD"],
+        "PASSWORD": os.getenv("DB_PASSWORD", ""),
         "HOST": os.getenv("DB_HOST", "127.0.0.1"),
         "PORT": os.getenv("DB_PORT", "5432"),
         "CONN_MAX_AGE": 60,
@@ -161,8 +164,8 @@ DIRECTORY = {
         "AD_BASE_DN",
         "DC=comuneaversa,DC=local",
     ),
-    "BIND_USER": os.environ["AD_BIND_USER"],
-    "BIND_PASSWORD": os.environ["AD_BIND_PASSWORD"],
+    "BIND_USER": os.getenv("AD_BIND_USER", ""),
+    "BIND_PASSWORD": os.getenv("AD_BIND_PASSWORD", ""),
     "USER_SEARCH_BASE": os.getenv(
         "AD_USER_SEARCH_BASE",
         "OU=Users,DC=comuneaversa,DC=local",
@@ -188,6 +191,8 @@ DIRECTORY = {
         ).split(",")
         if item.strip()
     ],
+    "GIUNTA_GROUP": "ASSESSORE",
+    "CONSIGLIERI_GROUP": "CONSIGLIERE",
 }
 
 
@@ -215,3 +220,13 @@ PORTINERIA_GROUP_NAME = os.getenv("PORTINERIA_GROUP_NAME", "Portineria")
 
 # Nginx / reverse proxy
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+
+# ============================================================
+# LOCAL DEVELOPMENT SETTINGS
+# ============================================================
+
+try:
+    from .settings_develop import *
+except ImportError:
+    pass

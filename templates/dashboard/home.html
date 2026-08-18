@@ -117,7 +117,7 @@
                         </div>
 
                         <div class="small text-primary mt-2">
-                            Calendario settimanale
+                            Disponibili per nuovo ricevimento
                         </div>
 
                     </div>
@@ -166,37 +166,40 @@
 
         <div class="row g-3 mb-4">
 
-            <div class="col-md-4">
-
+            <div class="col-md-3">
                 <a
-                        href="{% url 'portineria:nuovo_ricevimento' %}"
-                        class="btn btn-primary btn-lg w-100 py-4"
+                    href="{% url 'portineria:nuovo_ricevimento' %}"
+                    class="btn btn-primary btn-lg w-100 py-4"
                 >
                     Nuovo ricevimento
                 </a>
-
             </div>
 
-            <div class="col-md-4">
-
+            <div class="col-md-3">
                 <a
-                        href="{% url 'portineria:nuova_visita' %}"
-                        class="btn btn-success btn-lg w-100 py-4"
+                    href="{% url 'portineria:nuova_visita' %}"
+                    class="btn btn-success btn-lg w-100 py-4"
                 >
                     Nuova visita
                 </a>
-
             </div>
 
-            <div class="col-md-4">
-
+            <div class="col-md-3">
                 <a
-                        href="#"
-                        class="btn btn-outline-primary btn-lg w-100 py-4"
+                    href="{% url 'portineria:rientro_badge' %}"
+                    class="btn btn-warning btn-lg w-100 py-4"
                 >
-                    Ricerca visitatore
+                    Rientro con badge
                 </a>
+            </div>
 
+            <div class="col-md-3">
+                <a
+                    href="{% url 'portineria:amministratori' %}"
+                    class="btn btn-dark btn-lg w-100 py-4"
+                >
+                    Amministratori
+                </a>
             </div>
 
         </div>
@@ -802,6 +805,7 @@
 
                                                 </div>
 
+                                                {% if request.user.is_superuser %}
                                                 <div class="col-6">
 
                                                     <div class="border rounded p-2">
@@ -817,6 +821,7 @@
                                                     </div>
 
                                                 </div>
+                                                {% endif %}
 
                                                 <div class="col-6">
 
@@ -842,87 +847,70 @@
 
                                             <!-- ELENCO DIPENDENTI -->
 
-                                            <div class="border-top pt-3">
+                                            {% if request.user.is_superuser %}
+                                                <div class="border-top pt-3">
 
-                                                {% if request.user.is_staff %}
-
-                                                    <!-- ELENCO DIPENDENTI VISIBILE SOLO AGLI ADMIN -->
-
-                                                    <div class="border-top pt-3">
-
-                                                        <div class="small text-muted mb-2">
-                                                            Dipendenti assegnati
-                                                        </div>
-
-                                                        {% if ufficio.dipendenti_assegnati %}
-
-                                                            <ul class="list-group list-group-flush">
-
-                                                                {% for dipendente in ufficio.dipendenti_assegnati %}
-
-                                                                    <li
-                                                                            class="list-group-item
-                               px-0 py-2
-                               d-flex
-                               justify-content-between
-                               align-items-center
-                               gap-2"
-                                                                    >
-                        <span>
-                            {% firstof dipendente.get_full_name dipendente.username %}
-                        </span>
-
-                                                                        {% if dipendente in ufficio.operatori_disponibili %}
-
-                                                                            <span class="badge bg-success">
-                                Disponibile al ricevimento
-                            </span>
-
-                                                                        {% elif dipendente.stato_presenza == "ASS" %}
-
-                                                                            <span class="badge bg-danger">
-                                Assente
-                            </span>
-
-                                                                        {% elif dipendente.tipo_attivita == "AMM" %}
-
-                                                                            <span class="badge bg-secondary">
-                                Presente, non in ricevimento
-                            </span>
-
-                                                                        {% elif dipendente.stato_presenza == "PRE" %}
-
-                                                                            <span class="badge bg-warning text-dark">
-                                Sportellista non disponibile
-                            </span>
-
-                                                                        {% else %}
-
-                                                                            <span class="badge bg-secondary">
-                                Presenza non verificata
-                            </span>
-
-                                                                        {% endif %}
-
-                                                                    </li>
-
-                                                                {% endfor %}
-
-                                                            </ul>
-
-                                                        {% else %}
-
-                                                            <div class="text-muted">
-                                                                Nessun dipendente associato all’ufficio.
-                                                            </div>
-
-                                                        {% endif %}
-
+                                                    <div class="small text-muted mb-2">
+                                                        Dipendenti assegnati
                                                     </div>
 
-                                                {% endif %}
+                                                    {% if ufficio.dipendenti_assegnati %}
 
-                                            </div>
+                                                        <ul class="list-group list-group-flush">
+
+                                                            {% for dipendente in ufficio.dipendenti_assegnati %}
+
+                                                                <li
+                                                                    class="list-group-item px-0 py-2
+                                                                           d-flex justify-content-between
+                                                                           align-items-center gap-2"
+                                                                >
+                                                                    <span>
+                                                                        {% firstof dipendente.get_full_name dipendente.username %}
+                                                                    </span>
+
+                                                                    {% if dipendente in ufficio.operatori_disponibili %}
+                                                                        <span
+                                                                            class="rounded-circle bg-success d-inline-block flex-shrink-0"
+                                                                            style="width: .75rem; height: .75rem;"
+                                                                            aria-label="Disponibile al ricevimento"
+                                                                        ></span>
+                                                                    {% elif dipendente.stato_presenza == "ASS" %}
+                                                                        <span
+                                                                            class="rounded-circle bg-danger d-inline-block flex-shrink-0"
+                                                                            style="width: .75rem; height: .75rem;"
+                                                                            aria-label="Assente"
+                                                                        ></span>
+                                                                    {% elif dipendente.stato_presenza == "PRE" and dipendente.tipo_attivita == "AMM" %}
+                                                                        <span
+                                                                            class="rounded-circle bg-primary d-inline-block flex-shrink-0"
+                                                                            style="width: .75rem; height: .75rem;"
+                                                                            aria-label="Presente, non in ricevimento"
+                                                                        ></span>
+                                                                    {% else %}
+                                                                        <span
+                                                                            class="rounded-circle bg-secondary d-inline-block flex-shrink-0"
+                                                                            style="width: .75rem; height: .75rem;"
+                                                                            aria-label="Non disponibile / presenza non verificata"
+                                                                        ></span>
+                                                                    {% endif %}
+
+                                                                </li>
+
+                                                            {% endfor %}
+
+                                                        </ul>
+
+                                                    {% else %}
+
+                                                        <div class="text-muted">
+                                                            Nessun dipendente associato all’ufficio.
+                                                        </div>
+
+                                                    {% endif %}
+
+                                                </div>
+                                            {% endif %}
 
                                         </div>
 

@@ -1,6 +1,15 @@
 from django.contrib import admin
 from django.utils import timezone
-from .models import Visitatore, AccessoVisitatore, Appuntamento, Badge, SessioneRicevimento, EventoAccesso
+from .models import (
+    Visitatore,
+    AccessoVisitatore,
+    Appuntamento,
+    Badge,
+    SessioneRicevimento,
+    EventoAccesso,
+    AmministratoreEnte,
+    TransitoAmministratore,
+)
 
 
 @admin.register(Visitatore)
@@ -16,6 +25,8 @@ class AccessoAdmin(admin.ModelAdmin):
         "visitatore",
         "ufficio_destinazione",
         "tipo_accesso",
+        "accompagnato",
+        "rientro_prioritario",
         "badge",
         "ingresso",
         "uscita",
@@ -81,11 +92,13 @@ class BadgeAdmin(admin.ModelAdmin):
     list_display = (
         "codice",
         "attivo",
+        "riservato_rientro",
         "stato_disponibilita",
     )
 
     list_filter = (
         "attivo",
+        "riservato_rientro",
     )
 
     search_fields = (
@@ -177,6 +190,79 @@ class EventoAccessoAdmin(admin.ModelAdmin):
     ordering = (
         "-timestamp",
     )
+
+    def has_add_permission(self, request):
+        return False
+
+@admin.register(AmministratoreEnte)
+class AmministratoreEnteAdmin(admin.ModelAdmin):
+    list_display = (
+        "utente_nome",
+        "utente_username",
+        "carica",
+        "attivo",
+        "ordine",
+    )
+    list_filter = ("attivo", "carica")
+    search_fields = (
+        "utente__first_name",
+        "utente__last_name",
+        "utente__username",
+        "utente__email",
+        "carica",
+    )
+    list_editable = ("attivo", "ordine")
+    autocomplete_fields = ("utente",)
+    ordering = (
+        "ordine",
+        "utente__last_name",
+        "utente__first_name",
+        "utente__username",
+    )
+
+    @admin.display(description="Nome")
+    def utente_nome(self, obj):
+        if not obj.utente:
+            return "—"
+        return obj.utente.get_full_name() or obj.utente.username
+
+    @admin.display(description="Username AD")
+    def utente_username(self, obj):
+        return obj.utente.username if obj.utente else "—"
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "utente":
+            kwargs["queryset"] = db_field.remote_field.model.objects.filter(
+                is_active=True,
+            ).order_by("last_name", "first_name", "username")
+        return super().formfield_for_foreignkey(
+            db_field, request, **kwargs
+        )
+
+
+@admin.register(TransitoAmministratore)
+class TransitoAmministratoreAdmin(admin.ModelAdmin):
+    list_display = (
+        "timestamp",
+        "amministratore",
+        "tipo",
+        "operatore",
+    )
+    list_filter = ("tipo", "timestamp", "amministratore")
+    search_fields = (
+        "amministratore__utente__first_name",
+        "amministratore__utente__last_name",
+        "amministratore__utente__username",
+        "amministratore__carica",
+        "operatore__username",
+    )
+    readonly_fields = (
+        "amministratore",
+        "tipo",
+        "timestamp",
+        "operatore",
+    )
+    ordering = ("-timestamp",)
 
     def has_add_permission(self, request):
         return False

@@ -29,3 +29,4 @@ media/
 .idea/
 .DS_Store
 Thumbs.db
+/ControlloAccessi/settings_develop.py

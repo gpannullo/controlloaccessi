@@ -220,6 +220,15 @@
                                 </dd>
 
                                 <dt class="col-sm-4">
+                                    Accompagnato
+                                </dt>
+                                <dd class="col-sm-8">
+                                    {% if visita_corrente.accompagnato %}
+                                        <span class="badge bg-info text-dark">Sì</span>
+                                    {% else %}No{% endif %}
+                                </dd>
+
+                                <dt class="col-sm-4">
                                     Ingresso in ufficio
                                 </dt>
 
@@ -281,6 +290,20 @@
                                     Concludi visita
                                 </button>
 
+                            </form>
+
+                            <hr>
+                            <form method="post" action="{% url 'uffici:trasferisci_visitatore' ufficio.pk visita_corrente.pk %}">
+                                {% csrf_token %}
+                                <label class="form-label" for="nuovo_ufficio">Trasferisci ad altro ufficio</label>
+                                <select class="form-select mb-2" id="nuovo_ufficio" name="nuovo_ufficio" required>
+                                    <option value="">Seleziona ufficio</option>
+                                    {% for destinazione in uffici_trasferimento %}
+                                        <option value="{{ destinazione.pk }}">{{ destinazione.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                                <input type="text" class="form-control mb-2" name="note_trasferimento" placeholder="Nota facoltativa">
+                                <button type="submit" class="btn btn-outline-primary w-100">Concludi e trasferisci</button>
                             </form>
 
                         </div>
@@ -407,7 +430,9 @@
                                     </td>
 
                                     <td>
-                                        {% if accesso.tipo_accesso == "VIS" %}
+                                        {% if accesso.rientro_prioritario %}
+                                            <span class="badge bg-warning text-dark">Rientro</span>
+                                        {% elif accesso.tipo_accesso == "VIS" %}
                                             <span class="badge bg-success">Visita</span>
                                         {% elif accesso.appuntamento %}
                                             <span class="badge bg-danger">Appuntamento</span>
@@ -581,7 +606,7 @@
                             <tr>
                                 <th>Coda</th>
                                 <th>Visitatore</th>
-                                <th>Appuntamento</th>
+                                <th>Priorità</th>
                                 <th>Arrivo</th>
                             </tr>
                             </thead>
@@ -602,7 +627,11 @@
                                     </td>
 
                                     <td>
-                                        {{ accesso.appuntamento.data_ora|date:"H:i" }}
+                                        {% if accesso.rientro_prioritario %}
+                                            <span class="badge bg-warning text-dark">Rientro</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Appuntamento {{ accesso.appuntamento.data_ora|date:"H:i" }}</span>
+                                        {% endif %}
                                     </td>
 
                                     <td>
@@ -617,7 +646,7 @@
                                             colspan="4"
                                             class="text-center text-muted py-4"
                                     >
-                                        Nessun prenotato in attesa.
+                                        Nessun accesso prioritario in attesa.
                                     </td>
                                 </tr>
 

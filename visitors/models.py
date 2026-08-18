@@ -87,6 +87,12 @@ class Badge(models.Model):
         verbose_name="Note",
     )
 
+    riservato_rientro = models.BooleanField(
+        default=False,
+        db_index=True,
+        verbose_name="Riservato per rientro",
+    )
+
     class Meta:
         ordering = ["codice"]
 
@@ -98,6 +104,9 @@ class Badge(models.Model):
 
     @property
     def disponibile(self):
+        if self.riservato_rientro:
+            return False
+
         return not self.accessi.filter(
             uscita__isnull=True,
         ).exists()
@@ -158,6 +167,17 @@ class AccessoVisitatore(models.Model):
     documento_presentato = models.BooleanField(
         default=True,
         verbose_name="Documento presentato",
+    )
+
+    accompagnato = models.BooleanField(
+        default=False,
+        verbose_name="Visitatore accompagnato",
+    )
+
+    rientro_prioritario = models.BooleanField(
+        default=False,
+        db_index=True,
+        verbose_name="Rientro prioritario",
     )
 
     ingresso = models.DateTimeField(
@@ -246,7 +266,10 @@ class AccessoVisitatore(models.Model):
 
     @property
     def prioritario(self):
-        return self.appuntamento_id is not None
+        return (
+            self.rientro_prioritario
+            or self.appuntamento_id is not None
+        )
 
     def checkout(self):
         self.uscita = timezone.now()
@@ -520,4 +543,114 @@ class EventoAccesso(models.Model):
             f"{self.get_tipo_display()} - "
             f"{self.accesso} - "
             f"{self.timestamp:%d/%m/%Y %H:%M:%S}"
+        )
+
+
+class AmministratoreEnte(models.Model):
+    """
+    Persona con carica istituzionale dell'Ente.
+
+    L'anagrafica non viene duplicata: nome, cognome e username
+    provengono sempre dall'utente Django sincronizzato da
+    Active Directory.
+    """
+
+    utente = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="profilo_amministratore_ente",
+        limit_choices_to={"is_active": True},
+        null=True,  # consente l'applicazione della migration su DB esistenti
+        blank=False,
+        verbose_name="Utente Active Directory",
+    )
+    carica = models.CharField(
+        max_length=150,
+        blank=True,
+        verbose_name="Carica",
+    )
+    attivo = models.BooleanField(default=True, verbose_name="Attivo")
+    ordine = models.PositiveIntegerField(default=0, verbose_name="Ordine")
+
+    class Meta:
+        ordering = [
+            "ordine",
+            "utente__last_name",
+            "utente__first_name",
+            "utente__username",
+        ]
+        verbose_name = "Amministratore dell'Ente"
+        verbose_name_plural = "Amministratori dell'Ente"
+
+    @property
+    def nome_completo(self):
+        if not self.utente:
+            return "Utente non associato"
+        return self.utente.get_full_name() or self.utente.username
+
+    def __str__(self):
+        if self.carica:
+            return f"{self.nome_completo} - {self.carica}"
+        return self.nome_completo
+
+    @property
+    def ultimo_transito(self):
+        return self.transiti.order_by("-timestamp", "-pk").first()
+
+    @property
+    def presente(self):
+        ultimo = self.ultimo_transito
+        return bool(
+            ultimo
+            and ultimo.tipo == TransitoAmministratore.Tipo.INGRESSO
+        )
+
+
+class TransitoAmministratore(models.Model):
+    class Tipo(models.TextChoices):
+        INGRESSO = "IN", "Ingresso"
+        USCITA = "OUT", "Uscita"
+
+    amministratore = models.ForeignKey(
+        AmministratoreEnte,
+        on_delete=models.PROTECT,
+        related_name="transiti",
+        verbose_name="Amministratore",
+    )
+    tipo = models.CharField(
+        max_length=3,
+        choices=Tipo.choices,
+        db_index=True,
+        verbose_name="Tipo transito",
+    )
+    timestamp = models.DateTimeField(
+        default=timezone.now,
+        db_index=True,
+        verbose_name="Data e ora",
+    )
+    operatore = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="transiti_amministratori_registrati",
+        verbose_name="Registrato da",
+    )
+
+    class Meta:
+        ordering = ["-timestamp", "-pk"]
+        verbose_name = "Transito amministratore"
+        verbose_name_plural = "Transiti amministratori"
+        indexes = [
+            models.Index(
+                fields=["amministratore", "timestamp"],
+                name="idx_amm_transito_data",
+            ),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.amministratore} - "
+            f"{self.get_tipo_display()} - "
+            f"{self.timestamp:%d/%m/%Y %H:%M}"
         )

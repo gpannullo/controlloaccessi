@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.http import JsonResponse
@@ -17,10 +18,17 @@ from common.exceptions import (
     BusinessException,
     TicketPrinterException,
 )
-from visitors.forms import RegistrazioneVisitatoreForm, ChiusuraAccessoForm
+from visitors.forms import (
+    RegistrazioneVisitatoreForm,
+    ChiusuraAccessoForm,
+    RientroBadgeForm,
+)
 from visitors.models import (
     AccessoVisitatore,
     Visitatore,
+    Badge,
+    AmministratoreEnte,
+    TransitoAmministratore,
 )
 from visitors.services.reception_service import (
     ReceptionService,
@@ -29,6 +37,7 @@ from visitors.services.ticket_printer_service import (
     TicketPrinterService,
 )
 from visitors.permissions import portineria_required
+from visitors.services.continuity_service import ContinuitaAccessoService
 
 def _normalizza_testo(value):
     return " ".join(
@@ -222,6 +231,7 @@ def _nuovo_accesso(request, tipo_accesso):
                     operatore=request.user,
                     ip_address=_get_client_ip(request),
                     tipo_accesso=tipo_accesso,
+                    accompagnato=form.cleaned_data.get("accompagnato", False),
                 )
 
             ticket_stampato = False
@@ -481,14 +491,25 @@ def chiudi_accesso(request, pk):
                         .strip()
                     ),
                     ip_address=_get_client_ip(request),
+                    riserva_badge_rientro=(
+                        request.POST.get("azione") == "rientro"
+                    ),
                 )
 
+                riservato = (
+                    request.POST.get("azione") == "rientro"
+                )
+                testo_badge = (
+                    "Il badge resta riservato per il rientro."
+                    if riservato
+                    else "Il badge è nuovamente disponibile."
+                )
                 messages.success(
                     request,
                     (
                         "Uscita registrata correttamente alle "
                         f"{timezone.localtime(form.cleaned_data['uscita']):%H:%M}. "
-                        "Il badge è nuovamente disponibile."
+                        f"{testo_badge}"
                     ),
                 )
 
@@ -510,3 +531,157 @@ def chiudi_accesso(request, pk):
             "form": form,
         },
     )
+
+@portineria_required
+def rientro_badge(request):
+    form = RientroBadgeForm(request.POST or None)
+    badge_riservati = Badge.objects.filter(
+        attivo=True, riservato_rientro=True
+    ).order_by("codice")
+
+    if request.method == "POST" and form.is_valid():
+        try:
+            accesso = ContinuitaAccessoService.rientro_da_badge(
+                codice_badge=form.cleaned_data["badge"],
+                operatore=request.user,
+                ip_address=_get_client_ip(request),
+            )
+            messages.success(
+                request,
+                f"Rientro registrato. Badge {accesso.badge.codice}, "
+                f"coda {accesso.numero_coda_formattato} con priorità.",
+            )
+            return redirect(
+                "portineria:registrazione_completata", pk=accesso.pk
+            )
+        except BusinessException as exc:
+            form.add_error("badge", str(exc))
+
+    return render(
+        request,
+        "visitors/rientro_badge.html",
+        {"form": form, "badge_riservati": badge_riservati},
+    )
+
+
+@portineria_required
+@require_POST
+def libera_badge_rientro(request, badge_id):
+    badge = get_object_or_404(Badge, pk=badge_id)
+    try:
+        ContinuitaAccessoService.libera_badge_rientro(
+            badge=badge,
+            operatore=request.user,
+            ip_address=_get_client_ip(request),
+        )
+        messages.success(
+            request, f"Badge {badge.codice} nuovamente disponibile."
+        )
+    except BusinessException as exc:
+        messages.warning(request, str(exc))
+    return redirect("portineria:rientro_badge")
+
+
+@portineria_required
+def amministratori(request):
+    """
+    Pannello portineria per la registrazione rapida dei transiti
+    degli utenti appartenenti ai gruppi AD Giunta e Consiglieri.
+    La portineria non calcola né mostra lo stato presente/assente.
+    """
+    User = get_user_model()
+
+    def prepara_gruppo(nome_gruppo):
+        utenti = list(
+            User.objects
+            .filter(
+                is_active=True,
+                groups__name=nome_gruppo,
+            )
+            .distinct()
+            .order_by(
+                "last_name",
+                "first_name",
+                "username",
+            )
+        )
+
+        persone = []
+
+        for utente in utenti:
+            persona, _ = AmministratoreEnte.objects.get_or_create(
+                utente=utente,
+                defaults={
+                    "attivo": True,
+                    "ordine": 0,
+                },
+            )
+
+            if not persona.attivo:
+                persona.attivo = True
+                persona.save(update_fields=["attivo"])
+
+            persone.append(persona)
+
+        return persone
+
+    return render(
+        request,
+        "visitors/amministratori.html",
+        {
+            "giunta": prepara_gruppo("Giunta"),
+            "consiglieri": prepara_gruppo("Consiglieri"),
+        },
+    )
+
+
+@portineria_required
+@require_POST
+def registra_transito_amministratore(request, pk):
+    """
+    Registra il passaggio indicato esplicitamente dall'operatore:
+    ingresso oppure uscita. Nessun calcolo di stato viene eseguito
+    nella pagina di portineria.
+    """
+    persona = get_object_or_404(
+        AmministratoreEnte.objects.select_related("utente"),
+        pk=pk,
+        attivo=True,
+        utente__is_active=True,
+    )
+
+    tipo = request.POST.get("tipo")
+
+    tipi_validi = {
+        TransitoAmministratore.Tipo.INGRESSO,
+        TransitoAmministratore.Tipo.USCITA,
+    }
+
+    if tipo not in tipi_validi:
+        messages.error(
+            request,
+            "Tipo di transito non valido.",
+        )
+        return redirect("portineria:amministratori")
+
+    transito = TransitoAmministratore.objects.create(
+        amministratore=persona,
+        tipo=tipo,
+        operatore=request.user,
+    )
+
+    nome = (
+        persona.utente.get_full_name()
+        or persona.utente.username
+    )
+
+    messages.success(
+        request,
+        (
+            f"{transito.get_tipo_display()} registrato per "
+            f"{nome} alle "
+            f"{timezone.localtime(transito.timestamp):%H:%M}."
+        ),
+    )
+
+    return redirect("portineria:amministratori")

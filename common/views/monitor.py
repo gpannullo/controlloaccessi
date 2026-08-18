@@ -1,3 +1,4 @@
+from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
@@ -131,29 +132,43 @@ def _stato_monitor():
         # PROSSIMI TRE NUMERI
         # =====================================================
 
-        prioritari = list(
+        rientri = list(
             AccessoVisitatore.objects
             .filter(
                 ufficio_destinazione=ufficio,
                 ingresso__date=oggi,
                 uscita__isnull=True,
-                appuntamento__isnull=False,
+                rientro_prioritario=True,
                 spostato_fuori_ufficio_il__isnull=True,
                 ingresso_ufficio_il__isnull=True,
                 visita_conclusa_il__isnull=True,
             )
-            .select_related("appuntamento")
-            .order_by(
-                "appuntamento__data_ora",
-                "ingresso",
-                "numero_coda",
-            )[:3]
+            .order_by("ingresso", "numero_coda")[:3]
         )
 
-        posti_residui = 3 - len(prioritari)
+        posti_residui = 3 - len(rientri)
+        appuntamenti = []
+        if posti_residui > 0:
+            appuntamenti = list(
+                AccessoVisitatore.objects
+                .filter(
+                    ufficio_destinazione=ufficio,
+                    ingresso__date=oggi,
+                    uscita__isnull=True,
+                    rientro_prioritario=False,
+                    appuntamento__isnull=False,
+                    spostato_fuori_ufficio_il__isnull=True,
+                    ingresso_ufficio_il__isnull=True,
+                    visita_conclusa_il__isnull=True,
+                )
+                .select_related("appuntamento")
+                .order_by(
+                    "appuntamento__data_ora", "ingresso", "numero_coda"
+                )[:posti_residui]
+            )
 
+        posti_residui -= len(appuntamenti)
         ordinari = []
-
         if posti_residui > 0:
             ordinari = list(
                 AccessoVisitatore.objects
@@ -161,24 +176,22 @@ def _stato_monitor():
                     ufficio_destinazione=ufficio,
                     ingresso__date=oggi,
                     uscita__isnull=True,
+                    rientro_prioritario=False,
                     appuntamento__isnull=True,
                     spostato_fuori_ufficio_il__isnull=True,
                     ingresso_ufficio_il__isnull=True,
                     visita_conclusa_il__isnull=True,
                 )
-                .order_by(
-                    "ingresso",
-                    "numero_coda",
-                )[:posti_residui]
+                .order_by("ingresso", "numero_coda")[:posti_residui]
             )
 
-        prossimi_accessi = prioritari + ordinari
+        prossimi_accessi = rientri + appuntamenti + ordinari
 
         prossimi_numeri = [
             {
                 "id": accesso.pk,
                 "numero": accesso.numero_coda_formattato,
-                "prioritario": accesso.appuntamento_id is not None,
+                "prioritario": accesso.prioritario,
             }
             for accesso in prossimi_accessi
         ]

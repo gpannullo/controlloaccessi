@@ -30,6 +30,7 @@ class ReceptionService:
             ip_address=None,
             appuntamento=None,
             tipo_accesso=AccessoVisitatore.TipoAccesso.RICEVIMENTO,
+            accompagnato=False,
     ):
         accesso_esistente = (
             AccessoVisitatore.objects
@@ -83,6 +84,7 @@ class ReceptionService:
             numero_coda=numero_coda,
             note=note,
             documento_presentato=documento_presentato,
+            accompagnato=accompagnato,
             stato_coda=AccessoVisitatore.StatoCoda.HALL,
             tipo_accesso=tipo_accesso,
             appuntamento=appuntamento,
@@ -126,6 +128,7 @@ class ReceptionService:
             operatore,
             note_chiusura="",
             ip_address=None,
+            riserva_badge_rientro=False,
     ):
         accesso = (
             AccessoVisitatore.objects
@@ -158,6 +161,14 @@ class ReceptionService:
             ]
         )
 
+        if accesso.badge_id:
+            accesso.badge.riservato_rientro = bool(
+                riserva_badge_rientro
+            )
+            accesso.badge.save(
+                update_fields=["riservato_rientro"]
+            )
+
         descrizione = (
             f"Chiusura accesso {accesso.pk}; "
             f"badge "
@@ -165,6 +176,9 @@ class ReceptionService:
             f"uscita dichiarata "
             f"{timezone.localtime(uscita):%d/%m/%Y %H:%M}."
         )
+
+        if riserva_badge_rientro:
+            descrizione += " Badge riservato per rientro."
 
         if note_chiusura:
             descrizione += (

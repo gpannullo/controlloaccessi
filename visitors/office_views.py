@@ -12,6 +12,7 @@ from common.exceptions import BusinessException
 from visitors.models import AccessoVisitatore
 from visitors.permissions import ufficio_required
 from visitors.services.capacity_service import CapacityService
+from visitors.services.continuity_service import ContinuitaAccessoService
 from visitors.services.office_queue_service import (
     OfficeQueueService,
 )
@@ -119,7 +120,8 @@ def ufficio_dashboard(request, ufficio_id):
     )
 
     ha_ricevimenti_fuori = any(
-        accesso.appuntamento_id is not None
+        accesso.rientro_prioritario
+        or accesso.appuntamento_id is not None
         or (
             accesso.tipo_accesso
             == AccessoVisitatore.TipoAccesso.RICEVIMENTO
@@ -145,6 +147,12 @@ def ufficio_dashboard(request, ufficio_id):
         )
     )
 
+    uffici_trasferimento = list(
+        Ufficio.objects.filter(attivo=True)
+        .exclude(pk=ufficio.pk)
+        .order_by("nome")
+    )
+
     return render(
         request,
         "visitors/ufficio_dashboard.html",
@@ -165,6 +173,7 @@ def ufficio_dashboard(request, ufficio_id):
             "numero_in_ufficio": len(
                 visite_in_corso
             ),
+            "uffici_trasferimento": uffici_trasferimento,
         },
     )
 
@@ -427,6 +436,38 @@ def aggiorna_coda_fuori(request, ufficio_id):
         "uffici:dashboard",
         ufficio_id=ufficio.pk,
     )
+
+
+
+@ufficio_required
+@require_POST
+def trasferisci_visitatore(request, ufficio_id, accesso_id):
+    ufficio = _get_ufficio_autorizzato(request.user, ufficio_id)
+    accesso = get_object_or_404(
+        AccessoVisitatore, pk=accesso_id, ufficio_destinazione=ufficio
+    )
+    nuovo_ufficio = get_object_or_404(
+        Ufficio,
+        pk=request.POST.get("nuovo_ufficio"),
+        attivo=True,
+    )
+    note = (request.POST.get("note_trasferimento") or "").strip()
+    try:
+        nuovo_accesso = ContinuitaAccessoService.trasferisci_ufficio(
+            accesso=accesso,
+            nuovo_ufficio=nuovo_ufficio,
+            operatore=request.user,
+            note=note,
+            ip_address=_get_client_ip(request),
+        )
+        messages.success(
+            request,
+            f"Visitatore trasferito a {nuovo_ufficio.nome}. "
+            f"Nuova coda {nuovo_accesso.numero_coda_formattato}.",
+        )
+    except BusinessException as exc:
+        messages.warning(request, str(exc))
+    return redirect("uffici:dashboard", ufficio_id=ufficio.pk)
 
 @ufficio_required
 @require_GET

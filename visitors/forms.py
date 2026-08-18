@@ -65,6 +65,12 @@ class RegistrazioneVisitatoreForm(forms.Form):
         label="Telefono",
     )
 
+    accompagnato = forms.BooleanField(
+        required=False,
+        initial=False,
+        label="Il visitatore è accompagnato",
+    )
+
     ufficio = forms.ModelChoiceField(
         queryset=Ufficio.objects.none(),
         label="Ufficio di destinazione",
@@ -237,6 +243,23 @@ class RegistrazioneVisitatoreForm(forms.Form):
             cleaned_data["documento_scadenza"] = None
 
         return cleaned_data
+
+
+class RientroBadgeForm(forms.Form):
+    badge = forms.CharField(
+        max_length=10,
+        label="Codice badge",
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "autocomplete": "off",
+                "autofocus": True,
+            }
+        ),
+    )
+
+    def clean_badge(self):
+        return self.cleaned_data["badge"].strip().upper()
 
 
 class ChiusuraAccessoForm(forms.Form):

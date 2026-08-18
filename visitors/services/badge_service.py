@@ -38,6 +38,7 @@ class BadgeService:
             .select_for_update()
             .filter(
                 attivo=True,
+                riservato_rientro=False,
             )
             .exclude(
                 pk__in=badge_occupati,
@@ -75,6 +76,7 @@ class BadgeService:
             Badge.objects
             .filter(
                 attivo=True,
+                riservato_rientro=False,
             )
             .exclude(
                 pk__in=badge_occupati,

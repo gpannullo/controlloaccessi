@@ -240,7 +240,14 @@
 
                     <div class="row g-3">
 
-                        <div class="col-md-6">
+                                                <div class="form-check mb-4">
+                            {{ form.accompagnato }}
+                            <label class="form-check-label" for="{{ form.accompagnato.id_for_label }}">
+                                {{ form.accompagnato.label }}
+                            </label>
+                        </div>
+
+<div class="col-md-6">
                             <label
                                 class="form-label"
                                 for="{{ form.ufficio.id_for_label }}"

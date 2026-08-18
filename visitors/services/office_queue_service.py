@@ -83,28 +83,23 @@ class OfficeQueueService:
 
     @staticmethod
     def coda_prioritaria(ufficio):
-        """
-        Visitatori prenotati già arrivati e ancora
-        in attesa nella hall.
-        """
-
+        """Rientri prioritari e appuntamenti ancora nella hall."""
         return (
             AccessoVisitatore.objects
             .filter(
                 ufficio_destinazione=ufficio,
                 uscita__isnull=True,
-                appuntamento__isnull=False,
                 spostato_fuori_ufficio_il__isnull=True,
                 ingresso_ufficio_il__isnull=True,
                 visita_conclusa_il__isnull=True,
             )
-            .select_related(
-                "visitatore",
-                "badge",
-                "appuntamento",
+            .filter(
+                Q(rientro_prioritario=True)
+                | Q(appuntamento__isnull=False)
             )
+            .select_related("visitatore", "badge", "appuntamento")
             .order_by(
-                "appuntamento__data_ora",
+                "-rientro_prioritario",
                 "ingresso",
                 "numero_coda",
             )
@@ -123,6 +118,7 @@ class OfficeQueueService:
                 ufficio_destinazione=ufficio,
                 uscita__isnull=True,
                 appuntamento__isnull=True,
+                rientro_prioritario=False,
                 spostato_fuori_ufficio_il__isnull=True,
                 ingresso_ufficio_il__isnull=True,
                 visita_conclusa_il__isnull=True,
@@ -181,30 +177,43 @@ class OfficeQueueService:
         if numero_posti <= 0:
             return []
 
-        prioritari = list(
+        rientri = list(
             AccessoVisitatore.objects
             .select_for_update()
             .filter(
                 ufficio_destinazione=ufficio,
                 uscita__isnull=True,
-                appuntamento__isnull=False,
-                tipo_accesso=(
-                    AccessoVisitatore.TipoAccesso.RICEVIMENTO
-                ),
+                rientro_prioritario=True,
                 spostato_fuori_ufficio_il__isnull=True,
                 ingresso_ufficio_il__isnull=True,
                 visita_conclusa_il__isnull=True,
             )
-            .order_by(
-                "appuntamento__data_ora",
-                "ingresso",
-                "numero_coda",
-            )[:numero_posti]
+            .order_by("ingresso", "numero_coda")[:numero_posti]
         )
 
-        posti_residui = numero_posti - len(prioritari)
-        ordinari = []
+        posti_residui = numero_posti - len(rientri)
+        prioritari = []
+        if posti_residui > 0:
+            prioritari = list(
+                AccessoVisitatore.objects
+                .select_for_update()
+                .filter(
+                    ufficio_destinazione=ufficio,
+                    uscita__isnull=True,
+                    rientro_prioritario=False,
+                    appuntamento__isnull=False,
+                    tipo_accesso=AccessoVisitatore.TipoAccesso.RICEVIMENTO,
+                    spostato_fuori_ufficio_il__isnull=True,
+                    ingresso_ufficio_il__isnull=True,
+                    visita_conclusa_il__isnull=True,
+                )
+                .order_by(
+                    "appuntamento__data_ora", "ingresso", "numero_coda"
+                )[:posti_residui]
+            )
 
+        posti_residui -= len(prioritari)
+        ordinari = []
         if posti_residui > 0:
             ordinari = list(
                 AccessoVisitatore.objects
@@ -212,21 +221,17 @@ class OfficeQueueService:
                 .filter(
                     ufficio_destinazione=ufficio,
                     uscita__isnull=True,
+                    rientro_prioritario=False,
                     appuntamento__isnull=True,
-                    tipo_accesso=(
-                        AccessoVisitatore.TipoAccesso.RICEVIMENTO
-                    ),
+                    tipo_accesso=AccessoVisitatore.TipoAccesso.RICEVIMENTO,
                     spostato_fuori_ufficio_il__isnull=True,
                     ingresso_ufficio_il__isnull=True,
                     visita_conclusa_il__isnull=True,
                 )
-                .order_by(
-                    "ingresso",
-                    "numero_coda",
-                )[:posti_residui]
+                .order_by("ingresso", "numero_coda")[:posti_residui]
             )
 
-        accessi = prioritari + ordinari
+        accessi = rientri + prioritari + ordinari
         momento = timezone.now()
 
         for accesso in accessi:
@@ -457,22 +462,16 @@ class OfficeQueueService:
                 visita_conclusa_il__isnull=True,
             )
             .filter(
-                Q(appuntamento__isnull=False)
-                | Q(
-                    tipo_accesso=(
-                        AccessoVisitatore
-                        .TipoAccesso
-                        .RICEVIMENTO
-                    )
-                )
+                Q(rientro_prioritario=True)
+                | Q(appuntamento__isnull=False)
+                | Q(tipo_accesso=AccessoVisitatore.TipoAccesso.RICEVIMENTO)
             )
         )
 
         accesso = (
             base
-            .filter(appuntamento__isnull=False)
+            .filter(rientro_prioritario=True)
             .order_by(
-                "appuntamento__data_ora",
                 "spostato_fuori_ufficio_il",
                 "ingresso",
                 "numero_coda",
@@ -483,7 +482,23 @@ class OfficeQueueService:
         if accesso is None:
             accesso = (
                 base
-                .filter(appuntamento__isnull=True)
+                .filter(
+                    rientro_prioritario=False,
+                    appuntamento__isnull=False,
+                )
+                .order_by(
+                    "appuntamento__data_ora",
+                    "spostato_fuori_ufficio_il",
+                    "ingresso",
+                    "numero_coda",
+                )
+                .first()
+            )
+
+        if accesso is None:
+            accesso = (
+                base
+                .filter(rientro_prioritario=False, appuntamento__isnull=True)
                 .order_by(
                     "spostato_fuori_ufficio_il",
                     "ingresso",
