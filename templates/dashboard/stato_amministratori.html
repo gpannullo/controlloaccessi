@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Stato amministratori{% endblock %}
+
+{% block content %}
+<style>
+    .persona-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: .75rem;
+    }
+
+    @media (max-width: 1199px) {
+        .persona-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 767px) {
+        .persona-grid {
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+        }
+    }
+</style>
+
+<div class="container-fluid py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">Amministratori</h1>
+            <p class="text-muted mb-0">
+                Stato attuale ricavato dall'ultimo transito registrato.
+            </p>
+        </div>
+
+        <a
+            href="{% url 'dashboard:dirigenza_home' %}"
+            class="btn btn-outline-primary"
+        >
+            Torna al pannello
+        </a>
+    </div>
+
+    {% include "dashboard/_stato_gruppo_amministratori.html" with titolo="Giunta" persone=giunta %}
+    {% include "dashboard/_stato_gruppo_amministratori.html" with titolo="Consiglieri" persone=consiglieri %}
+
+</div>
+{% endblock %}

@@ -1,0 +1,48 @@
+<section class="mb-4">
+    <h2 class="h5 mb-3">{{ titolo }}</h2>
+
+    <div class="persona-grid">
+        {% for riga in persone %}
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                        <strong>
+                            {% firstof riga.utente.get_full_name riga.utente.username %}
+                        </strong>
+
+                        {% if riga.presente %}
+                            <span class="badge bg-success">
+                                Presente
+                            </span>
+                        {% else %}
+                            <span class="badge bg-secondary">
+                                Assente
+                            </span>
+                        {% endif %}
+                    </div>
+
+                    <div class="small text-muted mt-2">
+                        {% if riga.ultimo_transito %}
+                            Ultimo:
+                            {{ riga.ultimo_transito.get_tipo_display }}
+                            · {{ riga.ultimo_transito.timestamp|date:"d/m/Y H:i" }}
+                        {% else %}
+                            Nessun transito registrato
+                        {% endif %}
+                    </div>
+
+                    <a
+                        href="{% url 'dashboard:log_amministratore' riga.profilo.pk %}"
+                        class="btn btn-sm btn-outline-primary mt-3"
+                    >
+                        Visualizza log
+                    </a>
+                </div>
+            </div>
+        {% empty %}
+            <div class="text-muted">
+                Nessun utente attivo nel gruppo {{ titolo }}.
+            </div>
+        {% endfor %}
+    </div>
+</section>

@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}
+Dirigenti / Funzionari EQ - Controllo Accessi
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-5">
+        <div>
+            <h1 class="display-6 fw-semibold mb-2">
+                Dirigenti / Funzionari EQ
+            </h1>
+            <p class="text-muted fs-5 mb-0">
+                Consultazione visitatori, amministratori e indicatori degli uffici.
+            </p>
+        </div>
+
+        <a href="{% url 'home' %}" class="btn btn-outline-primary">
+            Torna alla home
+        </a>
+    </div>
+
+    <div class="row g-4">
+
+        <div class="col-md-6 col-xl-4">
+            <a
+                href="{% url 'dashboard:statistiche_uffici' %}"
+                class="card h-100 shadow-sm text-decoration-none text-body"
+            >
+                <div class="card-body p-4">
+                    <div
+                        class="rounded-circle bg-primary-subtle text-primary
+                               d-flex align-items-center justify-content-center mb-4"
+                        style="width:64px;height:64px;"
+                    >
+                        <span class="fs-2">S</span>
+                    </div>
+
+                    <h2 class="h4">Statistiche uffici</h2>
+
+                    <p class="text-muted">
+                        Tempi medi, presenze, domanda e capacità
+                        degli uffici.
+                    </p>
+
+                    <span class="btn btn-primary">
+                        Apri statistiche
+                    </span>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-md-6 col-xl-4">
+            <a
+                href="{% url 'dashboard:ricerca_visitatori' %}"
+                class="card h-100 shadow-sm text-decoration-none text-body"
+            >
+                <div class="card-body p-4">
+                    <div
+                        class="rounded-circle bg-success-subtle text-success
+                               d-flex align-items-center justify-content-center mb-4"
+                        style="width:64px;height:64px;"
+                    >
+                        <span class="fs-2">V</span>
+                    </div>
+
+                    <h2 class="h4">Ricerca visitatore</h2>
+
+                    <p class="text-muted">
+                        Ricerca nell'anagrafica e consultazione
+                        dello storico degli accessi.
+                    </p>
+
+                    <span class="btn btn-success">
+                        Cerca visitatore
+                    </span>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-md-6 col-xl-4">
+            <a
+                href="{% url 'dashboard:stato_amministratori' %}"
+                class="card h-100 shadow-sm text-decoration-none text-body"
+            >
+                <div class="card-body p-4">
+                    <div
+                        class="rounded-circle bg-warning-subtle text-warning-emphasis
+                               d-flex align-items-center justify-content-center mb-4"
+                        style="width:64px;height:64px;"
+                    >
+                        <span class="fs-2">A</span>
+                    </div>
+
+                    <h2 class="h4">Amministratori</h2>
+
+                    <p class="text-muted">
+                        Stato attuale di Giunta e Consiglieri
+                        e storico dei relativi transiti.
+                    </p>
+
+                    <div class="small mb-3">
+                        Presenti:
+                        <strong>{{ numero_amministratori_presenti }}</strong>
+                        · Giunta {{ numero_giunta }}
+                        · Consiglieri {{ numero_consiglieri }}
+                    </div>
+
+                    <span class="btn btn-warning">
+                        Visualizza amministratori
+                    </span>
+                </div>
+            </a>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

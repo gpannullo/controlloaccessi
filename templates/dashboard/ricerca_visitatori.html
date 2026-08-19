@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Ricerca visitatori{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">Ricerca visitatori</h1>
+            <p class="text-muted mb-0">
+                Consultazione riservata dell'anagrafica visitatori.
+            </p>
+        </div>
+
+        <a
+            href="{% url 'dashboard:dirigenza_home' %}"
+            class="btn btn-outline-primary"
+        >
+            Torna al pannello
+        </a>
+    </div>
+
+    <form method="get" class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+            <label for="q" class="form-label">
+                Nome, cognome, codice fiscale, documento o telefono
+            </label>
+
+            <div class="input-group">
+                <input
+                    id="q"
+                    name="q"
+                    type="search"
+                    class="form-control form-control-lg"
+                    value="{{ query }}"
+                    autocomplete="off"
+                    autofocus
+                >
+                <button class="btn btn-primary" type="submit">
+                    Cerca
+                </button>
+            </div>
+        </div>
+    </form>
+
+    {% if query %}
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white">
+                <strong>Risultati</strong>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Cognome e nome</th>
+                            <th>Codice fiscale</th>
+                            <th>Documento</th>
+                            <th>Telefono</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for visitatore in risultati %}
+                        <tr>
+                            <td>
+                                <strong>
+                                    {{ visitatore.cognome }}
+                                    {{ visitatore.nome }}
+                                </strong>
+                            </td>
+                            <td>{{ visitatore.codice_fiscale|default:"—" }}</td>
+                            <td>{{ visitatore.documento_numero|default:"—" }}</td>
+                            <td>{{ visitatore.telefono|default:"—" }}</td>
+                            <td class="text-end">
+                                <a
+                                    href="{% url 'dashboard:dettaglio_visitatore' visitatore.pk %}"
+                                    class="btn btn-sm btn-outline-primary"
+                                >
+                                    Apri
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">
+                                Nessun visitatore trovato.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

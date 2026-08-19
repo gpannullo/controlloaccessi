@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}Dettaglio visitatore{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">
+                {{ visitatore.cognome }} {{ visitatore.nome }}
+            </h1>
+            <p class="text-muted mb-0">
+                Storico degli accessi del visitatore.
+            </p>
+        </div>
+
+        <a
+            href="{% url 'dashboard:ricerca_visitatori' %}"
+            class="btn btn-outline-primary"
+        >
+            Torna alla ricerca
+        </a>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <div class="text-muted small">Codice fiscale</div>
+                    <strong>{{ visitatore.codice_fiscale|default:"—" }}</strong>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="text-muted small">Documento</div>
+                    <strong>
+                        {{ visitatore.documento_tipo|default:"" }}
+                        {{ visitatore.documento_numero|default:"—" }}
+                    </strong>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="text-muted small">Scadenza documento</div>
+                    <strong>
+                        {{ visitatore.documento_scadenza|date:"d/m/Y"|default:"—" }}
+                    </strong>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="text-muted small">Telefono</div>
+                    <strong>{{ visitatore.telefono|default:"—" }}</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-white">
+            <strong>Accessi</strong>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Ingresso</th>
+                        <th>Ufficio</th>
+                        <th>Tipo</th>
+                        <th>Coda</th>
+                        <th>Badge</th>
+                        <th>Stato</th>
+                        <th>Uscita</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for accesso in accessi %}
+                    <tr>
+                        <td>{{ accesso.ingresso|date:"d/m/Y H:i" }}</td>
+                        <td>{{ accesso.ufficio_destinazione.nome }}</td>
+                        <td>{{ accesso.get_tipo_accesso_display }}</td>
+                        <td>{{ accesso.numero_coda_formattato|default:"—" }}</td>
+                        <td>
+                            {% if accesso.badge %}
+                                {{ accesso.badge.codice }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>{{ accesso.get_stato_coda_display }}</td>
+                        <td>
+                            {% if accesso.uscita %}
+                                {{ accesso.uscita|date:"d/m/Y H:i" }}
+                            {% else %}
+                                <span class="badge bg-success">Presente</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">
+                            Nessun accesso registrato.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

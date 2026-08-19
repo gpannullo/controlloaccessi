@@ -218,12 +218,19 @@ class QueueService:
 
         if posti_fuori > 0:
 
+            accesso.stato_coda = (
+                AccessoVisitatore
+                .StatoCoda
+                .FUORI_UFFICIO
+            )
+
             accesso.spostato_fuori_ufficio_il = (
                 timezone.now()
             )
 
             accesso.save(
                 update_fields=[
+                    "stato_coda",
                     "spostato_fuori_ufficio_il",
                 ]
             )
@@ -241,11 +248,18 @@ class QueueService:
 
         else:
 
+            accesso.stato_coda = (
+                AccessoVisitatore
+                .StatoCoda
+                .HALL
+            )
+
             # Rimane nella hall.
             accesso.spostato_fuori_ufficio_il = None
 
             accesso.save(
                 update_fields=[
+                    "stato_coda",
                     "spostato_fuori_ufficio_il",
                 ]
             )

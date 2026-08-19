@@ -1,0 +1,12 @@
+[Unit]
+Description=Snapshot presenze uffici ControlloAccessi
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=controlloaccessi
+Group=controlloaccessi
+WorkingDirectory=/var/www/controlloaccessi/app
+EnvironmentFile=/etc/controlloaccessi.env
+ExecStart=/var/www/controlloaccessi/venv/bin/python manage.py snapshot_presenze

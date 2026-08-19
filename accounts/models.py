@@ -1,6 +1,8 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
+from access_control.models import Ufficio
+
 
 class CustomUser(AbstractUser):
     """
@@ -73,4 +75,73 @@ class CustomUser(AbstractUser):
         return (
                 self.tipo_attivita
                 == self.TipoAttivita.SPORTELLISTA
+        )
+
+
+class SnapshotPresenzaUfficio(models.Model):
+    """
+    Fotografia della presenza dei dipendenti di un ufficio
+    in un determinato momento.
+
+    Serve per costruire statistiche storiche:
+    - dipendenti medi presenti;
+    - sportellisti medi presenti;
+    - capacità media dell'ufficio.
+    """
+
+    ufficio = models.ForeignKey(
+        Ufficio,
+        on_delete=models.CASCADE,
+        related_name="snapshot_presenze",
+        verbose_name="Ufficio",
+    )
+
+    rilevato_il = models.DateTimeField(
+        db_index=True,
+        verbose_name="Rilevato il",
+    )
+
+    dipendenti_presenti = models.PositiveSmallIntegerField(
+        default=0,
+        verbose_name="Dipendenti presenti",
+    )
+
+    sportellisti_presenti = models.PositiveSmallIntegerField(
+        default=0,
+        verbose_name="Sportellisti presenti",
+    )
+
+    dipendenti_totali = models.PositiveSmallIntegerField(
+        default=0,
+        verbose_name="Dipendenti assegnati",
+    )
+
+    sportellisti_totali = models.PositiveSmallIntegerField(
+        default=0,
+        verbose_name="Sportellisti assegnati",
+    )
+
+    class Meta:
+        ordering = [
+            "-rilevato_il",
+        ]
+
+        indexes = [
+            models.Index(
+                fields=[
+                    "ufficio",
+                    "rilevato_il",
+                ],
+                name="idx_presenza_ufficio_data",
+            ),
+        ]
+
+        verbose_name = "Snapshot presenza ufficio"
+        verbose_name_plural = "Snapshot presenze uffici"
+
+    def __str__(self):
+        return (
+            f"{self.ufficio} - "
+            f"{self.rilevato_il:%d/%m/%Y %H:%M} - "
+            f"{self.dipendenti_presenti} presenti"
         )

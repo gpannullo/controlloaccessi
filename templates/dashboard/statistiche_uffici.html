@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+
+{% block title %}Statistiche uffici - Controllo Accessi{% endblock %}
+
+{% block content %}
+<style>
+    .metric-number {
+        font-size: 1.65rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    .metric-label {
+        font-size: .82rem;
+        color: #6c757d;
+    }
+
+    .stats-table th,
+    .stats-table td {
+        white-space: nowrap;
+        font-size: .88rem;
+    }
+</style>
+
+<div class="container-fluid py-4">
+
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+        <div>
+            <h1 class="h3 mb-1">Statistiche uffici</h1>
+            <p class="text-muted mb-0">
+                Tempi, domanda, presenza e capacità degli uffici.
+            </p>
+        </div>
+
+        <div class="d-flex gap-2">
+            <form method="get">
+                <select
+                    name="giorni"
+                    class="form-select"
+                    onchange="this.form.submit()"
+                >
+                    <option value="30" {% if periodo_giorni == 30 %}selected{% endif %}>
+                        Ultimi 30 giorni
+                    </option>
+                    <option value="90" {% if periodo_giorni == 90 %}selected{% endif %}>
+                        Ultimi 90 giorni
+                    </option>
+                    <option value="180" {% if periodo_giorni == 180 %}selected{% endif %}>
+                        Ultimi 180 giorni
+                    </option>
+                    <option value="365" {% if periodo_giorni == 365 %}selected{% endif %}>
+                        Ultimo anno
+                    </option>
+                </select>
+            </form>
+
+            <a href="{% url 'home' %}" class="btn btn-outline-primary">
+                Torna alla home
+            </a>
+        </div>
+    </div>
+
+    <div class="alert alert-info">
+        La capacità media è una stima diagnostica:
+        <strong>sportellisti medi presenti × minuti di apertura ÷ tempo medio di servizio</strong>.
+        La capacità corrente, invece, è quella calcolata in tempo reale da CapacityService.
+    </div>
+
+    {% for riga in righe %}
+        <div class="card shadow-sm border-0 mb-4">
+
+            <div class="card-header bg-white py-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <strong class="fs-5">
+                        {{ riga.ufficio.nome }}
+                    </strong>
+
+                    {% if riga.capacita.accetta_non_prenotati %}
+                        <span class="badge bg-success">
+                            Nuovi ricevimenti accettati
+                        </span>
+                    {% else %}
+                        <span class="badge bg-danger">
+                            Nuovi ricevimenti non accettati
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card-body">
+
+                <h2 class="h6 mb-3">Tempi medi</h2>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <div class="p-3 bg-light rounded">
+                            <div class="metric-number">
+                                {{ riga.tempi.hall|floatformat:1 }}
+                                <span class="fs-6">min</span>
+                            </div>
+                            <div class="metric-label">
+                                Attesa in hall
+                                · {{ riga.tempi.campioni_hall }} campioni
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="p-3 bg-light rounded">
+                            <div class="metric-number">
+                                {{ riga.tempi.fuori|floatformat:1 }}
+                                <span class="fs-6">min</span>
+                            </div>
+                            <div class="metric-label">
+                                Attesa fuori ufficio
+                                · {{ riga.tempi.campioni_fuori }} campioni
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="p-3 bg-light rounded">
+                            <div class="metric-number">
+                                {{ riga.tempi.lavorazione|floatformat:1 }}
+                                <span class="fs-6">min</span>
+                            </div>
+                            <div class="metric-label">
+                                Tempo di lavorazione
+                                · {{ riga.tempi.campioni_lavorazione }} campioni
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4">
+
+                    <div class="col-xl-7">
+                        <h2 class="h6">
+                            Domanda e capacità media per giorno
+                        </h2>
+
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover stats-table align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Giorno</th>
+                                        <th class="text-end">Visitatori medi</th>
+                                        <th class="text-end">Dip. medi presenti</th>
+                                        <th class="text-end">Sportellisti medi</th>
+                                        <th class="text-end">Apertura</th>
+                                        <th class="text-end">Capacità media</th>
+                                        <th class="text-end">Margine</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for giorno in riga.capacita_media %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ giorno.nome }}</strong>
+                                        </td>
+
+                                        <td class="text-end">
+                                            {{ giorno.visitatori_medi|floatformat:1 }}
+                                        </td>
+
+                                        <td class="text-end">
+                                            {{ giorno.dipendenti_presenti|floatformat:1 }}
+                                        </td>
+
+                                        <td class="text-end">
+                                            {{ giorno.sportellisti_presenti|floatformat:1 }}
+                                        </td>
+
+                                        <td class="text-end">
+                                            {{ giorno.minuti_apertura }} min
+                                        </td>
+
+                                        <td class="text-end">
+                                            <strong>
+                                                {{ giorno.capacita_media|floatformat:1 }}
+                                            </strong>
+                                        </td>
+
+                                        <td class="text-end">
+                                            {% if giorno.margine >= 0 %}
+                                                <span class="text-success fw-semibold">
+                                                    +{{ giorno.margine|floatformat:1 }}
+                                                </span>
+                                            {% else %}
+                                                <span class="text-danger fw-semibold">
+                                                    {{ giorno.margine|floatformat:1 }}
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="small text-muted">
+                            Il margine è capacità media stimata meno visitatori medi.
+                        </div>
+                    </div>
+
+                    <div class="col-xl-5">
+
+                        <h2 class="h6">Presenza</h2>
+
+                        <div class="border rounded p-3 mb-3">
+                            {% if riga.ultimo_snapshot %}
+                                <div class="small text-muted mb-2">
+                                    Ultima rilevazione:
+                                    {{ riga.ultimo_snapshot.rilevato_il|date:"d/m/Y H:i" }}
+                                </div>
+
+                                <div class="d-flex justify-content-between">
+                                    <span>Dipendenti presenti</span>
+                                    <strong>
+                                        {{ riga.ultimo_snapshot.dipendenti_presenti }}
+                                        /
+                                        {{ riga.ultimo_snapshot.dipendenti_totali }}
+                                    </strong>
+                                </div>
+
+                                <div class="d-flex justify-content-between">
+                                    <span>Sportellisti presenti</span>
+                                    <strong>
+                                        {{ riga.ultimo_snapshot.sportellisti_presenti }}
+                                        /
+                                        {{ riga.ultimo_snapshot.sportellisti_totali }}
+                                    </strong>
+                                </div>
+                            {% else %}
+                                <span class="text-muted">
+                                    Nessuno snapshot disponibile.
+                                </span>
+                            {% endif %}
+                        </div>
+
+                        <h2 class="h6">Calcolo capacità corrente</h2>
+
+                        <div class="border rounded p-3">
+                            <div class="d-flex justify-content-between">
+                                <span>Operatori disponibili</span>
+                                <strong>{{ riga.capacita.operatori }}</strong>
+                            </div>
+
+                            <div class="d-flex justify-content-between">
+                                <span>Tempo medio servizio</span>
+                                <strong>{{ riga.capacita.tempo_medio }} min</strong>
+                            </div>
+
+                            <div class="d-flex justify-content-between">
+                                <span>Minuti residui</span>
+                                <strong>{{ riga.capacita.minuti_residui }}</strong>
+                            </div>
+
+                            <div class="d-flex justify-content-between">
+                                <span>Capacità teorica</span>
+                                <strong>{{ riga.capacita.capacita_teorica }}</strong>
+                            </div>
+
+                            <div class="d-flex justify-content-between">
+                                <span>Persone da servire</span>
+                                <strong>{{ riga.capacita.persone_da_servire }}</strong>
+                            </div>
+
+                            <div class="d-flex justify-content-between">
+                                <span>Prenotazioni riservate</span>
+                                <strong>{{ riga.capacita.prenotazioni_riservate }}</strong>
+                            </div>
+
+                            <div class="d-flex justify-content-between">
+                                <span>Overbooking</span>
+                                <strong>{{ riga.capacita.overbooking }}</strong>
+                            </div>
+
+                            <hr>
+
+                            <div class="d-flex justify-content-between fs-5">
+                                <span>Posti ordinari disponibili</span>
+                                <strong>
+                                    {{ riga.capacita.posti_disponibili_ordinari }}
+                                </strong>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}

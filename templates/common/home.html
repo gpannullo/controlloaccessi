@@ -10,7 +10,6 @@ Controllo Accessi - Seleziona area
 
     {% if messages %}
         {% for message in messages %}
-
             <div
                 class="alert alert-{{ message.tags|default:'info' }}
                        alert-dismissible fade show"
@@ -25,11 +24,8 @@ Controllo Accessi - Seleziona area
                     aria-label="Chiudi"
                 ></button>
             </div>
-
         {% endfor %}
     {% endif %}
-
-    <!-- INTESTAZIONE -->
 
     <div
         class="d-flex flex-column flex-md-row
@@ -38,7 +34,6 @@ Controllo Accessi - Seleziona area
                gap-3 mb-5"
     >
         <div>
-
             <h1 class="display-6 fw-semibold mb-2">
                 Sistema di controllo accessi
             </h1>
@@ -46,11 +41,9 @@ Controllo Accessi - Seleziona area
             <p class="text-muted fs-5 mb-0">
                 Seleziona l’area applicativa alla quale vuoi accedere.
             </p>
-
         </div>
 
         <div class="text-md-end">
-
             <div class="fw-semibold">
                 {% firstof request.user.get_full_name request.user.username %}
             </div>
@@ -65,35 +58,25 @@ Controllo Accessi - Seleziona area
                 class="mt-2"
             >
                 {% csrf_token %}
-
                 <button
                     type="submit"
                     class="btn btn-sm btn-outline-secondary"
                 >
                     Esci
                 </button>
-
             </form>
-
         </div>
-
     </div>
-
-    <!-- SELEZIONE AREA -->
 
     <div class="row g-4">
 
-        <!-- PORTINERIA -->
-
         <div class="col-md-6 col-xl-4">
-
             <a
                 href="{% url 'dashboard:home' %}"
                 class="card h-100 shadow-sm
                        text-decoration-none text-body"
             >
                 <div class="card-body p-4">
-
                     <div
                         class="rounded-circle bg-primary-subtle
                                text-primary
@@ -101,14 +84,10 @@ Controllo Accessi - Seleziona area
                                justify-content-center mb-4"
                         style="width: 64px; height: 64px;"
                     >
-                        <span class="fs-2">
-                            P
-                        </span>
+                        <span class="fs-2">P</span>
                     </div>
 
-                    <h2 class="h4">
-                        Portineria
-                    </h2>
+                    <h2 class="h4">Portineria</h2>
 
                     <p class="text-muted">
                         Registrazione dei visitatori, consegna badge,
@@ -118,23 +97,17 @@ Controllo Accessi - Seleziona area
                     <span class="btn btn-primary">
                         Accedi alla portineria
                     </span>
-
                 </div>
             </a>
-
         </div>
 
-        <!-- UFFICI -->
-
         <div class="col-md-6 col-xl-4">
-
             <a
                 href="{% url 'uffici:selezione' %}"
                 class="card h-100 shadow-sm
                        text-decoration-none text-body"
             >
                 <div class="card-body p-4">
-
                     <div
                         class="rounded-circle bg-success-subtle
                                text-success
@@ -142,14 +115,10 @@ Controllo Accessi - Seleziona area
                                justify-content-center mb-4"
                         style="width: 64px; height: 64px;"
                     >
-                        <span class="fs-2">
-                            U
-                        </span>
+                        <span class="fs-2">U</span>
                     </div>
 
-                    <h2 class="h4">
-                        Gestione uffici
-                    </h2>
+                    <h2 class="h4">Gestione uffici</h2>
 
                     <p class="text-muted">
                         Gestione delle code, chiamata del prossimo
@@ -159,23 +128,17 @@ Controllo Accessi - Seleziona area
                     <span class="btn btn-success">
                         Seleziona un ufficio
                     </span>
-
                 </div>
             </a>
-
         </div>
 
-        <!-- MONITOR -->
-
         <div class="col-md-6 col-xl-4">
-
             <a
                 href="{% url 'monitor_home' %}"
                 class="card h-100 shadow-sm
                        text-decoration-none text-body"
             >
                 <div class="card-body p-4">
-
                     <div
                         class="rounded-circle bg-info-subtle
                                text-info
@@ -183,14 +146,10 @@ Controllo Accessi - Seleziona area
                                justify-content-center mb-4"
                         style="width: 64px; height: 64px;"
                     >
-                        <span class="fs-2">
-                            M
-                        </span>
+                        <span class="fs-2">M</span>
                     </div>
 
-                    <h2 class="h4">
-                        Monitor pubblico
-                    </h2>
+                    <h2 class="h4">Monitor pubblico</h2>
 
                     <p class="text-muted">
                         Visualizzazione a tutto schermo dei numeri
@@ -200,25 +159,52 @@ Controllo Accessi - Seleziona area
                     <span class="btn btn-info">
                         Apri il monitor
                     </span>
-
                 </div>
             </a>
-
         </div>
 
-        <!-- AMMINISTRAZIONE -->
+        <!-- DIRIGENTI / FUNZIONARI EQ -->
+        <div class="col-md-6 col-xl-4">
+            <a
+                href="{% url 'dashboard:dirigenza_home' %}"
+                class="card h-100 shadow-sm
+                       text-decoration-none text-body"
+            >
+                <div class="card-body p-4">
+                    <div
+                        class="rounded-circle bg-warning-subtle
+                               text-warning-emphasis
+                               d-flex align-items-center
+                               justify-content-center mb-4"
+                        style="width: 64px; height: 64px;"
+                    >
+                        <span class="fs-2">D</span>
+                    </div>
+
+                    <h2 class="h4">
+                        Dirigenti / Funzionari EQ
+                    </h2>
+
+                    <p class="text-muted">
+                        Statistiche degli uffici, ricerca visitatori
+                        e stato degli amministratori dell’Ente.
+                    </p>
+
+                    <span class="btn btn-warning">
+                        Apri pannello
+                    </span>
+                </div>
+            </a>
+        </div>
 
         {% if request.user.is_staff %}
-
             <div class="col-md-6 col-xl-4">
-
                 <a
                     href="{% url 'admin:index' %}"
                     class="card h-100 shadow-sm
                            text-decoration-none text-body"
                 >
                     <div class="card-body p-4">
-
                         <div
                             class="rounded-circle bg-secondary-subtle
                                    text-secondary
@@ -226,9 +212,7 @@ Controllo Accessi - Seleziona area
                                    justify-content-center mb-4"
                             style="width: 64px; height: 64px;"
                         >
-                            <span class="fs-2">
-                                A
-                            </span>
+                            <span class="fs-2">A</span>
                         </div>
 
                         <h2 class="h4">
@@ -243,24 +227,18 @@ Controllo Accessi - Seleziona area
                         <span class="btn btn-secondary">
                             Apri amministrazione
                         </span>
-
                     </div>
                 </a>
-
             </div>
-
         {% endif %}
 
     </div>
 
     <div class="alert alert-light border mt-5 mb-0">
-
         <strong>Autorizzazioni:</strong>
-
         la selezione di un’area non garantisce automaticamente
         l’accesso. Il sistema verifica le autorizzazioni dell’utente
         prima di mostrare la relativa dashboard.
-
     </div>
 
 </div>
