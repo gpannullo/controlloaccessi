@@ -22,3 +22,10 @@ def puo_accedere_area_dirigenza(user):
 dirigenza_required = user_passes_test(
     puo_accedere_area_dirigenza
 )
+
+
+def puo_amministrare_directory(user):
+    return bool(user.is_authenticated and user.is_superuser)
+
+
+directory_admin_required = user_passes_test(puo_amministrare_directory)

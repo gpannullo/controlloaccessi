@@ -232,6 +232,35 @@ Controllo Accessi - Seleziona area
             </div>
         {% endif %}
 
+        {% if request.user.is_superuser %}
+            <div class="col-md-6 col-xl-4">
+                <a
+                    href="{% url 'dashboard:directory_home' %}"
+                    class="card h-100 shadow-sm text-decoration-none text-body"
+                >
+                    <div class="card-body p-4">
+                        <div
+                            class="rounded-circle bg-danger-subtle text-danger
+                                   d-flex align-items-center justify-content-center mb-4"
+                            style="width: 64px; height: 64px;"
+                        >
+                            <span class="fs-2">AD</span>
+                        </div>
+
+                        <h2 class="h4">Active Directory</h2>
+
+                        <p class="text-muted">
+                            Gestione utenti e gruppi della directory.
+                        </p>
+
+                        <span class="btn btn-danger">
+                            Apri gestione Active Directory
+                        </span>
+                    </div>
+                </a>
+            </div>
+        {% endif %}
+
     </div>
 
     <div class="alert alert-light border mt-5 mb-0">

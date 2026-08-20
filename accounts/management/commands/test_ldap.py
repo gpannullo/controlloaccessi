@@ -1,6 +1,8 @@
 from django.core.management.base import BaseCommand
 from django.conf import settings
-from ldap3 import Server, Connection, ALL
+from ldap3 import Connection
+
+from accounts.services.active_directory_service import ActiveDirectoryService
 
 
 class Command(BaseCommand):
@@ -21,12 +23,7 @@ class Command(BaseCommand):
                 )
             )
 
-            server = Server(
-                settings.DIRECTORY["SERVER"],
-                port=settings.DIRECTORY.get("PORT", 389),
-                use_ssl=settings.DIRECTORY.get("USE_SSL", False),
-                get_info=ALL,
-            )
+            server = ActiveDirectoryService().server
 
             conn = Connection(
                 server,
@@ -35,7 +32,7 @@ class Command(BaseCommand):
                 auto_bind=True,
             )
 
-            self.stdout.write(self.style.SUCCESS("✓ Connessione riuscita"))
+            self.stdout.write(self.style.SUCCESS("Connessione LDAPS riuscita"))
 
         except Exception as ex:
 

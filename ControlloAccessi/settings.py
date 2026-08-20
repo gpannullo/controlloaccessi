@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "audit",
     "dashboard",
     "common",
+    "post_office",
 ]
 
 MIDDLEWARE = [
@@ -155,10 +156,12 @@ AUTHENTICATION_BACKENDS = [
 DIRECTORY_PROVIDER = "ACTIVE_DIRECTORY"
 
 DIRECTORY = {
-    "SERVER": os.getenv("AD_SERVER", "ldap://192.168.15.100"),
-    "PORT": int(os.getenv("AD_PORT", "389")),
-    "USE_SSL": os.getenv("AD_USE_SSL", "False").lower()
-    in {"1", "true", "yes", "on"},
+    # Configurazione LDAPS del primo Domain Controller.
+    "SERVER": "srvdomain.comuneaversa.local",
+    "PORT": 636,
+    "USE_SSL": True,
+    "TLS_CA_CERT_FILE": BASE_DIR / "cert" / "srvdomain-ldaps.cer",
+    "TLS_VALIDATE": True,
     "DOMAIN": os.getenv("AD_DOMAIN", "comuneaversa.local"),
     "BASE_DN": os.getenv(
         "AD_BASE_DN",
@@ -166,6 +169,7 @@ DIRECTORY = {
     ),
     "BIND_USER": os.getenv("AD_BIND_USER", ""),
     "BIND_PASSWORD": os.getenv("AD_BIND_PASSWORD", ""),
+    "WRITE_ENABLED": os.getenv("AD_WRITE_ENABLED", "True").lower() in {"1", "true", "yes", "on"},
     "USER_SEARCH_BASE": os.getenv(
         "AD_USER_SEARCH_BASE",
         "OU=Users,DC=comuneaversa,DC=local",
@@ -217,6 +221,28 @@ PRESENCE_CHECK_ENABLED = os.getenv(
 ).lower() in {"1", "true", "yes", "on"}
 
 PORTINERIA_GROUP_NAME = os.getenv("PORTINERIA_GROUP_NAME", "Portineria")
+
+# Coda e-mail gestita da django-post-office. Le credenziali SMTP restano
+# esterne al repository e sono fornite con variabili d'ambiente.
+EMAIL_BACKEND = "post_office.EmailBackend"
+EMAIL_HOST = os.getenv("EMAIL_HOST", "mail.comune.aversa.ce.it")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "g.pannullo@comune.aversa.ce.it")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() in {"1", "true", "yes", "on"}
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@comune.aversa.ce.it")
+
+# Domini disponibili per le nuove caselle di posta istituzionali.
+INSTITUTIONAL_EMAIL_DOMAINS = (
+    "comune.aversa.ce.it",
+    "comuneaversa.local",
+    "giunta.comune.aversa.ce.it",
+)
+
+POST_OFFICE = {
+    "DEFAULT_PRIORITY": "medium",
+    "MAX_RETRIES": 4,
+}
 
 # Nginx / reverse proxy
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

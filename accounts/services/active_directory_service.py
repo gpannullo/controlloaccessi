@@ -1,6 +1,9 @@
 from datetime import datetime
 
-from ldap3 import Server, Connection, ALL, SUBTREE
+import ssl
+from pathlib import Path
+
+from ldap3 import Server, Connection, ALL, SUBTREE, Tls
 from django.conf import settings
 from ldap3.utils.conv import escape_filter_chars
 
@@ -14,6 +17,8 @@ class ActiveDirectoryService(DirectoryService):
         "givenName",
         "sn",
         "mail",
+        "otherMailbox",
+        "mobile",
         "memberOf",
         "userAccountControl",
     ]
@@ -25,10 +30,26 @@ class ActiveDirectoryService(DirectoryService):
     ]
 
     def __init__(self):
-
+        server_name = settings.DIRECTORY["SERVER"].removeprefix("ldap://").removeprefix("ldaps://").rstrip("/")
+        ca_cert_file = settings.DIRECTORY.get("TLS_CA_CERT_FILE")
+        ca_cert_data = None
+        if ca_cert_file:
+            cert_bytes = Path(ca_cert_file).read_bytes()
+            ca_cert_data = (
+                cert_bytes.decode("ascii")
+                if cert_bytes.lstrip().startswith(b"-----BEGIN CERTIFICATE-----")
+                else ssl.DER_cert_to_PEM_cert(cert_bytes)
+            )
+        tls = Tls(
+            validate=ssl.CERT_REQUIRED if settings.DIRECTORY.get("TLS_VALIDATE", True) else ssl.CERT_NONE,
+            ca_certs_data=ca_cert_data,
+        )
         self.server = Server(
-            settings.DIRECTORY["SERVER"],
-            get_info=ALL
+            server_name,
+            port=settings.DIRECTORY["PORT"],
+            use_ssl=settings.DIRECTORY["USE_SSL"],
+            tls=tls,
+            get_info=ALL,
         )
 
         self.base_dn = settings.DIRECTORY["BASE_DN"]

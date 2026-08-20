@@ -1,7 +1,8 @@
 from django.contrib.auth.models import Group
-from ldap3 import Server, Connection, ALL
+from ldap3 import Connection
 from django.contrib.auth import get_user_model
 from access_control.models import Ufficio
+from accounts.services.active_directory_service import ActiveDirectoryService
 
 User = get_user_model()
 
@@ -9,9 +10,9 @@ User = get_user_model()
 class ActiveDirectoryAuth:
     def authenticate(self, request, username=None, password=None):
         print("Verifica server")
-        server = Server('ldap://192.168.15.100', get_info=ALL)
+        server = ActiveDirectoryService().server
 
-        user_dn = f"COMUNEAVERSA\\{username}"
+        user_dn = f"{username}@{ActiveDirectoryService().domain}"
 
         try:
             conn = Connection(server, user=user_dn, password=password, auto_bind=True)

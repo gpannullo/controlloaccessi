@@ -3,3 +3,4 @@ gunicorn
 ldap3
 psycopg[binary]
 python-escpos
+django-post_office==3.11.2

@@ -55,3 +55,42 @@ class CustomUserAdmin(UserAdmin):
             },
         ),
     )
+
+    actions = (
+        "imposta_amministrativisti",
+        "imposta_sportellisti",
+        "imposta_tecnici",
+        "imposta_disuso",
+    )
+
+    @admin.action(
+        description="Imposta come Amministrativista",
+    )
+    def imposta_amministrativisti(self, request, queryset):
+        queryset.update(
+            tipo_attivita=CustomUser.TipoAttivita.AMMINISTRATIVISTA,
+        )
+
+    @admin.action(
+        description="Imposta come Sportellista",
+    )
+    def imposta_sportellisti(self, request, queryset):
+        queryset.update(
+            tipo_attivita=CustomUser.TipoAttivita.SPORTELLISTA,
+        )
+
+    @admin.action(
+        description="Imposta come Tecnico",
+    )
+    def imposta_tecnici(self, request, queryset):
+        queryset.update(
+            tipo_attivita=CustomUser.TipoAttivita.TECNICO,
+        )
+
+    @admin.action(
+        description="Imposta come Disuso",
+    )
+    def imposta_disuso(self, request, queryset):
+        queryset.update(
+            tipo_attivita=CustomUser.TipoAttivita.DISUSO,
+        )

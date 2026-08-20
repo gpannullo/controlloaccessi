@@ -25,8 +25,9 @@ class UserSyncService:
                 }
             )
 
-            user.set_unusable_password()
-            user.save()
+            if created:
+                user.set_unusable_password()
+                user.save(update_fields=["password"])
 
             if created:
                 result.add_created()

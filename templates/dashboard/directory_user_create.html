@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Nuovo utente Active Directory</h1>
+    <a class="btn btn-outline-secondary" href="{% url 'dashboard:directory_users' %}">Torna agli utenti</a>
+  </div>
+
+  {% if messages %}{% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
+  {% endfor %}{% endif %}
+
+  <form method="post" action="{% url 'dashboard:directory_user_create_submit' %}" class="card card-body" id="create-user-form">
+    {% csrf_token %}
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label" for="first_name">Nome</label>
+        <input id="first_name" class="form-control" name="first_name" required autocomplete="given-name">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="last_name">Cognome</label>
+        <input id="last_name" class="form-control" name="last_name" required autocomplete="family-name">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="email">E-mail personale</label>
+        <input id="email" class="form-control" type="email" name="email" required autocomplete="email">
+        <div class="form-text">Le credenziali di accesso verranno inviate a questo indirizzo.</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="mobile">Cellulare</label>
+        <input id="mobile" class="form-control" type="tel" name="mobile" autocomplete="tel">
+        <div class="form-text">Salvato nell'attributo cellulare di Active Directory.</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="username-preview">Username proposto</label>
+        <input id="username-preview" class="form-control" readonly placeholder="Inserire nome e cognome">
+        <div class="form-text" id="username-help">L'username è iniziale.nome + cognome; se occupato viene aggiunto 2, 3, ecc.</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="ufficio">Ufficio</label>
+        <select id="ufficio" class="form-select" name="ufficio" required>
+          <option value="">Selezionare l'ufficio</option>
+          {% for ufficio in uffici %}<option value="{{ ufficio.pk }}">{{ ufficio.nome }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6" id="gruppo-operativo-wrapper" hidden>
+        <label class="form-label" for="gruppo_organizzativo">Gruppo operativo AD</label>
+        <select id="gruppo_organizzativo" class="form-select" name="gruppo_organizzativo" required>
+          <option value="">Prima selezionare l'ufficio</option>
+          {% for gruppo in gruppi_operativi %}
+            <option value="{{ gruppo.pk }}" data-ufficio="{{ gruppo.ufficio_id }}" hidden>{{ gruppo.nome }} — {{ gruppo.directory_name }}</option>
+          {% endfor %}
+        </select>
+        <div class="form-text">Vengono mostrati solo i gruppi organizzativi dell'ufficio scelto.</div>
+      </div>
+      <div class="col-12">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="mail_istituzionale" name="mail_istituzionale">
+          <label class="form-check-label" for="mail_istituzionale">Mail istituzionale</label>
+        </div>
+        <div class="form-text">Se selezionata, l'utente verrà associato al gruppo Active Directory MDAEMON.</div>
+      </div>
+      <div class="col-md-6" id="dominio-istituzionale-wrapper" hidden>
+        <label class="form-label" for="dominio_istituzionale">Dominio della mail istituzionale</label>
+        <select id="dominio_istituzionale" class="form-select" name="dominio_istituzionale" disabled>
+          <option value="">Selezionare il dominio</option>
+          {% for dominio in domini_istituzionali %}<option value="{{ dominio }}">@{{ dominio }}</option>{% endfor %}
+        </select>
+        <div class="form-text" id="mail-istituzionale-preview"></div>
+      </div>
+    </div>
+    <div class="alert alert-info mt-4 mb-3">La password viene generata automaticamente, inviata via e-mail e dovrà essere cambiata al primo accesso.</div>
+    <div><button class="btn btn-primary" id="submit-button">Crea utente LDAP</button></div>
+  </form>
+</div>
+
+<script>
+(() => {
+  const nome = document.getElementById('first_name');
+  const cognome = document.getElementById('last_name');
+  const preview = document.getElementById('username-preview');
+  const help = document.getElementById('username-help');
+  const ufficio = document.getElementById('ufficio');
+  const gruppo = document.getElementById('gruppo_organizzativo');
+  const gruppoWrapper = document.getElementById('gruppo-operativo-wrapper');
+  const mailIstituzionale = document.getElementById('mail_istituzionale');
+  const dominioWrapper = document.getElementById('dominio-istituzionale-wrapper');
+  const dominio = document.getElementById('dominio_istituzionale');
+  const mailPreview = document.getElementById('mail-istituzionale-preview');
+  let timeout;
+
+  function aggiornaGruppi() {
+    const ufficioId = ufficio.value;
+    gruppo.value = '';
+    const opzioni = Array.from(gruppo.querySelectorAll('option[data-ufficio]'));
+    opzioni.forEach((option) => {
+      option.hidden = option.dataset.ufficio !== ufficioId;
+    });
+    const disponibili = opzioni.filter((option) => option.dataset.ufficio === ufficioId);
+    gruppo.disabled = !ufficioId || !disponibili.length;
+    gruppoWrapper.hidden = disponibili.length <= 1;
+    if (disponibili.length === 1) {
+      gruppo.value = disponibili[0].value;
+    }
+  }
+
+  function aggiornaUsername() {
+    clearTimeout(timeout);
+    preview.value = '';
+    if (!nome.value.trim() || !cognome.value.trim()) return;
+    timeout = setTimeout(async () => {
+      help.textContent = 'Verifica disponibilità in Active Directory…';
+      try {
+        const params = new URLSearchParams({first_name: nome.value, last_name: cognome.value});
+        const response = await fetch('{% url "dashboard:directory_username_suggestion" %}?' + params);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Verifica non riuscita');
+        preview.value = data.username;
+        help.textContent = 'Username disponibile: ' + data.username;
+        aggiornaMailIstituzionale();
+      } catch (error) {
+        help.textContent = error.message;
+      }
+    }, 350);
+  }
+
+  function aggiornaMailIstituzionale() {
+    const attiva = mailIstituzionale.checked;
+    dominioWrapper.hidden = !attiva;
+    dominio.disabled = !attiva;
+    dominio.required = attiva;
+    mailPreview.textContent = attiva && preview.value && dominio.value
+      ? 'Casella che verrà creata: ' + preview.value + '@' + dominio.value
+      : '';
+  }
+
+  ufficio.addEventListener('change', aggiornaGruppi);
+  nome.addEventListener('input', aggiornaUsername);
+  cognome.addEventListener('input', aggiornaUsername);
+  mailIstituzionale.addEventListener('change', aggiornaMailIstituzionale);
+  dominio.addEventListener('change', aggiornaMailIstituzionale);
+})();
+</script>
+{% endblock %}

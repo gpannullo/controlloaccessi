@@ -20,6 +20,8 @@ class CustomUser(AbstractUser):
     class TipoAttivita(models.TextChoices):
         SPORTELLISTA = "SPO", "Sportellista"
         AMMINISTRATIVISTA = "AMM", "Amministrativista"
+        TECNICO = "TEC", "Tecnico"
+        DISUSO = "DIS", "Disuso"
 
     tipo_attivita = models.CharField(
         max_length=3,
