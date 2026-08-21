@@ -34,6 +34,12 @@ class AccessoAdmin(admin.ModelAdmin):
         "stato",
     )
 
+    readonly_fields = (
+        "prefisso_coda",
+        "token_pubblico",
+        "token_pubblico_creato_il",
+    )
+
     list_filter = (
         "tipo_accesso",
         "stato",

@@ -43,33 +43,23 @@ Controllo Accessi - Seleziona area
             </p>
         </div>
 
-        <div class="text-md-end">
-            <div class="fw-semibold">
-                {% firstof request.user.get_full_name request.user.username %}
-            </div>
-
-            <div class="small text-muted">
-                Utente autenticato
-            </div>
-
-            <form
-                method="post"
-                action="{% url 'logout' %}"
-                class="mt-2"
-            >
-                {% csrf_token %}
-                <button
-                    type="submit"
-                    class="btn btn-sm btn-outline-secondary"
-                >
-                    Esci
-                </button>
-            </form>
+        <div class="dropdown text-md-end">
+            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">{% firstof request.user.get_full_name request.user.username %}</button>
+            <ul class="dropdown-menu dropdown-menu-end text-start">
+                {% if password_never_expires %}<li><span class="dropdown-item-text small text-muted">Password senza scadenza</span></li><li><hr class="dropdown-divider"></li>{% elif password_expiry %}<li><span class="dropdown-item-text small {% if password_days_remaining <= 15 %}text-danger fw-semibold{% else %}text-muted{% endif %}">Password valida fino al {{ password_expiry|date:"d/m/Y" }}</span></li><li><hr class="dropdown-divider"></li>{% endif %}
+                <li><a class="dropdown-item" href="{% url 'accounts_management' %}">Gestione account</a></li>
+                <li><a class="dropdown-item" href="{% url 'change_own_password' %}">Cambia password</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="dropdown-item text-danger" type="submit">Esci</button></form></li>
+            </ul>
         </div>
     </div>
 
+    {% if password_expiring_soon %}<div class="alert alert-danger d-flex justify-content-between align-items-center gap-3"><div><strong>Scadenza password:</strong> {{ password_expiry|date:"d/m/Y" }} — mancano {{ password_days_remaining }} giorni.</div><a class="btn btn-danger" href="{% url 'change_own_password' %}">Cambia password</a></div>{% endif %}
+
     <div class="row g-4">
 
+        {% if can_portineria %}
         <div class="col-md-6 col-xl-4">
             <a
                 href="{% url 'dashboard:home' %}"
@@ -100,7 +90,9 @@ Controllo Accessi - Seleziona area
                 </div>
             </a>
         </div>
+        {% endif %}
 
+        {% if can_offices %}
         <div class="col-md-6 col-xl-4">
             <a
                 href="{% url 'uffici:selezione' %}"
@@ -131,39 +123,14 @@ Controllo Accessi - Seleziona area
                 </div>
             </a>
         </div>
+        {% endif %}
 
-        <div class="col-md-6 col-xl-4">
-            <a
-                href="{% url 'monitor_home' %}"
-                class="card h-100 shadow-sm
-                       text-decoration-none text-body"
-            >
-                <div class="card-body p-4">
-                    <div
-                        class="rounded-circle bg-info-subtle
-                               text-info
-                               d-flex align-items-center
-                               justify-content-center mb-4"
-                        style="width: 64px; height: 64px;"
-                    >
-                        <span class="fs-2">M</span>
-                    </div>
-
-                    <h2 class="h4">Monitor pubblico</h2>
-
-                    <p class="text-muted">
-                        Visualizzazione a tutto schermo dei numeri
-                        chiamati dagli uffici, senza dati personali.
-                    </p>
-
-                    <span class="btn btn-info">
-                        Apri il monitor
-                    </span>
-                </div>
-            </a>
-        </div>
+        {% if can_monitor %}
+        <div class="col-md-6 col-xl-4"><a href="{% url 'monitor_home' %}" class="card h-100 shadow-sm text-decoration-none text-body"><div class="card-body p-4"><div class="rounded-circle bg-info-subtle text-info d-flex align-items-center justify-content-center mb-4" style="width:64px;height:64px;"><span class="fs-2">M</span></div><h2 class="h4">Monitor pubblico</h2><p class="text-muted">Visualizzazione a tutto schermo dei numeri chiamati dagli uffici.</p><span class="btn btn-info">Apri il monitor</span></div></a></div>
+        {% endif %}
 
         <!-- DIRIGENTI / FUNZIONARI EQ -->
+        {% if can_dirigenza %}
         <div class="col-md-6 col-xl-4">
             <a
                 href="{% url 'dashboard:dirigenza_home' %}"
@@ -196,8 +163,9 @@ Controllo Accessi - Seleziona area
                 </div>
             </a>
         </div>
+        {% endif %}
 
-        {% if request.user.is_staff %}
+        {% if request.user.is_superuser %}
             <div class="col-md-6 col-xl-4">
                 <a
                     href="{% url 'admin:index' %}"
@@ -247,14 +215,14 @@ Controllo Accessi - Seleziona area
                             <span class="fs-2">AD</span>
                         </div>
 
-                        <h2 class="h4">Active Directory</h2>
+                        <h2 class="h4">Amministrazione Account</h2>
 
                         <p class="text-muted">
-                            Gestione utenti e gruppi della directory.
+                            Gestione utenti, gruppi e credenziali di accesso.
                         </p>
 
                         <span class="btn btn-danger">
-                            Apri gestione Active Directory
+                            Apri amministrazione account
                         </span>
                     </div>
                 </a>

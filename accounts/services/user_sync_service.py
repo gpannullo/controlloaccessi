@@ -21,7 +21,11 @@ class UserSyncService:
                     "first_name": u.get("first_name", ""),
                     "last_name": u.get("last_name", ""),
                     "email": u.get("email", ""),
-                    "is_active": u["active"]
+                    "is_active": u["active"],
+                    "scadenza_password": u.get("password_expiry"),
+                    "password_senza_scadenza": u.get("password_never_expires", False),
+                    "email_personale": u.get("personal_email", ""),
+                    "cellulare_personale": u.get("mobile", ""),
                 }
             )
 

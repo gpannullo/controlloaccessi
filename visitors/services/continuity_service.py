@@ -26,6 +26,7 @@ class ContinuitaAccessoService:
         accesso,
         nuovo_ufficio,
         operatore,
+        motivo,
         note="",
         ip_address=None,
     ):
@@ -57,15 +58,22 @@ class ContinuitaAccessoService:
         momento = timezone.now()
         vecchio_ufficio = accesso.ufficio_destinazione
         badge = accesso.badge
+        dipendente = operatore.get_full_name() or operatore.username
+        nota_trasferimento = "Trasferito a %s da %s alle ore: %s." % (
+            nuovo_ufficio.nome,
+            dipendente,
+            timezone.localtime(momento).strftime("%d/%m/%Y %H:%M"),
+        )
+        if note:
+            nota_trasferimento += " Nota: %s" % note
 
         accesso.visita_conclusa_il = momento
         accesso.uscita = momento
         accesso.stato = AccessoVisitatore.Stato.CHIUSO
         accesso.stato_coda = AccessoVisitatore.StatoCoda.VISITA_CONCLUSA
-        if note:
-            accesso.note = (
-                f"{accesso.note}\n" if accesso.note else ""
-            ) + f"Trasferimento: {note}"
+        accesso.note = (
+            f"{accesso.note}\n" if accesso.note else ""
+        ) + nota_trasferimento
         accesso.save(
             update_fields=[
                 "visita_conclusa_il",
@@ -86,14 +94,13 @@ class ContinuitaAccessoService:
             ufficio_destinazione=nuovo_ufficio,
             badge=badge,
             numero_coda=QueueService.prossimo_numero(nuovo_ufficio),
+            prefisso_coda=nuovo_ufficio.prefisso_coda_effettivo,
             documento_presentato=accesso.documento_presentato,
             accompagnato=accesso.accompagnato,
             ingresso=momento,
-            motivo=accesso.motivo,
-            note=(
-                f"Trasferito da {vecchio_ufficio.nome}."
-                + (f" {note}" if note else "")
-            ),
+            motivo=motivo,
+            accesso_precedente=accesso,
+            note=nota_trasferimento,
             stato_coda=AccessoVisitatore.StatoCoda.HALL,
             tipo_accesso=AccessoVisitatore.TipoAccesso.RICEVIMENTO,
         )
@@ -184,6 +191,9 @@ class ContinuitaAccessoService:
             badge=badge,
             numero_coda=QueueService.prossimo_numero(
                 precedente.ufficio_destinazione
+            ),
+            prefisso_coda=(
+                precedente.ufficio_destinazione.prefisso_coda_effettivo
             ),
             documento_presentato=precedente.documento_presentato,
             accompagnato=precedente.accompagnato,

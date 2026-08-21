@@ -1,1 +1,42 @@
-{% extends "base.html" %}{% block content %}<div class="container py-5"><h1>Amministrazione Directory</h1><div class="row g-3 mt-2"><div class="col-md-6"><a class="card card-body text-decoration-none" href="{% url 'dashboard:directory_users' %}"><h2 class="h4">Utenti AD</h2><p class="mb-0">Ricerca, filtri, azioni massive e gestione utente.</p></a></div><div class="col-md-6"><a class="card card-body text-decoration-none" href="{% url 'dashboard:directory_groups' %}"><h2 class="h4">Gruppi AD</h2><p class="mb-0">Elenco, soggetti associati e rinomina LDAP.</p></a></div></div></div>{% endblock %}
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="d-flex justify-content-between align-items-center gap-3 mb-4">
+  <div class="d-flex align-items-center gap-3">
+    <div class="rounded-circle bg-danger-subtle text-danger d-flex align-items-center justify-content-center" style="width: 64px; height: 64px;">
+      <span class="fs-3">AD</span>
+    </div>
+    <div>
+      <h1 class="h2 mb-1">Amministrazione Account</h1>
+      <p class="text-muted mb-0">Gestione utenti, gruppi e credenziali di accesso.</p>
+    </div>
+  </div>
+    <a class="btn btn-outline-danger" href="{% url 'home' %}">Torna alla home</a>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-6">
+      <a class="card h-100 shadow-sm text-decoration-none text-body" href="{% url 'dashboard:directory_staff' %}"><div class="card-body p-4"><h2 class="h4">Personale</h2><p class="text-muted">Elenco anagrafico del personale, recapiti e uffici associati.</p><span class="btn btn-danger">Gestisci personale</span></div></a>
+    </div>
+    <div class="col-md-6">
+      <a class="card h-100 shadow-sm text-decoration-none text-body" href="{% url 'dashboard:directory_users' %}">
+        <div class="card-body p-4">
+          <h2 class="h4">Utenti</h2>
+          <p class="text-muted">Ricerca, filtri, azioni massive e gestione del singolo account.</p>
+          <span class="btn btn-danger">Gestisci utenti</span>
+        </div>
+      </a>
+    </div>
+    <div class="col-md-6">
+      <a class="card h-100 shadow-sm text-decoration-none text-body" href="{% url 'dashboard:directory_groups' %}">
+        <div class="card-body p-4">
+          <h2 class="h4">Gruppi</h2>
+          <p class="text-muted">Elenco dei gruppi, soggetti associati e rinomina.</p>
+          <span class="btn btn-danger">Gestisci gruppi</span>
+        </div>
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

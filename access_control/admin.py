@@ -27,6 +27,7 @@ class CalendarioAperturaInline(admin.TabularInline):
 class UfficioAdmin(admin.ModelAdmin):
     list_display = (
         "nome",
+        "prefisso_coda",
         "responsabile",
         "riceve_pubblico",
         "numero_dipendenti",

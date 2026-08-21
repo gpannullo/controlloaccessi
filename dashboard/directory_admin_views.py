@@ -61,22 +61,23 @@ def directory_home(request):
     return render(request, "dashboard/directory_portal.html")
 
 
-@directory_admin_required
-def directory_user_create(request):
+def _directory_user_create_context(form_data=None):
     gruppi_operativi = GruppoOrganizzativo.objects.filter(
         tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
         attivo=True,
         ufficio__attivo=True,
     ).select_related("ufficio", "django_group").order_by("ufficio__nome", "nome")
-    return render(
-        request,
-        "dashboard/directory_user_create.html",
-        {
-            "uffici": Ufficio.objects.filter(attivo=True).order_by("nome"),
-            "gruppi_operativi": gruppi_operativi,
-            "domini_istituzionali": settings.INSTITUTIONAL_EMAIL_DOMAINS,
-        },
-    )
+    return {
+        "uffici": Ufficio.objects.filter(attivo=True).order_by("nome"),
+        "gruppi_operativi": gruppi_operativi,
+        "domini_istituzionali": settings.INSTITUTIONAL_EMAIL_DOMAINS,
+        "form_data": form_data or {},
+    }
+
+
+@directory_admin_required
+def directory_user_create(request):
+    return render(request, "dashboard/directory_user_create.html", _directory_user_create_context())
 
 
 @directory_admin_required
@@ -116,7 +117,16 @@ def directory_user_create_submit(request):
             raise DirectoryAdminException("Selezionare un dominio valido per la mail istituzionale.")
         email_directory = "%s@%s" % (username, dominio) if mail_istituzionale else email
         service = DirectoryAdminService()
-        user_dn = service.crea_utente(username, first_name, last_name, email_directory, email, mobile, password)
+        user_dn = service.crea_utente(
+            username,
+            first_name,
+            last_name,
+            email_directory,
+            email,
+            mobile,
+            password,
+            upn_domain=dominio if mail_istituzionale else None,
+        )
         service.aggiungi_al_gruppo(user_dn, gruppo.directory_name)
 
         gruppi_locali = [gruppo.django_group]
@@ -164,7 +174,12 @@ def directory_user_create_submit(request):
         return redirect("dashboard:directory_users")
     except Exception as exc:
         messages.error(request, str(exc))
-        return redirect("dashboard:directory_user_create")
+        return render(
+            request,
+            "dashboard/directory_user_create.html",
+            _directory_user_create_context(request.POST),
+            status=400,
+        )
 
 
 @directory_admin_required
@@ -213,6 +228,37 @@ def directory_groups(request):
 
 
 @directory_admin_required
+def directory_staff(request):
+    session_key = "directory_staff_offices"
+    if "reset" in request.GET:
+        request.session.pop(session_key, None)
+        uffici_selezionati = []
+    elif "uffici" in request.GET:
+        uffici_selezionati = request.GET.getlist("uffici")
+        request.session[session_key] = uffici_selezionati
+    else:
+        uffici_selezionati = request.session.get(session_key, [])
+    personale = User.objects.filter(
+        groups__gruppo_organizzativo__ufficio__isnull=False,
+        groups__gruppo_organizzativo__ufficio__attivo=True,
+    ).distinct().prefetch_related("groups__gruppo_organizzativo__ufficio").order_by("last_name", "first_name", "username")
+    if uffici_selezionati:
+        personale = personale.filter(groups__gruppo_organizzativo__ufficio_id__in=uffici_selezionati).distinct()
+    for utente in personale:
+        assegnazioni = [
+            gruppo.gruppo_organizzativo.ufficio
+            for gruppo in utente.groups.all()
+            if hasattr(gruppo, "gruppo_organizzativo")
+            and gruppo.gruppo_organizzativo.ufficio_id
+        ]
+        utente.uffici_associati = list({ufficio.pk: ufficio for ufficio in assegnazioni}.values())
+        utente.numero_uffici = len(utente.uffici_associati)
+        utente.email_istituzionale = utente.email if utente.groups.filter(name="MDAEMON").exists() else ""
+        utente.cellulare = utente.cellulare_personale
+    return render(request, "dashboard/directory_staff.html", {"personale": personale, "uffici": Ufficio.objects.filter(attivo=True).order_by("nome"), "uffici_selezionati": [str(pk) for pk in uffici_selezionati]})
+
+
+@directory_admin_required
 @require_POST
 def directory_group_rename(request):
     nome, nuovo_nome = request.POST.get("nome", ""), request.POST.get("nuovo_nome", "")
@@ -241,13 +287,72 @@ def directory_bulk_action(request):
 
 
 @directory_admin_required
+@require_POST
+def directory_sync_mail_from_upn(request):
+    try:
+        aggiornati, saltati, errori = DirectoryAdminService().allinea_mail_da_upn()
+        for item in aggiornati:
+            User.objects.filter(username__iexact=item["username"]).update(email=item["email"])
+        AuditService.log(
+            user=request.user,
+            tipo="UPDATE",
+            oggetto="ActiveDirectory:mail",
+            descrizione="Allineate %s e-mail LDAP dal relativo UPN; %s utenti già valorizzati; %s errori." % (
+                len(aggiornati), saltati, len(errori),
+            ),
+            ip_address=request.META.get("REMOTE_ADDR"),
+        )
+        messaggio = "%s e-mail LDAP allineate dall'UPN. %s utenti avevano già l'e-mail." % (len(aggiornati), saltati)
+        if errori:
+            messages.warning(request, "%s. %s utenti senza UPN valido o non aggiornabili." % (messaggio, len(errori)))
+        else:
+            messages.success(request, messaggio)
+    except Exception as exc:
+        messages.error(request, "Allineamento e-mail non riuscito: %s" % exc)
+    return redirect("dashboard:directory_users")
+
+
+@directory_admin_required
 def directory_user(request, pk):
     utente = get_object_or_404(User, pk=pk)
+    uffici_associati = GruppoOrganizzativo.objects.filter(
+        django_group__user=utente,
+        tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
+        ufficio__isnull=False,
+    ).select_related("ufficio", "django_group").order_by("ufficio__nome", "nome")
+    gruppi_ufficio_disponibili = GruppoOrganizzativo.objects.filter(
+        tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
+        attivo=True,
+        ufficio__attivo=True,
+    ).exclude(django_group__user=utente).select_related("ufficio", "django_group").order_by("ufficio__nome", "nome")
     try:
         dettaglio = DirectoryAdminService().dettaglio(utente.username)
+        gruppi_automatici = set(
+            GruppoOrganizzativo.objects.filter(
+                tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO
+            ).values_list("directory_name", flat=True)
+        )
+        gruppi_automatici.add("MDAEMON")
+        gruppi_ad_disponibili = [
+            gruppo["name"] for gruppo in DirectoryAdminService().lista_gruppi()
+            if gruppo["name"] not in gruppi_automatici and gruppo["name"] not in dettaglio["groups"]
+        ]
+        dominio_istituzionale = ""
+        if "@" in dettaglio["email"]:
+            candidato = dettaglio["email"].rsplit("@", 1)[1].lower()
+            if candidato in settings.INSTITUTIONAL_EMAIL_DOMAINS:
+                dominio_istituzionale = candidato
     except Exception as exc:
-        dettaglio = None; messages.error(request, "Impossibile leggere AD: %s" % exc)
-    return render(request, "dashboard/directory_user.html", {"utente": utente, "dettaglio": dettaglio})
+        dettaglio = None; gruppi_ad_disponibili = []; dominio_istituzionale = ""; messages.error(request, "Impossibile leggere AD: %s" % exc)
+    return render(request, "dashboard/directory_user.html", {
+        "utente": utente,
+        "dettaglio": dettaglio,
+        "uffici_associati": uffici_associati,
+        "gruppi_ufficio_disponibili": gruppi_ufficio_disponibili,
+        "domini_istituzionali": settings.INSTITUTIONAL_EMAIL_DOMAINS,
+        "dominio_istituzionale": dominio_istituzionale,
+        "gruppi_ad_disponibili": gruppi_ad_disponibili,
+    })
 
 
 @directory_admin_required
@@ -255,25 +360,116 @@ def directory_user(request, pk):
 def directory_action(request, pk):
     utente = get_object_or_404(User, pk=pk); service = DirectoryAdminService(); azione = request.POST.get("azione")
     try:
+        messaggio_successo = "Operazione completata."
+        avviso_email = None
         if azione == "anagrafica":
             first_name = request.POST.get("first_name", "").strip()
             last_name = request.POST.get("last_name", "").strip()
+            personal_email = request.POST.get("personal_email", "").strip()
             service.aggiorna_anagrafica(
                 utente.username,
                 first_name,
                 last_name,
-                request.POST.get("personal_email", ""),
+                personal_email,
                 request.POST.get("mobile", ""),
             )
-            User.objects.filter(pk=utente.pk).update(first_name=first_name, last_name=last_name)
-        elif azione == "stato": service.imposta_attivo(utente.username, request.POST.get("attivo") == "true")
+            mail_istituzionale = request.POST.get("mail_istituzionale") == "on"
+            dominio = request.POST.get("dominio_istituzionale", "").strip().lower()
+            if mail_istituzionale and dominio not in settings.INSTITUTIONAL_EMAIL_DOMAINS:
+                raise DirectoryAdminException("Selezionare un dominio valido per la mail istituzionale.")
+            email_istituzionale = service.imposta_mail_istituzionale(utente.username, dominio if mail_istituzionale else None)
+            gruppo_mdaemon, _ = Group.objects.get_or_create(name="MDAEMON")
+            if mail_istituzionale:
+                utente.groups.add(gruppo_mdaemon)
+            else:
+                utente.groups.remove(gruppo_mdaemon)
+            User.objects.filter(pk=utente.pk).update(first_name=first_name, last_name=last_name, email=email_istituzionale or personal_email)
+            messaggio_successo = "Anagrafica e impostazioni della mail istituzionale aggiornate."
+        elif azione == "stato":
+            service.imposta_attivo(utente.username, request.POST.get("attivo") == "true")
         elif azione == "password":
-            password = request.POST.get("password", "")
-            if len(password) < 12: raise DirectoryAdminException("La password provvisoria deve avere almeno 12 caratteri.")
-            service.reset_password(utente.username, password, request.POST.get("forza_cambio") == "on")
-        elif azione == "gruppi": service.aggiorna_gruppi(utente.username, [item.strip() for item in request.POST.get("gruppi", "").splitlines() if item.strip()])
+            destinatario = service.dettaglio(utente.username).get("personal_email", "").strip()
+            if not destinatario:
+                raise DirectoryAdminException("Impossibile reimpostare la password: l'utente non ha un'e-mail personale.")
+            password = _password_provvisoria()
+            service.reset_password(utente.username, password, True)
+            try:
+                from post_office import mail
+
+                mail.send(
+                    recipients=[destinatario],
+                    sender=settings.DEFAULT_FROM_EMAIL,
+                    subject="Nuova password di accesso",
+                    message=(
+                        "Buongiorno %s %s,\n\n"
+                        "la password del suo account è stata reimpostata.\n"
+                        "Username: %s\nPassword provvisoria: %s\n\n"
+                        "Al primo accesso sarà richiesto di cambiare la password."
+                    ) % (utente.first_name, utente.last_name, utente.username, password),
+                )
+            except Exception as exc:
+                avviso_email = "Password reimpostata, ma l'e-mail non è stata accodata: %s" % exc
+            messaggio_successo = (
+                "Password reimpostata."
+                if avviso_email
+                else "Password reimpostata e credenziali accodate per l'invio all'e-mail personale."
+            )
+        elif azione == "rimuovi_ufficio":
+            assegnazione = get_object_or_404(
+                GruppoOrganizzativo.objects.select_related("django_group", "ufficio"),
+                pk=request.POST.get("gruppo_organizzativo"),
+                django_group__user=utente,
+                tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
+                ufficio__isnull=False,
+            )
+            service.rimuovi_da_gruppo(utente.username, assegnazione.directory_name)
+            utente.groups.remove(assegnazione.django_group)
+            messaggio_successo = "Ufficio %s rimosso dall'account." % assegnazione.ufficio
+        elif azione == "aggiungi_ufficio":
+            assegnazione = get_object_or_404(
+                GruppoOrganizzativo.objects.select_related("django_group", "ufficio"),
+                pk=request.POST.get("gruppo_organizzativo"),
+                tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
+                attivo=True,
+                ufficio__attivo=True,
+            )
+            if utente.groups.filter(pk=assegnazione.django_group_id).exists():
+                raise DirectoryAdminException("L'ufficio è già associato all'account.")
+            service.aggiungi_utente_al_gruppo(utente.username, assegnazione.directory_name)
+            utente.groups.add(assegnazione.django_group)
+            messaggio_successo = "Ufficio %s aggiunto all'account." % assegnazione.ufficio
+        elif azione == "aggiungi_gruppo_ad":
+            nome_gruppo = request.POST.get("gruppo_ad", "").strip()
+            if not nome_gruppo:
+                raise DirectoryAdminException("Selezionare un gruppo AD.")
+            if nome_gruppo == "MDAEMON" or GruppoOrganizzativo.objects.filter(
+                tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
+                directory_name=nome_gruppo,
+            ).exists():
+                raise DirectoryAdminException("Questo gruppo è gestito automaticamente e non può essere aggiunto da qui.")
+            service.aggiungi_utente_al_gruppo(utente.username, nome_gruppo)
+            gruppo_locale, _ = Group.objects.get_or_create(name=nome_gruppo)
+            utente.groups.add(gruppo_locale)
+            messaggio_successo = "Gruppo AD %s aggiunto all'account." % nome_gruppo
+        elif azione in {"accesso_remoto", "smartworking"}:
+            nome_gruppo = "ACCESSO-RDP" if azione == "accesso_remoto" else "VPN_COMMON_RULES"
+            abilita = request.POST.get("abilita") == "true"
+            if abilita:
+                service.aggiungi_utente_al_gruppo(utente.username, nome_gruppo)
+                gruppo_locale, _ = Group.objects.get_or_create(name=nome_gruppo)
+                utente.groups.add(gruppo_locale)
+            else:
+                service.rimuovi_da_gruppo(utente.username, nome_gruppo)
+                gruppo_locale = Group.objects.filter(name=nome_gruppo).first()
+                if gruppo_locale:
+                    utente.groups.remove(gruppo_locale)
+            servizio = "Accesso remoto" if azione == "accesso_remoto" else "SmartWorking"
+            messaggio_successo = "%s %s." % (servizio, "abilitato" if abilita else "disabilitato")
         else: raise DirectoryAdminException("Operazione non valida.")
-        AuditService.log(user=request.user, tipo="UPDATE", oggetto="ActiveDirectory:%s" % utente.username, descrizione="Operazione AD: %s." % azione, ip_address=request.META.get("REMOTE_ADDR")); messages.success(request, "Operazione AD completata.")
+        AuditService.log(user=request.user, tipo="UPDATE", oggetto="ActiveDirectory:%s" % utente.username, descrizione="Operazione AD: %s." % azione, ip_address=request.META.get("REMOTE_ADDR"))
+        if avviso_email:
+            messages.warning(request, avviso_email)
+        messages.success(request, messaggio_successo)
     except Exception as exc:
         AuditService.log(user=request.user, tipo="SYSTEM", oggetto="ActiveDirectory:%s" % utente.username, descrizione="Operazione AD non riuscita: %s; errore: %s" % (azione, exc), ip_address=request.META.get("REMOTE_ADDR"))
         messages.error(request, str(exc))

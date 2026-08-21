@@ -31,6 +31,13 @@ class CustomUser(AbstractUser):
         verbose_name="Tipo di attività",
     )
 
+    email_aggiuntiva = models.EmailField(blank=True, verbose_name="E-mail aggiuntiva")
+    telefono_aggiuntivo = models.CharField(max_length=50, blank=True, verbose_name="Telefono aggiuntivo")
+    scadenza_password = models.DateTimeField(null=True, blank=True, editable=False)
+    password_senza_scadenza = models.BooleanField(default=False, editable=False)
+    email_personale = models.EmailField(blank=True, editable=False)
+    cellulare_personale = models.CharField(max_length=50, blank=True, editable=False)
+
     livello_sicurezza = models.PositiveSmallIntegerField(
         default=1,
         verbose_name="Livello di sicurezza"
@@ -75,9 +82,17 @@ class CustomUser(AbstractUser):
     @property
     def puo_ricevere_pubblico(self):
         return (
-                self.tipo_attivita
-                == self.TipoAttivita.SPORTELLISTA
+            self.tipo_attivita
+            == self.TipoAttivita.SPORTELLISTA
         )
+
+    @property
+    def password_info(self):
+        """Compatibilità per la tabella utenti: dati sincronizzati localmente."""
+        return {
+            "password_never_expires": self.password_senza_scadenza,
+            "password_expiry": self.scadenza_password,
+        }
 
 
 class SnapshotPresenzaUfficio(models.Model):

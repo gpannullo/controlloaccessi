@@ -3,8 +3,11 @@
 {% block content %}
 <div class="container py-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="h3 mb-0">Nuovo utente Active Directory</h1>
-    <a class="btn btn-outline-secondary" href="{% url 'dashboard:directory_users' %}">Torna agli utenti</a>
+    <div>
+      <p class="text-danger fw-semibold mb-1">Amministrazione Account</p>
+      <h1 class="h3 mb-0">Nuovo account</h1>
+    </div>
+    <a class="btn btn-outline-danger" href="{% url 'dashboard:directory_users' %}">Torna alla gestione utenti</a>
   </div>
 
   {% if messages %}{% for message in messages %}
@@ -16,20 +19,20 @@
     <div class="row g-3">
       <div class="col-md-6">
         <label class="form-label" for="first_name">Nome</label>
-        <input id="first_name" class="form-control" name="first_name" required autocomplete="given-name">
+        <input id="first_name" class="form-control" name="first_name" value="{{ form_data.first_name|default:'' }}" required autocomplete="given-name">
       </div>
       <div class="col-md-6">
         <label class="form-label" for="last_name">Cognome</label>
-        <input id="last_name" class="form-control" name="last_name" required autocomplete="family-name">
+        <input id="last_name" class="form-control" name="last_name" value="{{ form_data.last_name|default:'' }}" required autocomplete="family-name">
       </div>
       <div class="col-md-6">
         <label class="form-label" for="email">E-mail personale</label>
-        <input id="email" class="form-control" type="email" name="email" required autocomplete="email">
+        <input id="email" class="form-control" type="email" name="email" value="{{ form_data.email|default:'' }}" required autocomplete="email">
         <div class="form-text">Le credenziali di accesso verranno inviate a questo indirizzo.</div>
       </div>
       <div class="col-md-6">
         <label class="form-label" for="mobile">Cellulare</label>
-        <input id="mobile" class="form-control" type="tel" name="mobile" autocomplete="tel">
+        <input id="mobile" class="form-control" type="tel" name="mobile" value="{{ form_data.mobile|default:'' }}" autocomplete="tel">
         <div class="form-text">Salvato nell'attributo cellulare di Active Directory.</div>
       </div>
       <div class="col-md-6">
@@ -41,7 +44,7 @@
         <label class="form-label" for="ufficio">Ufficio</label>
         <select id="ufficio" class="form-select" name="ufficio" required>
           <option value="">Selezionare l'ufficio</option>
-          {% for ufficio in uffici %}<option value="{{ ufficio.pk }}">{{ ufficio.nome }}</option>{% endfor %}
+          {% for ufficio in uffici %}<option value="{{ ufficio.pk }}" {% if form_data.ufficio == ufficio.pk|stringformat:"s" %}selected{% endif %}>{{ ufficio.nome }}</option>{% endfor %}
         </select>
       </div>
       <div class="col-md-6" id="gruppo-operativo-wrapper" hidden>
@@ -49,14 +52,14 @@
         <select id="gruppo_organizzativo" class="form-select" name="gruppo_organizzativo" required>
           <option value="">Prima selezionare l'ufficio</option>
           {% for gruppo in gruppi_operativi %}
-            <option value="{{ gruppo.pk }}" data-ufficio="{{ gruppo.ufficio_id }}" hidden>{{ gruppo.nome }} — {{ gruppo.directory_name }}</option>
+            <option value="{{ gruppo.pk }}" data-ufficio="{{ gruppo.ufficio_id }}" hidden {% if form_data.gruppo_organizzativo == gruppo.pk|stringformat:"s" %}selected{% endif %}>{{ gruppo.nome }} — {{ gruppo.directory_name }}</option>
           {% endfor %}
         </select>
         <div class="form-text">Vengono mostrati solo i gruppi organizzativi dell'ufficio scelto.</div>
       </div>
       <div class="col-12">
         <div class="form-check">
-          <input class="form-check-input" type="checkbox" id="mail_istituzionale" name="mail_istituzionale">
+          <input class="form-check-input" type="checkbox" id="mail_istituzionale" name="mail_istituzionale" {% if form_data.mail_istituzionale %}checked{% endif %}>
           <label class="form-check-label" for="mail_istituzionale">Mail istituzionale</label>
         </div>
         <div class="form-text">Se selezionata, l'utente verrà associato al gruppo Active Directory MDAEMON.</div>
@@ -65,7 +68,7 @@
         <label class="form-label" for="dominio_istituzionale">Dominio della mail istituzionale</label>
         <select id="dominio_istituzionale" class="form-select" name="dominio_istituzionale" disabled>
           <option value="">Selezionare il dominio</option>
-          {% for dominio in domini_istituzionali %}<option value="{{ dominio }}">@{{ dominio }}</option>{% endfor %}
+          {% for dominio in domini_istituzionali %}<option value="{{ dominio }}" {% if form_data.dominio_istituzionale == dominio %}selected{% endif %}>@{{ dominio }}</option>{% endfor %}
         </select>
         <div class="form-text" id="mail-istituzionale-preview"></div>
       </div>
@@ -92,6 +95,7 @@
 
   function aggiornaGruppi() {
     const ufficioId = ufficio.value;
+    const gruppoPrecedente = gruppo.value;
     gruppo.value = '';
     const opzioni = Array.from(gruppo.querySelectorAll('option[data-ufficio]'));
     opzioni.forEach((option) => {
@@ -102,6 +106,8 @@
     gruppoWrapper.hidden = disponibili.length <= 1;
     if (disponibili.length === 1) {
       gruppo.value = disponibili[0].value;
+    } else if (disponibili.some((option) => option.value === gruppoPrecedente)) {
+      gruppo.value = gruppoPrecedente;
     }
   }
 
@@ -140,6 +146,9 @@
   cognome.addEventListener('input', aggiornaUsername);
   mailIstituzionale.addEventListener('change', aggiornaMailIstituzionale);
   dominio.addEventListener('change', aggiornaMailIstituzionale);
+  aggiornaGruppi();
+  aggiornaMailIstituzionale();
+  aggiornaUsername();
 })();
 </script>
 {% endblock %}

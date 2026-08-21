@@ -735,7 +735,8 @@ class QueueService:
         l'ufficio nella giornata corrente.
 
         Il progressivo riparte da 1 ogni giorno
-        e per ciascun ufficio.
+        e per ciascun prefisso. Il prefisso è quindi parte del codice
+        leggibile, ad esempio A001 o C001.
         """
 
         oggi = timezone.localdate()
@@ -743,7 +744,7 @@ class QueueService:
         ultimo_numero = (
             AccessoVisitatore.objects
             .filter(
-                ufficio_destinazione=ufficio,
+                prefisso_coda=ufficio.prefisso_coda_effettivo,
                 ingresso__date=oggi,
             )
             .aggregate(

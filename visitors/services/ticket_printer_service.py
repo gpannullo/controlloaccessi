@@ -1,4 +1,5 @@
 import logging
+from urllib.parse import quote
 
 from django.conf import settings
 from django.utils import timezone
@@ -134,8 +135,14 @@ class TicketPrinterService:
             # QR facoltativo con solo identificativo interno.
             if config.get("PRINT_QR", False):
                 printer.textln("")
+                token = accesso.genera_token_pubblico()
+                base_url = config.get("PUBLIC_TICKET_BASE_URL", "").rstrip("/")
+                if not base_url:
+                    raise TicketPrinterException(
+                        "Indirizzo pubblico dei ticket non configurato."
+                    )
                 printer.qr(
-                    f"ACCESSO:{accesso.pk}",
+                    f"{base_url}/attesa/{quote(token)}/",
                     size=5,
                     center=True,
                 )

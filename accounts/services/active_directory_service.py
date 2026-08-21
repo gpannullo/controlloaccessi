@@ -1,9 +1,11 @@
 from datetime import datetime
+from datetime import timezone as datetime_timezone
 
 import ssl
 from pathlib import Path
 
-from ldap3 import Server, Connection, ALL, SUBTREE, Tls
+from ldap3 import ALL, Connection, MODIFY_ADD, MODIFY_DELETE, Server, SUBTREE, Tls
+from ldap3.core.exceptions import LDAPBindError
 from django.conf import settings
 from ldap3.utils.conv import escape_filter_chars
 
@@ -21,6 +23,7 @@ class ActiveDirectoryService(DirectoryService):
         "mobile",
         "memberOf",
         "userAccountControl",
+        "msDS-UserPasswordExpiryTimeComputed",
     ]
 
     GROUP_ATTRIBUTES = [
@@ -77,8 +80,69 @@ class ActiveDirectoryService(DirectoryService):
 
     def authenticate(self, username: str, password: str) -> bool:
 
-        try:
+        return self.authentication_status(username, password) == "authenticated"
 
+    def cambia_password_personale(self, username: str, password_attuale: str, nuova_password: str):
+        """Cambio password eseguito con le credenziali dell'utente.
+
+        La richiesta LDAP contiene delete/add di unicodePwd, anziché un reset
+        amministrativo. In questo modo AD applica le policy effettive
+        dell'utente, incluso lo storico delle password.
+        """
+        try:
+            conn = Connection(
+                self.server,
+                user=f"{username.strip()}@{self.domain}",
+                password=password_attuale,
+                auto_bind=True,
+            )
+        except LDAPBindError as exc:
+            raise ValueError("La password attuale non è corretta.") from exc
+
+        safe_username = escape_filter_chars(username.strip())
+        try:
+            found = conn.search(
+                search_base=self.base_dn,
+                search_filter=(
+                    "(&(objectCategory=person)(objectClass=user)"
+                    f"(sAMAccountName={safe_username}))"
+                ),
+                search_scope=SUBTREE,
+                attributes=[],
+                size_limit=1,
+            )
+            if not found or not conn.entries:
+                raise ValueError("Utente Active Directory non trovato.")
+
+            old_value = ('"%s"' % password_attuale).encode("utf-16-le")
+            new_value = ('"%s"' % nuova_password).encode("utf-16-le")
+            conn.modify(
+                conn.entries[0].entry_dn,
+                {
+                    "unicodePwd": [
+                        (MODIFY_DELETE, [old_value]),
+                        (MODIFY_ADD, [new_value]),
+                    ]
+                },
+            )
+            if conn.result.get("description") != "success":
+                description = conn.result.get("description", "")
+                message = conn.result.get("message", "")
+                if description == "constraintViolation":
+                    raise ValueError(
+                        "La nuova password non rispetta la policy Active Directory "
+                        "(complessità, lunghezza, storico o età minima)."
+                    )
+                raise ValueError(
+                    "Cambio password non riuscito: %s" % (message or description)
+                )
+        finally:
+            conn.unbind()
+
+    def authentication_status(self, username: str, password: str) -> str:
+        """Restituisce anche il caso AD ``data 773``: password da cambiare."""
+
+        try:
             conn = Connection(
                 self.server,
                 user=f"{username}@{self.domain}",
@@ -86,11 +150,15 @@ class ActiveDirectoryService(DirectoryService):
                 auto_bind=True,
             )
 
-            return conn.bound
-
+            stato = "authenticated" if conn.bound else "invalid"
+            conn.unbind()
+            return stato
+        except LDAPBindError as exc:
+            # Active Directory restituisce 773 quando le credenziali sono
+            # corrette ma la password provvisoria deve essere cambiata.
+            return "password_change_required" if "773" in str(exc) else "invalid"
         except Exception:
-
-            return False
+            return "invalid"
 
     def get_groups(self):
 
@@ -139,11 +207,17 @@ class ActiveDirectoryService(DirectoryService):
                     member_of.append(cn)
 
             disabled = False
+            password_expiry = None
+            password_never_expires = False
 
             if hasattr(entry, "userAccountControl"):
                 uac = int(entry.userAccountControl.value)
 
                 disabled = bool(uac & 2)
+                password_never_expires = bool(uac & 0x10000)
+            expiry = getattr(entry, "msDS-UserPasswordExpiryTimeComputed", None)
+            if expiry and expiry.value and int(expiry.value) not in {0, 9223372036854775807}:
+                password_expiry = datetime.fromtimestamp((int(expiry.value) - 116444736000000000) / 10000000, tz=datetime_timezone.utc)
 
             users.append({
 
@@ -158,9 +232,14 @@ class ActiveDirectoryService(DirectoryService):
                 "email": str(entry.mail)
                 if entry.mail else "",
 
+                "personal_email": entry.otherMailbox.values[0] if hasattr(entry, "otherMailbox") and entry.otherMailbox.values else "",
+                "mobile": str(entry.mobile) if entry.mobile else "",
+
                 "groups": member_of,
 
                 "active": not disabled,
+                "password_expiry": password_expiry,
+                "password_never_expires": password_never_expires,
 
             })
 

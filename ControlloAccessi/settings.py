@@ -33,7 +33,12 @@ ALLOWED_HOSTS = [
     host.strip()
     for host in os.getenv(
         "DJANGO_ALLOWED_HOSTS",
-        "192.168.15.24,127.0.0.1,localhost",
+        (
+            "192.168.15.24,127.0.0.1,localhost,"
+            "ticket.comune.aversa.ce.it,"
+            "account.comune.aversa.ce.it,"
+            "controlloaccessi.comune.aversa.ce.it"
+        ),
     ).split(",")
     if host.strip()
 ]
@@ -58,10 +63,12 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'common.middleware.HostAccessMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'accounts.middleware.ProfileCompletionMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -172,7 +179,7 @@ DIRECTORY = {
     "WRITE_ENABLED": os.getenv("AD_WRITE_ENABLED", "True").lower() in {"1", "true", "yes", "on"},
     "USER_SEARCH_BASE": os.getenv(
         "AD_USER_SEARCH_BASE",
-        "OU=Users,DC=comuneaversa,DC=local",
+        "CN=Users,DC=comuneaversa,DC=local",
     ),
     "GROUP_SEARCH_BASE": os.getenv(
         "AD_GROUP_SEARCH_BASE",
@@ -212,7 +219,47 @@ TICKET_PRINTER = {
     "TIMEOUT": int(os.getenv("TICKET_PRINTER_TIMEOUT", "5")),
     "PRINT_QR": os.getenv("TICKET_PRINTER_PRINT_QR", "False").lower()
     in {"1", "true", "yes", "on"},
+    "PUBLIC_TICKET_BASE_URL": os.getenv(
+        "PUBLIC_TICKET_BASE_URL",
+        "https://ticket.comune.aversa.ce.it",
+    ),
 }
+
+# Separazione delle funzioni sui tre hostname. Il middleware applica questa
+# regola anche dentro Django; il reverse proxy/firewall deve replicarla.
+PUBLIC_TICKET_HOST = os.getenv(
+    "PUBLIC_TICKET_HOST", "ticket.comune.aversa.ce.it"
+).lower()
+PUBLIC_ACCOUNT_HOST = os.getenv(
+    "PUBLIC_ACCOUNT_HOST", "account.comune.aversa.ce.it"
+).lower()
+INTERNAL_APPLICATION_HOST = os.getenv(
+    "INTERNAL_APPLICATION_HOST", "controlloaccessi.comune.aversa.ce.it"
+).lower()
+PUBLIC_TICKET_TOKEN_HOURS = int(
+    os.getenv("PUBLIC_TICKET_TOKEN_HOURS", "24")
+)
+
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "DJANGO_CSRF_TRUSTED_ORIGINS",
+        (
+            "https://ticket.comune.aversa.ce.it,"
+            "https://account.comune.aversa.ce.it,"
+            "https://controlloaccessi.comune.aversa.ce.it"
+        ),
+    ).split(",")
+    if origin.strip()
+]
+
+# Attivare a True quando gli hostname pubblici sono esposti in HTTPS.
+SESSION_COOKIE_SECURE = os.getenv(
+    "DJANGO_SESSION_COOKIE_SECURE", "False"
+).lower() in {"1", "true", "yes", "on"}
+CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
 
 
 PRESENCE_CHECK_ENABLED = os.getenv(
@@ -231,6 +278,8 @@ EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "g.pannullo@comune.aversa.ce.it")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() in {"1", "true", "yes", "on"}
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@comune.aversa.ce.it")
+# Recapito dell'ufficio competente per le richieste di aggiornamento anagrafico.
+ACCOUNT_UPDATE_CONTACT_EMAIL = os.getenv("ACCOUNT_UPDATE_CONTACT_EMAIL", EMAIL_HOST_USER)
 
 # Domini disponibili per le nuove caselle di posta istituzionali.
 INSTITUTIONAL_EMAIL_DOMAINS = (
@@ -256,3 +305,16 @@ try:
     from .settings_develop import *
 except ImportError:
     pass
+
+# settings_develop può sostituire ALLOWED_HOSTS per i test locali: gli host
+# previsti dall'applicazione devono comunque restare ammessi.
+ALLOWED_HOSTS = list(
+    dict.fromkeys(
+        ALLOWED_HOSTS
+        + [
+            PUBLIC_TICKET_HOST,
+            PUBLIC_ACCOUNT_HOST,
+            INTERNAL_APPLICATION_HOST,
+        ]
+    )
+)

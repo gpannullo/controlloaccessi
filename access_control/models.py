@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.contrib.auth.models import Group
 
@@ -12,6 +13,16 @@ class Ufficio(models.Model):
         max_length=20,
         unique=True,
         verbose_name="Codice"
+    )
+
+    prefisso_coda = models.CharField(
+        max_length=1,
+        blank=True,
+        verbose_name="Prefisso coda",
+        help_text=(
+            "Una lettera visibile sul ticket (es. A per A001). "
+            "Impostare un prefisso diverso per ogni ufficio."
+        ),
     )
 
     nome = models.CharField(
@@ -94,6 +105,25 @@ class Ufficio(models.Model):
 
     def __str__(self):
         return self.nome
+
+    def clean(self):
+        super().clean()
+        if self.prefisso_coda and (
+            not self.prefisso_coda.isalpha()
+            or len(self.prefisso_coda) != 1
+        ):
+            raise ValidationError(
+                {"prefisso_coda": "Indicare una sola lettera."}
+            )
+
+    @property
+    def prefisso_coda_effettivo(self):
+        """Prefisso usato dai nuovi ticket.
+
+        Il ripiego sul codice mantiene operative le configurazioni
+        precedenti, ma ogni ufficio deve essere configurato esplicitamente.
+        """
+        return (self.prefisso_coda or self.codice[:1] or "A").upper()
 
     @property
     def numero_dipendenti(self):

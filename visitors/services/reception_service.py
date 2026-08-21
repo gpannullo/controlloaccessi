@@ -82,6 +82,7 @@ class ReceptionService:
             motivo=motivo,
             badge=badge,
             numero_coda=numero_coda,
+            prefisso_coda=ufficio.prefisso_coda_effettivo,
             note=note,
             documento_presentato=documento_presentato,
             accompagnato=accompagnato,

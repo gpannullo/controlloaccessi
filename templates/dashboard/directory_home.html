@@ -1,7 +1,42 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container-fluid py-4"><div class="d-flex justify-content-between align-items-center"><h1>Utenti Active Directory</h1><div><a class="btn btn-primary" href="{% url 'dashboard:directory_user_create' %}">Nuovo utente AD</a> <a class="btn btn-outline-secondary" href="{% url 'dashboard:directory_home' %}">Home Directory</a></div></div>
-<details class="card card-body my-3"><summary>Filtri</summary><form method="get" class="row g-2 mt-2"><div class="col-md-4"><input class="form-control" name="q" value="{{ query }}" placeholder="Username, nome, cognome, email"></div><div class="col-md-3"><select class="form-select" name="tipo_attivita" multiple size="4">{% for value,label in utenti.model.TipoAttivita.choices %}<option value="{{ value }}" {% if value in tipi %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div><div class="col-md-3"><select class="form-select" name="gruppo"><option value="">Tutti i gruppi</option>{% for item in gruppi %}<option value="{{ item.pk }}">{{ item.name }}</option>{% endfor %}</select></div><div class="col-md-2"><button class="btn btn-primary">Filtra</button><a class="btn btn-outline-secondary" href="{% url 'dashboard:directory_users' %}?reset=1">Reset</a></div></form></details>
-<p>{{ totale_filtrati }} risultati su {{ totale_utenti }} utenti.</p><table class="table"><thead><tr><th>Username</th><th>Nome</th><th>Cognome</th><th>Email</th><th>Attività</th><th>Gruppi</th></tr></thead><tbody>{% for utente in utenti %}<tr><td><a href="{% url 'dashboard:directory_user' utente.pk %}">{{ utente.username }}</a></td><td>{{ utente.first_name }}</td><td>{{ utente.last_name }}</td><td>{{ utente.email }}</td><td>{{ utente.get_tipo_attivita_display }}</td><td><button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#gruppi-{{ utente.pk }}">{{ utente.groups.count }}</button><div class="modal fade" id="gruppi-{{ utente.pk }}"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h2 class="modal-title fs-5">Gruppi: {{ utente.username }}</h2><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><ul>{% for item in utente.groups.all %}<li>{{ item.name }}</li>{% empty %}<li>Nessun gruppo.</li>{% endfor %}</ul></div></div></div></div></td></tr>{% empty %}<tr><td colspan="6">Nessun utente.</td></tr>{% endfor %}</tbody></table></div>
-<link rel="stylesheet" href="https://cdn.datatables.net/2.3.0/css/dataTables.bootstrap5.css"><script src="https://code.jquery.com/jquery-3.7.1.min.js"></script><script src="https://cdn.datatables.net/2.3.0/js/dataTables.js"></script><script src="https://cdn.datatables.net/2.3.0/js/dataTables.bootstrap5.js"></script><script>new DataTable('table.table',{pageLength:20,lengthMenu:[[20,50,100,-1],[20,50,100,'Tutti']],language:{url:'https://cdn.datatables.net/plug-ins/2.3.0/i18n/it-IT.json'}});</script>
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
+    <div>
+      <p class="text-danger fw-semibold mb-1">Amministrazione Account</p>
+      <h1 class="h2 mb-0">Gestione utenti</h1>
+    </div>
+    <div>
+      <a class="btn btn-danger" href="{% url 'dashboard:directory_user_create' %}">Nuovo account</a>
+      <form class="d-inline" method="post" action="{% url 'dashboard:directory_sync_mail_from_upn' %}" onsubmit="return confirm('Vuoi valorizzare l’e-mail LDAP degli utenti che ne sono privi copiando il relativo UPN? Le e-mail già presenti non verranno modificate.');">{% csrf_token %}<button class="btn btn-outline-danger">Allinea e-mail da UPN</button></form>
+      <a class="btn btn-outline-danger" href="{% url 'dashboard:directory_home' %}">Amministrazione Account</a>
+    </div>
+  </div>
+
+  {% if messages %}
+    <div class="mt-3">
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert" {% if 'success' in message.tags %}data-auto-dismiss="true"{% endif %}>
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Chiudi"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <details class="card card-body my-3 border-danger-subtle">
+    <summary class="text-danger fw-semibold">Filtri utenti</summary>
+    <form method="get" class="row g-2 mt-2">
+      <div class="col-md-4"><input class="form-control" name="q" value="{{ query }}" placeholder="Username, nome, cognome, email"></div>
+      <div class="col-md-3"><select class="form-select" name="tipo_attivita" multiple size="4">{% for value,label in utenti.model.TipoAttivita.choices %}<option value="{{ value }}" {% if value in tipi %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+      <div class="col-md-2"><select class="form-select" name="gruppo"><option value="">Tutti i gruppi</option>{% for item in gruppi %}<option value="{{ item.pk }}">{{ item.name }}</option>{% endfor %}</select></div>
+      <div class="col-md-2"><select class="form-select" name="stato_account"><option value="">Tutti gli utenti</option><option value="attivi" {% if attivo == 'attivi' %}selected{% endif %}>Solo attivi</option><option value="disattivi" {% if attivo == 'disattivi' %}selected{% endif %}>Solo non attivi</option></select></div>
+      <div class="col-md-1"><button class="btn btn-danger">Filtra</button><a class="btn btn-outline-secondary" href="{% url 'dashboard:directory_users' %}?reset=1">Reset</a></div>
+    </form>
+  </details>
+
+  <p class="text-muted">{{ totale_filtrati }} risultati su {{ totale_utenti }} utenti.</p>
+  <table class="table table-hover align-middle"><thead><tr><th>Stato</th><th>Username</th><th>Nome</th><th>Cognome</th><th>Email</th><th>Scadenza password</th><th>Attività</th><th>Gruppi</th></tr></thead><tbody>{% for utente in utenti %}<tr><td class="text-center" title="{% if utente.is_active %}Account attivo{% else %}Account non attivo{% endif %}"><span class="d-inline-block rounded-circle {% if utente.is_active %}bg-success{% else %}bg-danger{% endif %}" style="width:12px;height:12px;"></span></td><td><a class="link-danger fw-semibold" href="{% url 'dashboard:directory_user' utente.pk %}">{{ utente.username }}</a></td><td>{{ utente.first_name }}</td><td>{{ utente.last_name }}</td><td>{{ utente.email }}</td><td>{% if utente.password_senza_scadenza %}<span class="text-muted">Senza scadenza</span>{% elif utente.scadenza_password %}{{ utente.scadenza_password|date:"d/m/Y" }}{% else %}—{% endif %}</td><td>{{ utente.get_tipo_attivita_display }}</td><td><button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#gruppi-{{ utente.pk }}">{{ utente.groups.count }}</button><div class="modal fade" id="gruppi-{{ utente.pk }}"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h2 class="modal-title fs-5">Gruppi assegnati: {{ utente.username }}</h2><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><ul>{% for item in utente.groups.all %}<li>{{ item.name }}</li>{% empty %}<li>Nessun gruppo.</li>{% endfor %}</ul></div></div></div></div></td></tr>{% empty %}<tr><td colspan="8">Nessun utente.</td></tr>{% endfor %}</tbody></table>
+</div>
+<link rel="stylesheet" href="https://cdn.datatables.net/2.3.0/css/dataTables.bootstrap5.css"><script src="https://code.jquery.com/jquery-3.7.1.min.js"></script><script src="https://cdn.datatables.net/2.3.0/js/dataTables.js"></script><script src="https://cdn.datatables.net/2.3.0/js/dataTables.bootstrap5.js"></script><script>new DataTable('table.table',{pageLength:10,lengthMenu:[[10,20,50,100,-1],[10,20,50,100,'Tutti']],columnDefs:[{targets:'_all',defaultContent:''},{targets:6,visible:false}],language:{url:'https://cdn.datatables.net/plug-ins/2.3.0/i18n/it-IT.json'}});window.setTimeout(() => document.querySelectorAll('[data-auto-dismiss="true"]').forEach((element) => bootstrap.Alert.getOrCreateInstance(element).close()), 5000);</script>
 {% endblock %}

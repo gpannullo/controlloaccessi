@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="refresh" content="30">
+    <title>Stato ticket {{ accesso.numero_coda_formattato }}</title>
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; color: #17324d; background: #f3f7fa; }
+        main { max-width: 620px; margin: 4rem auto; padding: 2.5rem; text-align: center; background: #fff; border-radius: 1rem; box-shadow: 0 6px 24px #17324d22; }
+        .ticket { color: #005a9c; font-size: clamp(4rem, 16vw, 7rem); font-weight: 700; margin: 1rem 0; }
+        .state { font-size: 1.5rem; font-weight: 700; }
+        .muted { color: #5d6a75; }
+        .details { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #dce3e8; }
+    </style>
+</head>
+<body>
+<main>
+    <p class="muted">Comune di Aversa · Stato della coda</p>
+    <div class="ticket">{{ accesso.numero_coda_formattato }}</div>
+    <p class="state">{{ stato }}</p>
+    <p>{{ istruzione }}</p>
+    <section class="details">
+        <p><strong>Destinazione:</strong> {{ accesso.ufficio_destinazione.nome }}</p>
+        {% if persone_davanti %}
+            <p>Persone davanti a lei: <strong>{{ persone_davanti }}</strong></p>
+            <p class="muted">Attesa stimata: circa {{ attesa_stimata }} minuti.</p>
+        {% endif %}
+        <p class="muted">La pagina si aggiorna automaticamente ogni 30 secondi.</p>
+    </section>
+</main>
+</body>
+</html>

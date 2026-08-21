@@ -203,6 +203,11 @@
                                     {{ visita_corrente.visitatore }}
                                 </dd>
 
+                                <dt class="col-sm-4">Badge</dt>
+                                <dd class="col-sm-8">{{ visita_corrente.badge.codice|default:"—" }}</dd>
+
+                                {% if visita_corrente.accesso_precedente %}<dt class="col-sm-4">Cronologia</dt><dd class="col-sm-8"><button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#cronologia-visitante">Vedi ufficio precedente</button></dd><div class="modal fade" id="cronologia-visitante"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h2 class="modal-title fs-5">Ufficio precedente: {{ visita_corrente.accesso_precedente.ufficio_destinazione.nome }}</h2><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-5">Motivo</dt><dd class="col-7">{{ visita_corrente.accesso_precedente.motivo|default:"—" }}</dd><dt class="col-5">Note aggiuntive</dt><dd class="col-7">{{ visita_corrente.accesso_precedente.note|default:"—"|linebreaksbr }}</dd><dt class="col-5">Ingresso ufficio</dt><dd class="col-7">{{ visita_corrente.accesso_precedente.ingresso_ufficio_il|date:"d/m/Y H:i"|default:"—" }}</dd><dt class="col-5">Uscita ufficio</dt><dd class="col-7">{{ visita_corrente.accesso_precedente.uscita|date:"d/m/Y H:i"|default:"—" }}</dd></dl></div></div></div></div>{% endif %}
+
                                 <dt class="col-sm-4">
                                     Motivo
                                 </dt>
@@ -210,6 +215,9 @@
                                 <dd class="col-sm-8">
                                     {{ visita_corrente.motivo|default:"—" }}
                                 </dd>
+
+                                <dt class="col-sm-4">Note aggiuntive</dt>
+                                <dd class="col-sm-8">{{ visita_corrente.note|default:"—"|linebreaksbr }}</dd>
 
                                 <dt class="col-sm-4">
                                     Telefono
@@ -302,6 +310,7 @@
                                         <option value="{{ destinazione.pk }}">{{ destinazione.nome }}</option>
                                     {% endfor %}
                                 </select>
+                                <input type="text" class="form-control mb-2" name="motivo_trasferimento" placeholder="Motivo del trasferimento" required>
                                 <input type="text" class="form-control mb-2" name="note_trasferimento" placeholder="Nota facoltativa">
                                 <button type="submit" class="btn btn-outline-primary w-100">Concludi e trasferisci</button>
                             </form>
@@ -446,7 +455,7 @@
                                     </td>
 
                                     <td>
-                                        {{ accesso.motivo|default:"—" }}
+                                        {% if accesso.note %}<button type="button" class="btn p-0 border-0 bg-transparent text-warning me-1" title="Nota della portineria" data-bs-toggle="modal" data-bs-target="#nota-portineria-{{ accesso.pk }}">&#9432;</button><div class="modal fade" id="nota-portineria-{{ accesso.pk }}" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h2 class="modal-title fs-5">Nota della portineria</h2><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body">{{ accesso.note|linebreaksbr }}</div></div></div></div>{% else %}<button type="button" class="btn p-0 border-0 bg-transparent text-muted opacity-50 me-1" disabled title="Nessuna nota della portineria">&#9432;</button>{% endif %}{{ accesso.motivo|default:"—" }}
                                     </td>
 
                                     <td>
@@ -719,7 +728,7 @@
                                     </td>
 
                                     <td>
-                                        {{ accesso.motivo|default:"—" }}
+                                        {% if accesso.note %}<button type="button" class="btn p-0 border-0 bg-transparent text-warning me-1" title="Nota della portineria" data-bs-toggle="modal" data-bs-target="#nota-portineria-{{ accesso.pk }}">&#9432;</button><div class="modal fade" id="nota-portineria-{{ accesso.pk }}" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h2 class="modal-title fs-5">Nota della portineria</h2><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body">{{ accesso.note|linebreaksbr }}</div></div></div></div>{% else %}<button type="button" class="btn p-0 border-0 bg-transparent text-muted opacity-50 me-1" disabled title="Nessuna nota della portineria">&#9432;</button>{% endif %}{{ accesso.motivo|default:"—" }}
                                     </td>
 
                                     <td>

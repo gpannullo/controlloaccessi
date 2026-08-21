@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.http import JsonResponse
 from django.shortcuts import (
     get_object_or_404,
@@ -16,6 +17,18 @@ from visitors.services.continuity_service import ContinuitaAccessoService
 from visitors.services.office_queue_service import (
     OfficeQueueService,
 )
+
+User = get_user_model()
+
+
+def _operatori_disponibili_ufficio(ufficio):
+    """Almeno un dipendente dell'ufficio deve risultare presente."""
+    return User.objects.filter(
+        is_active=True,
+        stato_presenza=User.StatoPresenza.PRESENTE,
+        groups__gruppo_organizzativo__ufficio=ufficio,
+        groups__gruppo_organizzativo__attivo=True,
+    ).exists()
 
 
 def _get_client_ip(request):
@@ -152,6 +165,10 @@ def ufficio_dashboard(request, ufficio_id):
         .exclude(pk=ufficio.pk)
         .order_by("nome")
     )
+    uffici_trasferimento = [
+        candidato for candidato in uffici_trasferimento
+        if _operatori_disponibili_ufficio(candidato)
+    ]
 
     return render(
         request,
@@ -451,12 +468,20 @@ def trasferisci_visitatore(request, ufficio_id, accesso_id):
         pk=request.POST.get("nuovo_ufficio"),
         attivo=True,
     )
+    if not _operatori_disponibili_ufficio(nuovo_ufficio):
+        messages.error(request, "L'ufficio selezionato non ha dipendenti presenti disponibili.")
+        return redirect("uffici:dashboard", ufficio_id=ufficio.pk)
     note = (request.POST.get("note_trasferimento") or "").strip()
+    motivo = (request.POST.get("motivo_trasferimento") or "").strip()
+    if not motivo:
+        messages.error(request, "Indicare il motivo del trasferimento.")
+        return redirect("uffici:dashboard", ufficio_id=ufficio.pk)
     try:
         nuovo_accesso = ContinuitaAccessoService.trasferisci_ufficio(
             accesso=accesso,
             nuovo_ufficio=nuovo_ufficio,
             operatore=request.user,
+            motivo=motivo,
             note=note,
             ip_address=_get_client_ip(request),
         )

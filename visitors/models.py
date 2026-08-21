@@ -1,3 +1,5 @@
+import secrets
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -164,6 +166,30 @@ class AccessoVisitatore(models.Model):
         verbose_name="Numero di coda",
     )
 
+    prefisso_coda = models.CharField(
+        max_length=1,
+        blank=True,
+        editable=False,
+        verbose_name="Prefisso della coda",
+    )
+
+    token_pubblico = models.CharField(
+        max_length=64,
+        unique=True,
+        null=True,
+        blank=True,
+        editable=False,
+        db_index=True,
+        verbose_name="Token pubblico ticket",
+    )
+
+    token_pubblico_creato_il = models.DateTimeField(
+        null=True,
+        blank=True,
+        editable=False,
+        verbose_name="Creazione token pubblico",
+    )
+
     documento_presentato = models.BooleanField(
         default=True,
         verbose_name="Documento presentato",
@@ -206,6 +232,15 @@ class AccessoVisitatore(models.Model):
     note = models.TextField(
         blank=True,
         verbose_name="Note della portineria",
+    )
+
+    accesso_precedente = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="accessi_successivi",
+        verbose_name="Accesso precedente",
     )
 
     stato_coda = models.CharField(
@@ -262,7 +297,20 @@ class AccessoVisitatore(models.Model):
         if self.numero_coda is None:
             return ""
 
-        return f"{self.numero_coda:03d}"
+        prefisso = self.prefisso_coda or (
+            self.ufficio_destinazione.prefisso_coda_effettivo
+        )
+        return f"{prefisso}{self.numero_coda:03d}"
+
+    def genera_token_pubblico(self):
+        """Genera il token casuale da inserire nel QR, mai l'id interno."""
+        if self.token_pubblico:
+            return self.token_pubblico
+
+        self.token_pubblico = secrets.token_urlsafe(32)
+        self.token_pubblico_creato_il = timezone.now()
+        self.save(update_fields=["token_pubblico", "token_pubblico_creato_il"])
+        return self.token_pubblico
 
     @property
     def prioritario(self):
