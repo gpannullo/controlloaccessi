@@ -35,7 +35,7 @@
     <script src="https://cdn.datatables.net/2.3.0/js/dataTables.js"></script>
     <script src="https://cdn.datatables.net/2.3.0/js/dataTables.bootstrap5.js"></script>
     <script>document.querySelectorAll('[title="Nota della portineria"]').forEach(e=>{e.title='Note aggiuntive';e.innerHTML='<i class="bi bi-sticky"></i>'});document.querySelectorAll('[title="Nessuna nota della portineria"]').forEach(e=>{e.title='Nessuna nota aggiuntiva';e.innerHTML='<i class="bi bi-sticky"></i>'});document.querySelectorAll('.modal[id^="nota-portineria"] .modal-title').forEach(e=>e.textContent='Note aggiuntive');</script>
-    <script>if (location.pathname.endsWith('/personale/')) new DataTable('table.table',{pageLength:10,lengthMenu:[[10,20,50,100,-1],[10,20,50,100,'Tutti']],language:{url:'https://cdn.datatables.net/plug-ins/2.3.0/i18n/it-IT.json'}});</script>
+    <script>const tabellaPersonale=document.querySelector('#tabella-personale');if(tabellaPersonale)new DataTable(tabellaPersonale,{pageLength:10,lengthMenu:[[10,20,50,100,-1],[10,20,50,100,'Tutti']],language:{url:'https://cdn.datatables.net/plug-ins/2.3.0/i18n/it-IT.json'}});</script>
 
 </body>
 
