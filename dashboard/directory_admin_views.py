@@ -239,17 +239,17 @@ def directory_staff(request):
     else:
         uffici_selezionati = request.session.get(session_key, [])
     personale = User.objects.filter(
-        groups__gruppo_organizzativo__ufficio__isnull=False,
-        groups__gruppo_organizzativo__ufficio__attivo=True,
-    ).distinct().prefetch_related("groups__gruppo_organizzativo__ufficio").order_by("last_name", "first_name", "username")
+        groups__gruppi_organizzativi__ufficio__isnull=False,
+        groups__gruppi_organizzativi__ufficio__attivo=True,
+    ).distinct().prefetch_related("groups__gruppi_organizzativi__ufficio").order_by("last_name", "first_name", "username")
     if uffici_selezionati:
-        personale = personale.filter(groups__gruppo_organizzativo__ufficio_id__in=uffici_selezionati).distinct()
+        personale = personale.filter(groups__gruppi_organizzativi__ufficio_id__in=uffici_selezionati).distinct()
     for utente in personale:
         assegnazioni = [
-            gruppo.gruppo_organizzativo.ufficio
+            gruppo_operativo.ufficio
             for gruppo in utente.groups.all()
-            if hasattr(gruppo, "gruppo_organizzativo")
-            and gruppo.gruppo_organizzativo.ufficio_id
+            for gruppo_operativo in gruppo.gruppi_organizzativi.all()
+            if gruppo_operativo.ufficio_id
         ]
         utente.uffici_associati = list({ufficio.pk: ufficio for ufficio in assegnazioni}.values())
         utente.numero_uffici = len(utente.uffici_associati)

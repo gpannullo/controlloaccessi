@@ -16,8 +16,8 @@ def home(request):
     """
 
     has_offices = request.user.is_superuser or request.user.groups.filter(
-        gruppo_organizzativo__ufficio__isnull=False,
-        gruppo_organizzativo__ufficio__attivo=True,
+        gruppi_organizzativi__ufficio__isnull=False,
+        gruppi_organizzativi__ufficio__attivo=True,
     ).exists()
     has_dirigenza = request.user.is_superuser or request.user.groups.filter(
         name__in={"Dirigenti", "Funzionari_EQ"},

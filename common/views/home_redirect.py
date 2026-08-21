@@ -20,8 +20,8 @@ def home_redirect(request):
         return redirect("dashboard:home")
 
     if user.groups.filter(
-        gruppo_organizzativo__ufficio__isnull=False,
-        gruppo_organizzativo__ufficio__attivo=True,
+        gruppi_organizzativi__ufficio__isnull=False,
+        gruppi_organizzativi__ufficio__attivo=True,
     ).exists():
         return redirect("uffici:selezione")
 

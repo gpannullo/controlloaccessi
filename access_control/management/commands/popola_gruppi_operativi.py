@@ -30,10 +30,9 @@ class Command(BaseCommand):
         da_creare = []
         conflitti = []
 
-        gruppi_esistenti = {
-            gruppo.django_group_id: gruppo
-            for gruppo in GruppoOrganizzativo.objects.select_related("django_group")
-        }
+        gruppi_esistenti = set(
+            GruppoOrganizzativo.objects.values_list("django_group_id", flat=True)
+        )
         nomi_occupati = set(
             GruppoOrganizzativo.objects.values_list("nome", flat=True)
         )
