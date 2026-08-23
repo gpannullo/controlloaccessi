@@ -4,6 +4,8 @@ from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.http import require_GET
 
+from common.module_access import MonitorPortineriaAccessMixin, module_required
+
 from access_control.models import Ufficio
 from access_control.services.office_service import (
     OfficeService,
@@ -15,7 +17,7 @@ NUMERO_CHIAMATE_STORICO = 4
 
 def _stato_monitor():
     """
-    Costruisce lo stato del monitor pubblico.
+    Costruisce lo stato del Monitor portineria.
 
     Non restituisce dati personali.
     """
@@ -243,9 +245,10 @@ def _stato_monitor():
     }
 
 
+@module_required(MonitorPortineriaAccessMixin)
 def monitor_home(request):
     """
-    Pagina pubblica del monitor.
+    Pagina del Monitor portineria.
     """
 
     stato = _stato_monitor()
@@ -264,6 +267,7 @@ def monitor_home(request):
     )
 
 
+@module_required(MonitorPortineriaAccessMixin)
 @require_GET
 def monitor_stato_live(request):
     """

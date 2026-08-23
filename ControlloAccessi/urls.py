@@ -16,6 +16,10 @@ urlpatterns = [
     # Pagina pubblica consultabile esclusivamente con il token casuale del QR.
     path("attesa/<str:token>/", ticket_status, name="ticket_status"),
 
+    # Servizi pubblici per i cittadini.
+    path("prenotazioni/", include(("prenotazioni.urls", "prenotazioni"), namespace="prenotazioni")),
+    path("identita/", include(("spid_cie.urls", "spid_cie"), namespace="spid_cie")),
+
     # Home applicativa
     path("", home, name="home"),
 
@@ -41,7 +45,7 @@ urlpatterns = [
     # Gestione uffici
     path("uffici/", include(("visitors.office_urls", "uffici"), namespace="uffici")),
 
-    # Monitor pubblico
+    # Monitor portineria
     path("monitor/", monitor_home, name="monitor_home"),
 
     path("monitor/stato-live/", monitor_stato_live, name="monitor_stato_live"),

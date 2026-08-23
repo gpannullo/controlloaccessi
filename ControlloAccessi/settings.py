@@ -37,7 +37,8 @@ ALLOWED_HOSTS = [
             "192.168.15.24,127.0.0.1,localhost,"
             "ticket.comune.aversa.ce.it,"
             "account.comune.aversa.ce.it,"
-            "controlloaccessi.comune.aversa.ce.it"
+            "controlloaccessi.comune.aversa.ce.it,"
+            "prenotazioni.comune.aversa.ce.it"
         ),
     ).split(",")
     if host.strip()
@@ -59,15 +60,19 @@ INSTALLED_APPS = [
     "dashboard",
     "common",
     "post_office",
+    "spid_cie",
+    "prenotazioni",
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'common.middleware.HostAccessMiddleware',
+    'spid_cie.middleware.PublicBookingHostMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'common.module_access.AdminModuleAccessMiddleware',
     'accounts.middleware.ProfileCompletionMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -239,6 +244,9 @@ INTERNAL_APPLICATION_HOST = os.getenv(
 PUBLIC_TICKET_TOKEN_HOURS = int(
     os.getenv("PUBLIC_TICKET_TOKEN_HOURS", "24")
 )
+PUBLIC_BOOKING_HOST = os.getenv(
+    "PUBLIC_BOOKING_HOST", "prenotazioni.comune.aversa.ce.it"
+).lower()
 
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
@@ -247,7 +255,8 @@ CSRF_TRUSTED_ORIGINS = [
         (
             "https://ticket.comune.aversa.ce.it,"
             "https://account.comune.aversa.ce.it,"
-            "https://controlloaccessi.comune.aversa.ce.it"
+            "https://controlloaccessi.comune.aversa.ce.it,"
+            "https://prenotazioni.comune.aversa.ce.it"
         ),
     ).split(",")
     if origin.strip()
@@ -293,6 +302,24 @@ POST_OFFICE = {
     "MAX_RETRIES": 4,
 }
 
+# Accesso pubblico tramite la federazione/aggregatore OIDC dell'Ente.
+# Credenziali e metadata restano nel file /etc/controlloaccessi.env.
+SPID_CIE = {
+    "ENABLED": os.getenv("SPID_CIE_ENABLED", "False").lower()
+    in {"1", "true", "yes", "on"},
+    "SERVER_METADATA_URL": os.getenv("SPID_CIE_SERVER_METADATA_URL", ""),
+    "CLIENT_ID": os.getenv("SPID_CIE_CLIENT_ID", ""),
+    "CLIENT_SECRET": os.getenv("SPID_CIE_CLIENT_SECRET", ""),
+    "SCOPE": os.getenv("SPID_CIE_SCOPE", "openid profile email"),
+}
+
+PRENOTAZIONI_DURATA_SLOT_MINUTI = int(
+    os.getenv("PRENOTAZIONI_DURATA_SLOT_MINUTI", "30")
+)
+PRENOTAZIONI_MAX_GIORNI = int(
+    os.getenv("PRENOTAZIONI_MAX_GIORNI", "90")
+)
+
 # Nginx / reverse proxy
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
@@ -315,6 +342,7 @@ ALLOWED_HOSTS = list(
             PUBLIC_TICKET_HOST,
             PUBLIC_ACCOUNT_HOST,
             INTERNAL_APPLICATION_HOST,
+            PUBLIC_BOOKING_HOST,
         ]
     )
 )

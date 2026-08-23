@@ -2,7 +2,12 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.utils import timezone
 from accounts.services.directory_admin_service import DirectoryAdminService
-from visitors.permissions import is_portineria_user
+from common.module_access import (
+    DirigenzaAccessMixin,
+    MonitorPortineriaAccessMixin,
+    PortineriaAccessMixin,
+    UfficiAccessMixin,
+)
 
 
 @login_required
@@ -15,14 +20,9 @@ def home(request):
     prova ad accedere alla singola area.
     """
 
-    has_offices = request.user.is_superuser or request.user.groups.filter(
-        gruppi_organizzativi__ufficio__isnull=False,
-        gruppi_organizzativi__ufficio__attivo=True,
-    ).exists()
-    has_dirigenza = request.user.is_superuser or request.user.groups.filter(
-        name__in={"Dirigenti", "Funzionari_EQ"},
-    ).exists()
-    can_portineria = request.user.is_superuser or is_portineria_user(request.user)
+    has_offices = UfficiAccessMixin.has_module_access(request.user)
+    has_dirigenza = DirigenzaAccessMixin.has_module_access(request.user)
+    can_portineria = PortineriaAccessMixin.has_module_access(request.user)
     password_expiry = None
     password_days_remaining = None
     password_never_expires = False
@@ -40,7 +40,7 @@ def home(request):
         "can_portineria": can_portineria,
         "can_offices": has_offices,
         "can_dirigenza": has_dirigenza,
-        "can_monitor": can_portineria or has_dirigenza,
+        "can_monitor": MonitorPortineriaAccessMixin.has_module_access(request.user),
         "password_expiry": password_expiry,
         "password_days_remaining": password_days_remaining,
         "password_never_expires": password_never_expires,

@@ -140,7 +140,12 @@ class ActiveDirectoryService(DirectoryService):
             conn.unbind()
 
     def authentication_status(self, username: str, password: str) -> str:
-        """Restituisce anche il caso AD ``data 773``: password da cambiare."""
+        """Distingue login valido, password da cambiare e credenziali errate.
+
+        Active Directory restituisce ``data 773`` per la password provvisoria
+        e ``data 532`` per una password scaduta. In entrambi i casi l'utente
+        deve poter scegliere subito una nuova password.
+        """
 
         try:
             conn = Connection(
@@ -154,9 +159,13 @@ class ActiveDirectoryService(DirectoryService):
             conn.unbind()
             return stato
         except LDAPBindError as exc:
-            # Active Directory restituisce 773 quando le credenziali sono
-            # corrette ma la password provvisoria deve essere cambiata.
-            return "password_change_required" if "773" in str(exc) else "invalid"
+            # Le credenziali sono corrette, ma AD richiede il cambio password:
+            # 773 = password provvisoria; 532 = password scaduta.
+            return (
+                "password_change_required"
+                if any(code in str(exc) for code in ("773", "532"))
+                else "invalid"
+            )
         except Exception:
             return "invalid"
 
