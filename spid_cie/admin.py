@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import IdentitaDigitale, MessaggioIO
+from .models import CodiceAccessoGateway, IdentitaDigitale, MessaggioIO
 
 
 @admin.register(IdentitaDigitale)
@@ -17,3 +17,10 @@ class MessaggioIOAdmin(admin.ModelAdmin):
     list_filter = ("stato",)
     search_fields = ("codice_fiscale", "oggetto", "riferimento_esterno", "messaggio_io_id")
     readonly_fields = ("codice_fiscale", "oggetto", "contenuto", "riferimento_esterno", "messaggio_io_id", "stato", "risposta", "creato_il")
+
+
+@admin.register(CodiceAccessoGateway)
+class CodiceAccessoGatewayAdmin(admin.ModelAdmin):
+    list_display = ("codice_fiscale", "cognome", "nome", "scade_il", "usato_il", "creato_il")
+    search_fields = ("codice_fiscale", "cognome", "nome")
+    readonly_fields = ("codice_hash", "codice_fiscale", "nome", "cognome", "email", "destinazione", "scade_il", "usato_il", "creato_il")

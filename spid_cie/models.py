@@ -55,3 +55,22 @@ class MessaggioIO(models.Model):
 
     def __str__(self):
         return f"{self.codice_fiscale} — {self.oggetto}"
+
+
+class CodiceAccessoGateway(models.Model):
+    """Codice monouso ricevuto dal gateway SPID, mai salvato in chiaro."""
+
+    codice_hash = models.CharField(max_length=64, unique=True)
+    codice_fiscale = models.CharField(max_length=16)
+    nome = models.CharField(max_length=100, blank=True)
+    cognome = models.CharField(max_length=100, blank=True)
+    email = models.EmailField(blank=True)
+    destinazione = models.CharField(max_length=500)
+    scade_il = models.DateTimeField(db_index=True)
+    usato_il = models.DateTimeField(null=True, blank=True)
+    creato_il = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-creato_il"]
+        verbose_name = "Codice accesso gateway SPID"
+        verbose_name_plural = "Codici accesso gateway SPID"

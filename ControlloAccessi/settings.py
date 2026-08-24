@@ -314,6 +314,14 @@ SPID_CIE = {
     "SCOPE": os.getenv("SPID_CIE_SCOPE", "openid profile email"),
 }
 
+# Gateway SAML separato: la chiave è condivisa solo fra gateway e applicazione.
+SPID_GATEWAY = {
+    "ENABLED": os.getenv("SPID_GATEWAY_ENABLED", "False").lower() in {"1", "true", "yes", "on"},
+    "BASE_URL": os.getenv("SPID_GATEWAY_BASE_URL", "https://prenotazioni.comune.aversa.ce.it/identita/spid"),
+    "SHARED_SECRET": os.getenv("SPID_GATEWAY_SHARED_SECRET", ""),
+    "MAX_AGE_SECONDS": int(os.getenv("SPID_GATEWAY_MAX_AGE_SECONDS", "60")),
+}
+
 # App IO: inserire la chiave "use" del servizio nel file
 # /etc/controlloaccessi.env. L'invio resta inattivo finché ENABLED è False.
 APP_IO = {

@@ -106,6 +106,7 @@ def my_account(request):
         "dettaglio": dettaglio,
         "uffici": uffici,
         "account_update_contact_email": settings.ACCOUNT_UPDATE_CONTACT_EMAIL,
+        "is_public_account": request.get_host().split(":", 1)[0].lower() == settings.PUBLIC_ACCOUNT_HOST,
     })
 
 

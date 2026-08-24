@@ -1,6 +1,8 @@
 from datetime import datetime
+from urllib.parse import urlencode
 
 from django.contrib import messages
+from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -80,7 +82,10 @@ def wizard(request):
             )
             request.session.pop(SESSION_KEY, None)
             return redirect("prenotazioni:conferma", codice=prenotazione.codice)
-    return render(request, "prenotazioni/wizard.html", {"step": step, "form": form, "data": data, "identity": identity})
+    gateway_login_url = ""
+    if settings.SPID_GATEWAY["ENABLED"]:
+        gateway_login_url = f'{settings.SPID_GATEWAY["BASE_URL"].rstrip("/")}/login/?{urlencode({"next": request.get_full_path()})}'
+    return render(request, "prenotazioni/wizard.html", {"step": step, "form": form, "data": data, "identity": identity, "gateway_login_url": gateway_login_url})
 
 
 @require_GET
