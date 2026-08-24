@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.http import HttpResponseNotFound
+from django.shortcuts import redirect
 
 
 class HostAccessMiddleware:
@@ -28,6 +29,8 @@ class HostAccessMiddleware:
         if host == settings.PUBLIC_TICKET_HOST:
             allowed = path.startswith(self.ticket_paths)
         elif host == settings.PUBLIC_ACCOUNT_HOST:
+            if path == "/":
+                return redirect("my_account")
             allowed = path.startswith(self.account_paths)
         else:
             # Gli host interni e di sviluppo restano operativi. In produzione
