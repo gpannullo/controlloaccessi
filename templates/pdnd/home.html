@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Interoperabilità PDND{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div><h1 class="h2 mb-1">Interoperabilità PDND</h1><p class="text-muted mb-0">Interrogazioni consentite esclusivamente per finalità istituzionali autorizzate.</p></div>
+    <a class="btn btn-outline-secondary" href="{% url 'home' %}">Torna alla home</a>
+  </div>
+  <div class="alert alert-warning"><strong>Dati personali:</strong> ogni interrogazione viene registrata nell'audit. Le risposte non sono memorizzate nel database.</div>
+  <div class="row g-4">
+    {% for servizio in servizi %}
+      <div class="col-md-6"><div class="card h-100 shadow-sm"><div class="card-body"><h2 class="h4">{{ servizio.titolo }}</h2><p class="text-muted">{{ servizio.descrizione }}</p>{% if servizio.configurato %}<span class="badge text-bg-success mb-3">Configurato</span>{% else %}<span class="badge text-bg-secondary mb-3">Da configurare</span>{% endif %}<br><a class="btn btn-primary" href="{% url 'pdnd:interroga' servizio.slug %}">Apri servizio</a></div></div></div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

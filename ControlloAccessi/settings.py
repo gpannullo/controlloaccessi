@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     "post_office",
     "spid_cie",
     "prenotazioni",
+    "pdnd",
 ]
 
 MIDDLEWARE = [
@@ -311,6 +312,34 @@ SPID_CIE = {
     "CLIENT_ID": os.getenv("SPID_CIE_CLIENT_ID", ""),
     "CLIENT_SECRET": os.getenv("SPID_CIE_CLIENT_SECRET", ""),
     "SCOPE": os.getenv("SPID_CIE_SCOPE", "openid profile email"),
+}
+
+# App IO: inserire la chiave "use" del servizio nel file
+# /etc/controlloaccessi.env. L'invio resta inattivo finché ENABLED è False.
+APP_IO = {
+    "ENABLED": os.getenv("APP_IO_ENABLED", "False").lower() in {"1", "true", "yes", "on"},
+    "SUBSCRIPTION_KEY": os.getenv("APP_IO_SUBSCRIPTION_KEY", ""),
+    "BASE_URL": os.getenv("APP_IO_BASE_URL", "https://api.io.pagopa.it/api/v1"),
+    "TIMEOUT": int(os.getenv("APP_IO_TIMEOUT", "15")),
+}
+
+# PDND Interoperabilità. Ogni ENDPOINT e PURPOSE_ID viene rilasciato per lo
+# specifico e-service dopo la richiesta di fruizione e la relativa finalità.
+# La chiave privata non deve mai essere inclusa nel repository.
+PDND = {
+    "ENABLED": os.getenv("PDND_ENABLED", "False").lower() in {"1", "true", "yes", "on"},
+    "TOKEN_URL": os.getenv("PDND_TOKEN_URL", "https://auth.interop.pagopa.it/token.oauth2"),
+    "CLIENT_ASSERTION_AUDIENCE": os.getenv("PDND_CLIENT_ASSERTION_AUDIENCE", "https://auth.interop.pagopa.it/client-assertion"),
+    "CLIENT_ID": os.getenv("PDND_CLIENT_ID", ""),
+    "KID": os.getenv("PDND_KID", ""),
+    "PRIVATE_KEY_PATH": os.getenv("PDND_PRIVATE_KEY_PATH", ""),
+    "TIMEOUT": int(os.getenv("PDND_TIMEOUT", "20")),
+    "SERVICES": {
+        "ANPR_SOGGETTO": {"ENDPOINT": os.getenv("PDND_ANPR_SOGGETTO_ENDPOINT", ""), "PURPOSE_ID": os.getenv("PDND_ANPR_SOGGETTO_PURPOSE_ID", ""), "METHOD": os.getenv("PDND_ANPR_SOGGETTO_METHOD", "POST"), "PAYLOAD_FIELD": os.getenv("PDND_ANPR_SOGGETTO_PAYLOAD_FIELD", "codiceFiscale")},
+        "ANPR_FAMIGLIA": {"ENDPOINT": os.getenv("PDND_ANPR_FAMIGLIA_ENDPOINT", ""), "PURPOSE_ID": os.getenv("PDND_ANPR_FAMIGLIA_PURPOSE_ID", ""), "METHOD": os.getenv("PDND_ANPR_FAMIGLIA_METHOD", "POST"), "PAYLOAD_FIELD": os.getenv("PDND_ANPR_FAMIGLIA_PAYLOAD_FIELD", "codiceFiscale")},
+        "INPS_ISEE": {"ENDPOINT": os.getenv("PDND_INPS_ISEE_ENDPOINT", ""), "PURPOSE_ID": os.getenv("PDND_INPS_ISEE_PURPOSE_ID", ""), "METHOD": os.getenv("PDND_INPS_ISEE_METHOD", "POST"), "PAYLOAD_FIELD": os.getenv("PDND_INPS_ISEE_PAYLOAD_FIELD", "codiceFiscale")},
+        "DURC": {"ENDPOINT": os.getenv("PDND_DURC_ENDPOINT", ""), "PURPOSE_ID": os.getenv("PDND_DURC_PURPOSE_ID", ""), "METHOD": os.getenv("PDND_DURC_METHOD", "POST"), "PAYLOAD_FIELD": os.getenv("PDND_DURC_PAYLOAD_FIELD", "codiceFiscale")},
+    },
 }
 
 PRENOTAZIONI_DURATA_SLOT_MINUTI = int(

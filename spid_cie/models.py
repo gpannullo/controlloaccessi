@@ -28,3 +28,30 @@ class IdentitaDigitale(models.Model):
 
     def __str__(self):
         return f"{self.get_provider_display()} — {self.nome} {self.cognome}".strip()
+
+
+class MessaggioIO(models.Model):
+    """Storico tecnico delle comunicazioni personali inviate tramite App IO."""
+
+    class Stato(models.TextChoices):
+        INVIATO = "INVIATO", "Inviato a IO"
+        NON_CONFIGURATO = "NON_CONFIGURATO", "Integrazione non configurata"
+        NON_ABILITATO = "NON_ABILITATO", "Cittadino non abilitato al servizio"
+        ERRORE = "ERRORE", "Errore di invio"
+
+    codice_fiscale = models.CharField(max_length=16, db_index=True)
+    oggetto = models.CharField(max_length=120)
+    contenuto = models.TextField()
+    riferimento_esterno = models.CharField(max_length=64, blank=True, db_index=True)
+    messaggio_io_id = models.CharField(max_length=100, blank=True, db_index=True)
+    stato = models.CharField(max_length=20, choices=Stato.choices)
+    risposta = models.TextField(blank=True)
+    creato_il = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-creato_il"]
+        verbose_name = "Messaggio App IO"
+        verbose_name_plural = "Messaggi App IO"
+
+    def __str__(self):
+        return f"{self.codice_fiscale} — {self.oggetto}"

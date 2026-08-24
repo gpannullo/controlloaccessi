@@ -4,3 +4,4 @@ ldap3
 psycopg[binary]
 python-escpos
 django-post_office==3.11.2
+Authlib==1.7.2

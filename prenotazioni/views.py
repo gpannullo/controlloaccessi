@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET
 
-from spid_cie.services import SpidCieService
+from spid_cie.services import AppIOService, SpidCieService
 
 from .forms import DettagliForm, RichiedenteForm, SlotForm, UfficioForm
 from .models import Prenotazione
@@ -74,6 +74,10 @@ def wizard(request):
             except IntegrityError:
                 messages.error(request, "Lo slot non è più disponibile. Selezionane un altro.")
                 return redirect(f"{reverse('prenotazioni:wizard')}?step=2")
+            # Il mancato recapito su IO non deve annullare una prenotazione valida.
+            transaction.on_commit(
+                lambda: AppIOService.invia_conferma_prenotazione(prenotazione)
+            )
             request.session.pop(SESSION_KEY, None)
             return redirect("prenotazioni:conferma", codice=prenotazione.codice)
     return render(request, "prenotazioni/wizard.html", {"step": step, "form": form, "data": data, "identity": identity})

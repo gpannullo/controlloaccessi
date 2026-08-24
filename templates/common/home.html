@@ -202,6 +202,19 @@ Controllo Accessi - Seleziona area
 
         {% if request.user.is_superuser %}
             <div class="col-md-6 col-xl-4">
+                <a href="{% url 'pdnd:home' %}" class="card h-100 shadow-sm text-decoration-none text-body">
+                    <div class="card-body p-4">
+                        <div class="rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center mb-4" style="width:64px;height:64px;"><span class="fs-2">PD</span></div>
+                        <h2 class="h4">Interoperabilità PDND</h2>
+                        <p class="text-muted">Consultazione autorizzata di ANPR, ISEE e DURC.</p>
+                        <span class="btn btn-primary">Apri servizi PDND</span>
+                    </div>
+                </a>
+            </div>
+        {% endif %}
+
+        {% if request.user.is_superuser %}
+            <div class="col-md-6 col-xl-4">
                 <a
                     href="{% url 'dashboard:directory_home' %}"
                     class="card h-100 shadow-sm text-decoration-none text-body"

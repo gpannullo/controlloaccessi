@@ -19,6 +19,7 @@ urlpatterns = [
     # Servizi pubblici per i cittadini.
     path("prenotazioni/", include(("prenotazioni.urls", "prenotazioni"), namespace="prenotazioni")),
     path("identita/", include(("spid_cie.urls", "spid_cie"), namespace="spid_cie")),
+    path("pdnd/", include(("pdnd.urls", "pdnd"), namespace="pdnd")),
 
     # Home applicativa
     path("", home, name="home"),
