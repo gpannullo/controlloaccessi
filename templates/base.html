@@ -21,6 +21,7 @@
     >
     <link href="https://cdn.datatables.net/2.3.0/css/dataTables.bootstrap5.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    {% block head_extra %}{% endblock %}
     <style>button[data-bs-target^="#nota-portineria"] { font-size: 1.25rem; line-height: 1; }</style>
 </head>
 
@@ -35,6 +36,7 @@
     <script src="https://cdn.datatables.net/2.3.0/js/dataTables.js"></script>
     <script src="https://cdn.datatables.net/2.3.0/js/dataTables.bootstrap5.js"></script>
     <script>document.querySelectorAll('[title="Nota della portineria"]').forEach(e=>{e.title='Note aggiuntive';e.innerHTML='<i class="bi bi-sticky"></i>'});document.querySelectorAll('[title="Nessuna nota della portineria"]').forEach(e=>{e.title='Nessuna nota aggiuntiva';e.innerHTML='<i class="bi bi-sticky"></i>'});document.querySelectorAll('.modal[id^="nota-portineria"] .modal-title').forEach(e=>e.textContent='Note aggiuntive');</script>
+    {% block scripts_extra %}{% endblock %}
     <script>const tabellaPersonale=document.querySelector('#tabella-personale');if(tabellaPersonale)new DataTable(tabellaPersonale,{pageLength:10,lengthMenu:[[10,20,50,100,-1],[10,20,50,100,'Tutti']],language:{url:'https://cdn.datatables.net/plug-ins/2.3.0/i18n/it-IT.json'}});</script>
 
 </body>
