@@ -6,5 +6,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends git xmlsec1 lib
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
+RUN mkdir -p /app/metadata
 EXPOSE 8010
 CMD ["gunicorn", "--bind", "0.0.0.0:8010", "--workers", "2", "config.wsgi:application"]
