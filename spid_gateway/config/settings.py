@@ -10,6 +10,7 @@ DEBUG = os.getenv("SPID_GATEWAY_DEBUG", "False").lower() in {"1", "true", "yes",
 ALLOWED_HOSTS = [os.getenv("SPID_GATEWAY_HOST", "prenotazioni.comune.aversa.ce.it")]
 
 INSTALLED_APPS = [
+    "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
@@ -24,6 +25,7 @@ MIDDLEWARE = [
     "djangosaml2.middleware.SamlSessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
 ]
 ROOT_URLCONF = "config.urls"
