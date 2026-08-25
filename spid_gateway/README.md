@@ -1,11 +1,13 @@
 # Gateway SPID SAML
 
-Componente isolato per il protocollo SAML2 SPID. È raggiungibile solo tramite
+Componente isolato per il protocollo SAML2 SPID. Usa un container con Python
+3.10 e non installa dipendenze SAML nell'ambiente principale di
+ControlloAccessi o nel Python 3.14 del server. È raggiungibile solo tramite
 Nginx sul percorso `/identita/spid/` del dominio prenotazioni.
 
 ## Configurazione
 
-1. Copiare `.env.example` in `.env`, compilando tutti i segreti e i contatti.
+1. Copiare `env.example` in `.env`, compilando tutti i segreti e i contatti.
 2. Generare e proteggere `private.key` e `public.cert` in
    `/etc/controlloaccessi/spid` (permessi `640`, proprietario root).
 3. Nel file `/etc/controlloaccessi.env` dell'app principale impostare:
@@ -16,8 +18,12 @@ Nginx sul percorso `/identita/spid/` del dominio prenotazioni.
    SPID_GATEWAY_SHARED_SECRET=lo-stesso-segreto-lungo-del-gateway
    ```
 
-4. Avviare il gateway con `docker compose up -d --build` dalla cartella
-   `spid_gateway`.
+4. Dalla cartella `spid_gateway`, avviare il gateway:
+
+   ```bash
+   sudo docker compose up -d --build
+   ```
+
 5. Aggiungere la location Nginx riportata sotto e ricaricare Nginx.
 
 ## Nginx
