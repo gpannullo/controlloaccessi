@@ -12,6 +12,12 @@ def uffici_prenotabili():
     return Ufficio.objects.filter(attivo=True, riceve_pubblico=True, aperture__su_appuntamento=True).distinct().order_by("nome")
 
 
+def date_disponibili(ufficio):
+    oggi = timezone.localdate()
+    limite = oggi + timedelta(days=settings.PRENOTAZIONI_MAX_GIORNI)
+    return [giorno for giorno in (oggi + timedelta(days=offset) for offset in range((limite - oggi).days + 1)) if slot_disponibili(ufficio, giorno)]
+
+
 def slot_disponibili(ufficio, data):
     if data < timezone.localdate() or data > timezone.localdate() + timedelta(days=settings.PRENOTAZIONI_MAX_GIORNI):
         return []

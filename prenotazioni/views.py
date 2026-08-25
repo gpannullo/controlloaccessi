@@ -35,6 +35,7 @@ def wizard(request):
     step = min(max(step, 1), 5)
     data = _data(request)
     identity = SpidCieService.identity_from_session(request)
+    ufficio_id = None
 
     if step == 1:
         form = UfficioForm(request.POST or None, initial={"ufficio": data.get("ufficio")})
@@ -45,6 +46,7 @@ def wizard(request):
         if not data.get("ufficio"):
             return redirect(reverse("prenotazioni:wizard"))
         ufficio = get_object_or_404(uffici_prenotabili(), pk=data["ufficio"])
+        ufficio_id = ufficio.pk
         form = SlotForm(request.POST or None, ufficio=ufficio, initial={"data": data.get("data")})
         if request.method == "POST" and form.is_valid():
             _save(request, data_ora=form.cleaned_data["data_ora"].isoformat(), data=form.cleaned_data["data"].isoformat())
@@ -85,7 +87,7 @@ def wizard(request):
     gateway_login_url = ""
     if settings.SPID_GATEWAY["ENABLED"]:
         gateway_login_url = f'{settings.SPID_GATEWAY["BASE_URL"].rstrip("/")}/login/?{urlencode({"next": request.get_full_path()})}'
-    return render(request, "prenotazioni/wizard.html", {"step": step, "form": form, "data": data, "identity": identity, "gateway_login_url": gateway_login_url})
+    return render(request, "prenotazioni/wizard.html", {"step": step, "form": form, "data": data, "identity": identity, "gateway_login_url": gateway_login_url, "ufficio_id": ufficio_id})
 
 
 @require_GET

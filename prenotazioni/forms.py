@@ -1,6 +1,6 @@
 from django import forms
 
-from .services import slot_disponibili, uffici_prenotabili
+from .services import date_disponibili, slot_disponibili, uffici_prenotabili
 
 
 class UfficioForm(forms.Form):
@@ -8,12 +8,16 @@ class UfficioForm(forms.Form):
 
 
 class SlotForm(forms.Form):
-    data = forms.DateField(label="Data", widget=forms.DateInput(attrs={"type": "date"}))
-    orario = forms.ChoiceField(label="Appuntamenti disponibili")
+    data = forms.ChoiceField(label="Data disponibile")
+    orario = forms.ChoiceField(label="Orario disponibile")
 
     def __init__(self, *args, ufficio=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.ufficio = ufficio
+        self.date_disponibili = date_disponibili(ufficio) if ufficio else []
+        self.fields["data"].choices = [(giorno.isoformat(), giorno.strftime("%d/%m/%Y")) for giorno in self.date_disponibili]
+        if not self.fields["data"].choices:
+            self.fields["data"].choices = [("", "Nessuna data disponibile")]
         data = self.data.get("data") or self.initial.get("data")
         if data and ufficio:
             try:
@@ -23,6 +27,16 @@ class SlotForm(forms.Form):
                 pass
         if not self.fields["orario"].choices:
             self.fields["orario"].choices = [("", "Prima selezionare una data")]
+
+    def clean_data(self):
+        value = self.cleaned_data["data"]
+        try:
+            parsed = forms.DateField().to_python(value)
+        except (TypeError, ValueError) as exc:
+            raise forms.ValidationError("Selezionare una data disponibile.") from exc
+        if parsed not in self.date_disponibili:
+            raise forms.ValidationError("La data selezionata non è più disponibile.")
+        return parsed
 
     def clean(self):
         cleaned = super().clean()
