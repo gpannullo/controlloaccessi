@@ -19,10 +19,20 @@ class WordPressConnectorError(RuntimeError):
     pass
 
 
-def _parse_datetime(value):
+def _parse_datetime(value, required=False):
     if not value:
+        if required:
+            raise WordPressConnectorError("L'appuntamento WordPress non ha una data di aggiornamento valida.")
         return None
-    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if value.startswith("0000-00-00"):
+        # Alcuni appuntamenti storici WordPress non hanno date GMT valorizzate.
+        return datetime(1970, 1, 1, tzinfo=datetime_timezone.utc) if required else None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        if required:
+            raise WordPressConnectorError(f"Data WordPress non valida: {value!r}") from exc
+        return None
     if timezone.is_naive(parsed):
         parsed = timezone.make_aware(parsed, datetime_timezone.utc)
     return parsed
@@ -63,7 +73,7 @@ def _salva(item):
     mapping = _mappatura(item)
     defaults = {
         "origine_stato": item.get("stato", ""),
-        "origine_aggiornato_il": _parse_datetime(item["aggiornato_il"]),
+        "origine_aggiornato_il": _parse_datetime(item["aggiornato_il"], required=True),
         "prenotato_il": _parse_datetime(item.get("prenotato_il")),
         "data_ora_inizio": _parse_datetime(item.get("data_ora_inizio")),
         "data_ora_fine": _parse_datetime(item.get("data_ora_fine")),

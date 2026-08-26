@@ -69,6 +69,13 @@ function aversa_appointments_meta($post_ids) {
     return $result;
 }
 
+function aversa_appointments_datetime($value) {
+    if (!$value || strpos($value, '0000-00-00') === 0) {
+        return null;
+    }
+    return str_replace(' ', 'T', $value) . 'Z';
+}
+
 function aversa_appointments_list(WP_REST_Request $request) {
     global $wpdb;
     $page = max(1, (int) $request->get_param('page'));
@@ -83,7 +90,7 @@ function aversa_appointments_list(WP_REST_Request $request) {
         $where .= $wpdb->prepare(' AND post_modified_gmt > %s', $date->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s'));
     }
     $offset = ($page - 1) * $per_page;
-    $sql = "SELECT ID, post_status, post_modified_gmt FROM {$wpdb->posts} WHERE {$where} ORDER BY post_modified_gmt ASC, ID ASC LIMIT %d OFFSET %d";
+    $sql = "SELECT ID, post_status, post_modified_gmt, post_date_gmt FROM {$wpdb->posts} WHERE {$where} ORDER BY post_modified_gmt ASC, ID ASC LIMIT %d OFFSET %d";
     $posts = $wpdb->get_results($wpdb->prepare($sql, $per_page + 1, $offset), ARRAY_A);
     $has_more = count($posts) > $per_page;
     $posts = array_slice($posts, 0, $per_page);
@@ -94,7 +101,7 @@ function aversa_appointments_list(WP_REST_Request $request) {
         $items[] = array(
             'id' => (int) $post['ID'],
             'stato' => $post['post_status'],
-            'aggiornato_il' => str_replace(' ', 'T', $post['post_modified_gmt']) . 'Z',
+            'aggiornato_il' => aversa_appointments_datetime($post['post_modified_gmt']) ?: aversa_appointments_datetime($post['post_date_gmt']) ?: '1970-01-01T00:00:00Z',
             'prenotato_il' => $data['_dci_appuntamento_data_ora_prenotazione'] ?? null,
             'data_ora_inizio' => $data['_dci_appuntamento_data_ora_inizio_appuntamento'] ?? null,
             'data_ora_fine' => $data['_dci_appuntamento_data_ora_fine_appuntamento'] ?? null,
