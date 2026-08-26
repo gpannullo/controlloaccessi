@@ -1,6 +1,7 @@
 from django.contrib import admin, messages
 
 from .models import AssegnazionePersonaleWordPress, AppuntamentoWordPress, MappaturaUfficioWordPress, PersonaleWordPress, Prenotazione, SedeWordPress, StatoSincronizzazioneWordPress, UnitaOrganizzativaWordPress
+from .people_linking import collega_persone_pubbliche
 from .wordpress_connector import WordPressConnectorError, pubblica_calendario_wordpress, pubblica_organizzazioni_persona_pubblica_wordpress, sincronizza_anagrafiche_wordpress
 
 
@@ -86,7 +87,16 @@ class PersonaleWordPressAdmin(admin.ModelAdmin):
     autocomplete_fields = ("utente",)
     readonly_fields = ("origine_id", "aggiornato_il")
     inlines = (AssegnazionePersonaleWordPressInline,)
-    actions = ("pubblica_uffici_su_wordpress",)
+    actions = ("collega_utenti_django", "pubblica_uffici_su_wordpress",)
+
+    @admin.action(description="Collega automaticamente agli utenti Django corrispondenti")
+    def collega_utenti_django(self, request, queryset):
+        risultato = collega_persone_pubbliche(queryset)
+        self.message_user(
+            request,
+            "Collegati: {collegati}; già associati: {gia_collegati}; senza corrispondenza: {nessuna_corrispondenza}; ambigui: {ambigui}.".format(**risultato),
+            messages.SUCCESS,
+        )
 
     @admin.display(description="Uffici WordPress")
     def uffici_assegnati(self, obj):

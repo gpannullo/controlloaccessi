@@ -102,6 +102,7 @@ class PersonaleWordPress(models.Model):
         null=True,
         blank=True,
         related_name="profili_wordpress",
+        verbose_name="Utente Django associato",
     )
     unita_organizzative = models.ManyToManyField(
         UnitaOrganizzativaWordPress,
