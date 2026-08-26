@@ -1,8 +1,11 @@
 # Connettore appuntamenti WordPress
 
-Installare `aversa-appointments-connector.php` come plugin nel WordPress
-storico. Nel file `wp-config.php`, prima della riga che invita a non
-modificare ulteriormente il file, aggiungere una chiave casuale lunga:
+Installare `aversa-appointments-connector.php` come *must-use plugin* nel
+WordPress storico, copiandolo in `wp-content/mu-plugins/`. Se la cartella non
+esiste, crearla: WordPress lo caricherà automaticamente, senza attivazione e
+senza scrivere alcuna configurazione nel database. Nel file `wp-config.php`,
+prima della riga che invita a non modificare ulteriormente il file, aggiungere
+una chiave casuale lunga:
 
 ```php
 define('AVERSA_APPOINTMENTS_CONNECTOR_SECRET', 'inserire-una-chiave-casuale-lunga');
@@ -16,8 +19,8 @@ GET /wp-json/aversa/v1/appuntamenti?page=1&per_page=100&updated_after=2026-08-26
 
 Richiede gli header `X-Aversa-Timestamp` (Unix timestamp) e
 `X-Aversa-Signature` (HMAC SHA-256 del solo timestamp con la chiave condivisa).
-Il WS non modifica WordPress e restituisce al massimo 100 appuntamenti per
-pagina.
+Il WS non modifica WordPress né il suo database: esegue esclusivamente query
+`SELECT` e restituisce al massimo 100 appuntamenti per pagina.
 
 Nel file `/etc/controlloaccessi.env` aggiungere, con gli stessi valori di
 endpoint e chiave:
