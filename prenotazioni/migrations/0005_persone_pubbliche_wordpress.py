@@ -10,6 +10,8 @@ def elimina_utenti_tecnici_wordpress(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    atomic = False
+
     dependencies = [
         ("prenotazioni", "0004_unita_personale_wordpress"),
     ]
