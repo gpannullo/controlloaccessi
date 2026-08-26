@@ -45,12 +45,37 @@ class Prenotazione(models.Model):
         return f"{self.codice} — {self.cognome} {self.nome}"
 
 
+class SedeWordPress(models.Model):
+    """Anagrafica delle sedi (post type ``luogo``) del WordPress storico."""
+
+    origine_id = models.CharField(max_length=64, unique=True)
+    nome = models.CharField(max_length=255)
+    stato = models.CharField(max_length=32, blank=True)
+    aggiornato_il = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["nome"]
+        verbose_name = "Sede WordPress"
+        verbose_name_plural = "Sedi WordPress"
+
+    def __str__(self):
+        return self.nome
+
+
 class MappaturaUfficioWordPress(models.Model):
     """Corrispondenza fra le anagrafiche WordPress e gli uffici locali."""
 
     unita_organizzativa_id = models.CharField(max_length=64)
     luogo_id = models.CharField(max_length=64)
     unita_organizzativa = models.CharField(max_length=255, blank=True)
+    sede = models.ForeignKey(
+        SedeWordPress,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="mappature_ufficio",
+    )
+    calendario_wordpress_id = models.CharField(max_length=64, blank=True)
     ufficio = models.ForeignKey(
         "access_control.Ufficio",
         on_delete=models.SET_NULL,

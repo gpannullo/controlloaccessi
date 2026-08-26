@@ -4,7 +4,7 @@ import hashlib
 import hmac
 import json
 import time
-from datetime import datetime, timezone as datetime_timezone
+from datetime import datetime, timedelta, timezone as datetime_timezone
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -12,7 +12,9 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from .models import AppuntamentoWordPress, MappaturaUfficioWordPress, StatoSincronizzazioneWordPress
+from access_control.models import CalendarioApertura
+
+from .models import AppuntamentoWordPress, MappaturaUfficioWordPress, SedeWordPress, StatoSincronizzazioneWordPress
 
 
 class WordPressConnectorError(RuntimeError):
@@ -38,19 +40,31 @@ def _parse_datetime(value, required=False):
     return parsed
 
 
-def _request(url, secret, timeout):
+def _request(url, secret, timeout, *, method="GET", payload=None):
     timestamp = str(int(time.time()))
     signature = hmac.new(secret.encode(), timestamp.encode(), hashlib.sha256).hexdigest()
+    data = json.dumps(payload).encode("utf-8") if payload is not None else None
     request = Request(
         url,
+        data=data,
+        method=method,
         headers={
             "Accept": "application/json",
+            **({"Content-Type": "application/json"} if data else {}),
             "X-Aversa-Timestamp": timestamp,
             "X-Aversa-Signature": signature,
         },
     )
     with urlopen(request, timeout=timeout) as response:  # nosec B310 - endpoint configurato dall'ente
         return json.loads(response.read().decode("utf-8"))
+
+
+def _endpoint(config, name):
+    endpoint = config.get(name, "")
+    if endpoint:
+        return endpoint
+    base = config["ENDPOINT"].rsplit("/appuntamenti", 1)[0]
+    return f"{base}/{name.lower().replace('_endpoint', '')}"
 
 
 def _mappatura(item):
@@ -133,3 +147,84 @@ def sincronizza_appuntamenti_wordpress():
     stato.ultima_esecuzione_il = timezone.now()
     stato.save(update_fields=["cursore", "ultima_esecuzione_il"])
     return {"totale": totale, "creati": creati, "aggiornati": aggiornati, "cursore": cursor_finale}
+
+
+def sincronizza_anagrafiche_wordpress():
+    """Importa sedi, unità organizzative e calendari pubblicati su WordPress."""
+    config = settings.WORDPRESS_APPOINTMENTS
+    if not config["ENABLED"] or not config["SHARED_SECRET"]:
+        raise WordPressConnectorError("Connettore WordPress non abilitato o chiave non configurata.")
+    payload = _request(_endpoint(config, "ANAGRAFICHE_ENDPOINT"), config["SHARED_SECRET"], config["TIMEOUT"])
+    if not isinstance(payload, dict):
+        raise WordPressConnectorError("Risposta anagrafiche WordPress non valida.")
+
+    sedi = 0
+    for item in payload.get("sedi", []):
+        if not item.get("id"):
+            continue
+        SedeWordPress.objects.update_or_create(
+            origine_id=str(item["id"]),
+            defaults={"nome": item.get("nome", ""), "stato": item.get("stato", "")},
+        )
+        sedi += 1
+
+    unita = {str(item.get("id")): item.get("nome", "") for item in payload.get("uffici", []) if item.get("id")}
+    mappature = 0
+    for item in payload.get("calendari", []):
+        unita_id, luogo_id = str(item.get("ufficio_id") or ""), str(item.get("sede_id") or "")
+        if not unita_id or not luogo_id:
+            continue
+        sede = SedeWordPress.objects.filter(origine_id=luogo_id).first()
+        mapping, _ = MappaturaUfficioWordPress.objects.get_or_create(
+            unita_organizzativa_id=unita_id,
+            luogo_id=luogo_id,
+        )
+        mapping.unita_organizzativa = unita.get(unita_id, mapping.unita_organizzativa)
+        mapping.sede = sede
+        mapping.calendario_wordpress_id = str(item.get("id") or "")
+        mapping.save()
+        mappature += 1
+    return {"sedi": sedi, "mappature": mappature}
+
+
+def _disponibilita_ufficio(ufficio):
+    minuti = settings.PRENOTAZIONI_DURATA_SLOT_MINUTI
+    disponibilita = {str(giorno): [] for giorno in range(7)}
+    aperture = CalendarioApertura.objects.filter(ufficio=ufficio, su_appuntamento=True).order_by("giorno", "ora_inizio")
+    for apertura in aperture:
+        corrente = datetime.combine(datetime.today(), apertura.ora_inizio)
+        fine = datetime.combine(datetime.today(), apertura.ora_fine)
+        while corrente + timedelta(minutes=minuti) <= fine:
+            disponibilita[str(apertura.giorno)].append(corrente.strftime("%H:%M"))
+            corrente += timedelta(minutes=minuti)
+    return {"durata_minuti": minuti, "slot_per_giorno": disponibilita, "eccezioni": []}
+
+
+def pubblica_calendario_wordpress(mappatura):
+    """Pubblica gli orari locali dell'ufficio sul suo calendario WordPress."""
+    config = settings.WORDPRESS_APPOINTMENTS
+    if not config["ENABLED"] or not config["SHARED_SECRET"]:
+        raise WordPressConnectorError("Connettore WordPress non abilitato o chiave non configurata.")
+    if not mappatura.ufficio_id:
+        raise WordPressConnectorError("Associare prima un ufficio locale alla mappatura.")
+    if not mappatura.luogo_id or not mappatura.unita_organizzativa_id:
+        raise WordPressConnectorError("La mappatura WordPress non contiene ufficio o sede.")
+    payload = {
+        "ufficio_id": mappatura.unita_organizzativa_id,
+        "sede_id": mappatura.luogo_id,
+        "titolo": f"{mappatura.unita_organizzativa} - {mappatura.sede or mappatura.luogo_id}",
+        "disponibilita": _disponibilita_ufficio(mappatura.ufficio),
+    }
+    response = _request(
+        _endpoint(config, "CALENDARI_ENDPOINT"),
+        config["SHARED_SECRET"],
+        config["TIMEOUT"],
+        method="POST",
+        payload=payload,
+    )
+    calendario_id = response.get("id") if isinstance(response, dict) else None
+    if not calendario_id:
+        raise WordPressConnectorError("WordPress non ha restituito l'identificativo del calendario.")
+    mappatura.calendario_wordpress_id = str(calendario_id)
+    mappatura.save(update_fields=["calendario_wordpress_id", "aggiornato_il"])
+    return response

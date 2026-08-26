@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Aversa Appointments Connector
  * Description: Espone gli appuntamenti DCI a ControlloAccessi mediante Web Service REST firmato HMAC.
- * Version: 1.0.0
+ * Version: 1.1.0
  */
 
 defined('ABSPATH') || exit;
@@ -121,6 +121,119 @@ add_action('rest_api_init', function () {
     register_rest_route(AVERSA_APPOINTMENTS_ROUTE, '/appuntamenti', array(
         'methods' => WP_REST_Server::READABLE,
         'callback' => 'aversa_appointments_list',
+        'permission_callback' => 'aversa_appointments_authorized',
+    ));
+});
+
+function aversa_appointments_posts($post_type) {
+    $posts = get_posts(array(
+        'post_type' => $post_type,
+        'post_status' => array('publish', 'private'),
+        'numberposts' => -1,
+        'orderby' => 'title',
+        'order' => 'ASC',
+    ));
+    return array_map(function ($post) {
+        return array('id' => (int) $post->ID, 'nome' => $post->post_title, 'stato' => $post->post_status);
+    }, $posts);
+}
+
+function aversa_appointments_anagrafiche(WP_REST_Request $request) {
+    global $wpdb;
+    $calendari = $wpdb->get_results(
+        "SELECT p.ID,
+                MAX(CASE WHEN pm.meta_key = '_elios_gestione_caledario_ufficio' THEN pm.meta_value END) AS ufficio_id,
+                MAX(CASE WHEN pm.meta_key = '_elios_gestione_caledario_luogo' THEN pm.meta_value END) AS sede_id
+           FROM {$wpdb->posts} p
+           LEFT JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID
+          WHERE p.post_type = 'elios_calendario' AND p.post_status <> 'trash'
+          GROUP BY p.ID
+         HAVING ufficio_id IS NOT NULL AND sede_id IS NOT NULL",
+        ARRAY_A
+    );
+    return rest_ensure_response(array(
+        'sedi' => aversa_appointments_posts('luogo'),
+        'uffici' => aversa_appointments_posts('unita_organizzativa'),
+        'calendari' => array_map(function ($calendario) {
+            return array(
+                'id' => (int) $calendario['ID'],
+                'ufficio_id' => (string) $calendario['ufficio_id'],
+                'sede_id' => (string) $calendario['sede_id'],
+            );
+        }, $calendari),
+    ));
+}
+
+function aversa_appointments_salva_calendario(WP_REST_Request $request) {
+    global $wpdb;
+    $parametri = $request->get_json_params();
+    $ufficio_id = isset($parametri['ufficio_id']) ? (string) $parametri['ufficio_id'] : '';
+    $sede_id = isset($parametri['sede_id']) ? (string) $parametri['sede_id'] : '';
+    $disponibilita = isset($parametri['disponibilita']) && is_array($parametri['disponibilita']) ? $parametri['disponibilita'] : array();
+    if (!$ufficio_id || !$sede_id || !isset($disponibilita['durata_minuti']) || !isset($disponibilita['slot_per_giorno'])) {
+        return new WP_Error('aversa_bad_calendar', 'Configurazione calendario non valida.', array('status' => 400));
+    }
+
+    $sql = "SELECT p.ID FROM {$wpdb->posts} p
+            INNER JOIN {$wpdb->postmeta} u ON u.post_id = p.ID
+            INNER JOIN {$wpdb->postmeta} s ON s.post_id = p.ID
+            WHERE p.post_type = 'elios_calendario'
+              AND p.post_status <> 'trash'
+              AND u.meta_key = '_elios_gestione_caledario_ufficio' AND u.meta_value = %s
+              AND s.meta_key = '_elios_gestione_caledario_luogo' AND s.meta_value = %s
+            ORDER BY p.ID ASC LIMIT 1";
+    $calendario_id = (int) $wpdb->get_var($wpdb->prepare($sql, $ufficio_id, $sede_id));
+    $titolo = sanitize_text_field($parametri['titolo'] ?? 'Calendario appuntamenti');
+    if (!$calendario_id) {
+        $calendario_id = wp_insert_post(array(
+            'post_type' => 'elios_calendario',
+            'post_status' => 'publish',
+            'post_title' => $titolo,
+        ), true);
+        if (is_wp_error($calendario_id)) {
+            return $calendario_id;
+        }
+    } elseif ($titolo) {
+        wp_update_post(array('ID' => $calendario_id, 'post_title' => $titolo));
+    }
+
+    $prefisso = '_elios_gestione_caledario_';
+    $campi_giorno = array(
+        '0' => 'disp_lunedi', '1' => 'disp_martedi', '2' => 'disp_mercoledi', '3' => 'disp_giovedi',
+        '4' => 'disp_venerdi', '5' => 'disp_sabato', '6' => 'disp_domenica',
+    );
+    $configurazione = array($prefisso . 'disp_minuti' => max(5, (int) $disponibilita['durata_minuti']));
+    foreach ($campi_giorno as $giorno => $campo) {
+        $slot = isset($disponibilita['slot_per_giorno'][$giorno]) && is_array($disponibilita['slot_per_giorno'][$giorno])
+            ? array_values(array_filter(array_map('sanitize_text_field', $disponibilita['slot_per_giorno'][$giorno])))
+            : array();
+        if ($slot) {
+            $configurazione[$prefisso . $campo] = $slot;
+        }
+    }
+    $eccezioni = array();
+    foreach (($disponibilita['eccezioni'] ?? array()) as $eccezione) {
+        $timestamp = strtotime($eccezione);
+        if ($timestamp) {
+            $eccezioni[] = $timestamp;
+        }
+    }
+    update_post_meta($calendario_id, $prefisso . 'ufficio', $ufficio_id);
+    update_post_meta($calendario_id, $prefisso . 'luogo', $sede_id);
+    update_post_meta($calendario_id, $prefisso . 'box_disponibilita', array($configurazione));
+    update_post_meta($calendario_id, $prefisso . 'group_eccezioni', array(array($prefisso . 'eccezioni' => $eccezioni)));
+    return rest_ensure_response(array('id' => (int) $calendario_id, 'aggiornato' => true));
+}
+
+add_action('rest_api_init', function () {
+    register_rest_route(AVERSA_APPOINTMENTS_ROUTE, '/anagrafiche', array(
+        'methods' => WP_REST_Server::READABLE,
+        'callback' => 'aversa_appointments_anagrafiche',
+        'permission_callback' => 'aversa_appointments_authorized',
+    ));
+    register_rest_route(AVERSA_APPOINTMENTS_ROUTE, '/calendari', array(
+        'methods' => WP_REST_Server::CREATABLE,
+        'callback' => 'aversa_appointments_salva_calendario',
         'permission_callback' => 'aversa_appointments_authorized',
     ));
 });
