@@ -1,7 +1,7 @@
 from django.contrib import admin, messages
 
 from .models import AssegnazionePersonaleWordPress, AppuntamentoWordPress, MappaturaUfficioWordPress, PersonaleWordPress, Prenotazione, SedeWordPress, StatoSincronizzazioneWordPress, UnitaOrganizzativaWordPress
-from .wordpress_connector import WordPressConnectorError, pubblica_calendario_wordpress, pubblica_uffici_personale_wordpress, sincronizza_anagrafiche_wordpress
+from .wordpress_connector import WordPressConnectorError, pubblica_calendario_wordpress, pubblica_organizzazioni_persona_pubblica_wordpress, sincronizza_anagrafiche_wordpress
 
 
 @admin.register(Prenotazione)
@@ -80,9 +80,9 @@ class AssegnazionePersonaleWordPressInline(admin.TabularInline):
 
 @admin.register(PersonaleWordPress)
 class PersonaleWordPressAdmin(admin.ModelAdmin):
-    list_display = ("username", "cognome", "nome", "email", "attivo", "uffici_assegnati", "utente", "aggiornato_il")
+    list_display = ("titolo", "cognome", "nome", "competenze_brevi", "attivo", "uffici_assegnati", "utente", "aggiornato_il")
     list_filter = ("attivo", "unita_organizzative")
-    search_fields = ("username", "nome", "cognome", "email", "utente__username")
+    search_fields = ("titolo", "nome", "cognome", "competenze", "utente__username")
     autocomplete_fields = ("utente",)
     readonly_fields = ("origine_id", "aggiornato_il")
     inlines = (AssegnazionePersonaleWordPressInline,)
@@ -92,18 +92,22 @@ class PersonaleWordPressAdmin(admin.ModelAdmin):
     def uffici_assegnati(self, obj):
         return ", ".join(obj.unita_organizzative.values_list("nome", flat=True)) or "—"
 
-    @admin.action(description="Pubblica le assegnazioni ufficio selezionate su WordPress")
+    @admin.display(description="Competenze")
+    def competenze_brevi(self, obj):
+        return obj.competenze[:80] + ("…" if len(obj.competenze) > 80 else "")
+
+    @admin.action(description="Pubblica le organizzazioni selezionate su WordPress")
     def pubblica_uffici_su_wordpress(self, request, queryset):
         eseguiti = 0
         for persona in queryset.prefetch_related("unita_organizzative"):
             try:
-                pubblica_uffici_personale_wordpress(persona)
+                pubblica_organizzazioni_persona_pubblica_wordpress(persona)
             except WordPressConnectorError as exc:
                 self.message_user(request, f"{persona}: {exc}", messages.ERROR)
             else:
                 eseguiti += 1
         if eseguiti:
-            self.message_user(request, f"Pubblicate le assegnazioni di {eseguiti} persone su WordPress.", messages.SUCCESS)
+            self.message_user(request, f"Pubblicate le organizzazioni di {eseguiti} persone pubbliche su WordPress.", messages.SUCCESS)
 
 
 @admin.register(AppuntamentoWordPress)

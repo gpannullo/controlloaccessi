@@ -88,13 +88,13 @@ class UnitaOrganizzativaWordPress(models.Model):
 
 
 class PersonaleWordPress(models.Model):
-    """Utente del sito WordPress, con le competenze ufficio amministrate in Django."""
+    """Persona pubblica del sito WordPress e relative organizzazioni."""
 
     origine_id = models.CharField(max_length=64, unique=True)
-    username = models.CharField(max_length=100)
+    titolo = models.CharField(max_length=255, blank=True)
     nome = models.CharField(max_length=150, blank=True)
     cognome = models.CharField(max_length=150, blank=True)
-    email = models.EmailField(blank=True)
+    competenze = models.TextField(blank=True)
     attivo = models.BooleanField(default=True)
     utente = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -112,13 +112,13 @@ class PersonaleWordPress(models.Model):
     aggiornato_il = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["cognome", "nome", "username"]
-        verbose_name = "Persona WordPress"
-        verbose_name_plural = "Personale WordPress"
+        ordering = ["cognome", "nome", "titolo"]
+        verbose_name = "Persona pubblica WordPress"
+        verbose_name_plural = "Persone pubbliche WordPress"
 
     def __str__(self):
         nominativo = f"{self.nome} {self.cognome}".strip()
-        return nominativo or self.username
+        return nominativo or self.titolo or f"Persona {self.origine_id}"
 
 
 class AssegnazionePersonaleWordPress(models.Model):

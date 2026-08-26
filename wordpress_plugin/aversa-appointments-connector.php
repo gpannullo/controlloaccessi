@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Aversa Appointments Connector
  * Description: Espone gli appuntamenti DCI a ControlloAccessi mediante Web Service REST firmato HMAC.
- * Version: 1.2.0
+ * Version: 1.3.0
  */
 
 defined('ABSPATH') || exit;
@@ -154,7 +154,7 @@ function aversa_appointments_anagrafiche(WP_REST_Request $request) {
     return rest_ensure_response(array(
         'sedi' => aversa_appointments_posts('luogo'),
         'uffici' => aversa_appointments_posts('unita_organizzativa'),
-        'personale' => aversa_appointments_personale(),
+        'persone_pubbliche' => aversa_appointments_persone_pubbliche(),
         'calendari' => array_map(function ($calendario) {
             return array(
                 'id' => (int) $calendario['ID'],
@@ -165,46 +165,48 @@ function aversa_appointments_anagrafiche(WP_REST_Request $request) {
     ));
 }
 
-function aversa_appointments_personale() {
-    $utenti = get_users(array(
-        'fields' => array('ID', 'user_login', 'user_email', 'user_status', 'display_name', 'first_name', 'last_name'),
-        'orderby' => 'display_name',
+function aversa_appointments_persone_pubbliche() {
+    $persone = get_posts(array(
+        'post_type' => 'persona_pubblica',
+        'post_status' => array('publish', 'private'),
+        'numberposts' => -1,
+        'orderby' => 'title',
         'order' => 'ASC',
     ));
-    return array_map(function ($utente) {
-        $uffici = get_user_meta($utente->ID, '_custommeta_user_uffici', true);
-        if (!is_array($uffici)) {
-            $uffici = array();
+    return array_map(function ($persona) {
+        $organizzazioni = get_post_meta($persona->ID, '_dci_persona_pubblica_organizzazioni', true);
+        if (!is_array($organizzazioni)) {
+            $organizzazioni = array();
         }
         return array(
-            'id' => (int) $utente->ID,
-            'username' => $utente->user_login,
-            'nome' => (string) get_user_meta($utente->ID, 'first_name', true),
-            'cognome' => (string) get_user_meta($utente->ID, 'last_name', true),
-            'email' => $utente->user_email,
-            'attivo' => ((int) $utente->user_status) === 0,
-            'uffici' => array_values(array_map('strval', $uffici)),
+            'id' => (int) $persona->ID,
+            'titolo' => $persona->post_title,
+            'nome' => (string) get_post_meta($persona->ID, '_dci_persona_pubblica_nome', true),
+            'cognome' => (string) get_post_meta($persona->ID, '_dci_persona_pubblica_cognome', true),
+            'competenze' => (string) get_post_meta($persona->ID, '_dci_persona_pubblica_competenze', true),
+            'attivo' => $persona->post_status === 'publish',
+            'uffici' => array_values(array_map('strval', $organizzazioni)),
         );
-    }, $utenti);
+    }, $persone);
 }
 
-function aversa_appointments_salva_uffici_personale(WP_REST_Request $request) {
-    $utente_id = (int) $request->get_param('utente_id');
-    if (!$utente_id || !get_userdata($utente_id)) {
-        return new WP_Error('aversa_user_not_found', 'Utente WordPress non trovato.', array('status' => 404));
+function aversa_appointments_salva_organizzazioni_persona(WP_REST_Request $request) {
+    $persona_id = (int) $request->get_param('persona_id');
+    if (!$persona_id || get_post_type($persona_id) !== 'persona_pubblica') {
+        return new WP_Error('aversa_person_not_found', 'Persona pubblica WordPress non trovata.', array('status' => 404));
     }
     $parametri = $request->get_json_params();
-    $uffici = isset($parametri['uffici']) && is_array($parametri['uffici']) ? $parametri['uffici'] : array();
-    $uffici_validi = array();
-    foreach ($uffici as $ufficio_id) {
+    $organizzazioni = isset($parametri['organizzazioni']) && is_array($parametri['organizzazioni']) ? $parametri['organizzazioni'] : array();
+    $organizzazioni_valide = array();
+    foreach ($organizzazioni as $ufficio_id) {
         $ufficio_id = (int) $ufficio_id;
         if (!$ufficio_id || get_post_type($ufficio_id) !== 'unita_organizzativa') {
             return new WP_Error('aversa_bad_office', 'Una delle unità organizzative non è valida.', array('status' => 400));
         }
-        $uffici_validi[] = $ufficio_id;
+        $organizzazioni_valide[] = $ufficio_id;
     }
-    update_user_meta($utente_id, '_custommeta_user_uffici', array_values(array_unique($uffici_validi)));
-    return rest_ensure_response(array('id' => $utente_id, 'aggiornato' => true));
+    update_post_meta($persona_id, '_dci_persona_pubblica_organizzazioni', array_values(array_unique($organizzazioni_valide)));
+    return rest_ensure_response(array('id' => $persona_id, 'aggiornato' => true));
 }
 
 function aversa_appointments_salva_calendario(WP_REST_Request $request) {
@@ -279,9 +281,9 @@ add_action('rest_api_init', function () {
         'callback' => 'aversa_appointments_salva_calendario',
         'permission_callback' => 'aversa_appointments_authorized',
     ));
-    register_rest_route(AVERSA_APPOINTMENTS_ROUTE, '/personale/(?P<utente_id>\d+)/uffici', array(
+    register_rest_route(AVERSA_APPOINTMENTS_ROUTE, '/persone-pubbliche/(?P<persona_id>\d+)/organizzazioni', array(
         'methods' => WP_REST_Server::CREATABLE,
-        'callback' => 'aversa_appointments_salva_uffici_personale',
+        'callback' => 'aversa_appointments_salva_organizzazioni_persona',
         'permission_callback' => 'aversa_appointments_authorized',
     ));
 });

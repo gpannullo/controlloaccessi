@@ -197,16 +197,16 @@ def sincronizza_anagrafiche_wordpress():
         mappature += 1
 
     personale = 0
-    for item in payload.get("personale", []):
+    for item in payload.get("persone_pubbliche", []):
         if not item.get("id"):
             continue
         persona, _ = PersonaleWordPress.objects.update_or_create(
             origine_id=str(item["id"]),
             defaults={
-                "username": item.get("username") or "",
+                "titolo": item.get("titolo") or "",
                 "nome": item.get("nome") or "",
                 "cognome": item.get("cognome") or "",
-                "email": item.get("email") or "",
+                "competenze": item.get("competenze") or "",
                 "attivo": bool(item.get("attivo", True)),
             },
         )
@@ -267,19 +267,19 @@ def pubblica_calendario_wordpress(mappatura):
     return response
 
 
-def pubblica_uffici_personale_wordpress(persona):
-    """Aggiorna su WordPress le sole competenze ufficio del personale selezionato."""
+def pubblica_organizzazioni_persona_pubblica_wordpress(persona):
+    """Aggiorna su WordPress le organizzazioni della persona pubblica selezionata."""
     config = settings.WORDPRESS_APPOINTMENTS
     if not config["ENABLED"] or not config["SHARED_SECRET"]:
         raise WordPressConnectorError("Connettore WordPress non abilitato o chiave non configurata.")
-    endpoint = f'{_endpoint(config, "PERSONALE_ENDPOINT").rstrip("/")}/{persona.origine_id}/uffici'
+    endpoint = f'{_endpoint(config, "PERSONE_PUBBLICHE_ENDPOINT").rstrip("/")}/{persona.origine_id}/organizzazioni'
     response = _request(
         endpoint,
         config["SHARED_SECRET"],
         config["TIMEOUT"],
         method="POST",
-        payload={"uffici": list(persona.unita_organizzative.values_list("origine_id", flat=True))},
+        payload={"organizzazioni": list(persona.unita_organizzative.values_list("origine_id", flat=True))},
     )
     if not isinstance(response, dict) or not response.get("aggiornato"):
-        raise WordPressConnectorError("WordPress non ha confermato l'aggiornamento delle assegnazioni.")
+        raise WordPressConnectorError("WordPress non ha confermato l'aggiornamento delle organizzazioni.")
     return response
