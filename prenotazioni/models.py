@@ -181,6 +181,15 @@ class MappaturaUfficioWordPress(models.Model):
         destinazione = self.ufficio or "da associare"
         return f"{self.unita_organizzativa or self.unita_organizzativa_id} → {destinazione}"
 
+    def save(self, *args, **kwargs):
+        """Deriva gli identificativi remoti dalle selezioni dell'admin Django."""
+        if self.unita_organizzativa_wordpress_id:
+            self.unita_organizzativa_id = self.unita_organizzativa_wordpress.origine_id
+            self.unita_organizzativa = self.unita_organizzativa_wordpress.nome
+        if self.sede_id:
+            self.luogo_id = self.sede.origine_id
+        super().save(*args, **kwargs)
+
 
 class AppuntamentoWordPress(models.Model):
     """Archivio idempotente degli appuntamenti ricevuti dal WordPress storico."""

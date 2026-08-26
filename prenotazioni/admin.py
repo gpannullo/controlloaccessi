@@ -18,6 +18,8 @@ class MappaturaUfficioWordPressAdmin(admin.ModelAdmin):
     list_filter = ("ufficio", "sede")
     search_fields = ("unita_organizzativa", "unita_organizzativa_id", "luogo_id", "sede__nome", "ufficio__nome")
     autocomplete_fields = ("ufficio", "sede", "unita_organizzativa_wordpress")
+    fields = ("ufficio", "unita_organizzativa_wordpress", "sede", "calendario_wordpress_id", "aggiornato_il")
+    readonly_fields = ("calendario_wordpress_id", "aggiornato_il")
     actions = ("scarica_anagrafiche_da_wordpress", "sincronizza_ufficio_su_wordpress",)
 
     @admin.action(description="Scarica sedi e calendari da WordPress")
