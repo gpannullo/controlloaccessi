@@ -24,7 +24,7 @@ endpoint e chiave:
 
 ```dotenv
 WORDPRESS_APPOINTMENTS_ENABLED=True
-WORDPRESS_APPOINTMENTS_ENDPOINT=https://nu25.coopyleft.it/wp-json/aversa/v1/appuntamenti
+WORDPRESS_APPOINTMENTS_ENDPOINT=https://<hostname-wordpress>/wp-json/aversa/v1/appuntamenti
 WORDPRESS_APPOINTMENTS_SHARED_SECRET=inserire-la-stessa-chiave-casuale-lunga
 WORDPRESS_APPOINTMENTS_TIMEOUT=30
 WORDPRESS_APPOINTMENTS_PAGE_SIZE=100
