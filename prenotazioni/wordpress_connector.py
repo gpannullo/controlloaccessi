@@ -203,10 +203,10 @@ def sincronizza_anagrafiche_wordpress():
         persona, _ = PersonaleWordPress.objects.update_or_create(
             origine_id=str(item["id"]),
             defaults={
-                "username": item.get("username", ""),
-                "nome": item.get("nome", ""),
-                "cognome": item.get("cognome", ""),
-                "email": item.get("email", ""),
+                "username": item.get("username") or "",
+                "nome": item.get("nome") or "",
+                "cognome": item.get("cognome") or "",
+                "email": item.get("email") or "",
                 "attivo": bool(item.get("attivo", True)),
             },
         )

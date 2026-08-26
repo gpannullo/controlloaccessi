@@ -179,8 +179,8 @@ function aversa_appointments_personale() {
         return array(
             'id' => (int) $utente->ID,
             'username' => $utente->user_login,
-            'nome' => $utente->first_name,
-            'cognome' => $utente->last_name,
+            'nome' => (string) get_user_meta($utente->ID, 'first_name', true),
+            'cognome' => (string) get_user_meta($utente->ID, 'last_name', true),
             'email' => $utente->user_email,
             'attivo' => ((int) $utente->user_status) === 0,
             'uffici' => array_values(array_map('strval', $uffici)),
