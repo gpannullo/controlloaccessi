@@ -3,13 +3,22 @@
 Installare `aversa-appointments-connector.php` come *must-use plugin* nel
 WordPress storico, copiandolo in `wp-content/mu-plugins/`. Se la cartella non
 esiste, crearla: WordPress lo caricherà automaticamente, senza attivazione e
-senza scrivere alcuna configurazione nel database. Nel file `wp-config.php`,
-prima della riga che invita a non modificare ulteriormente il file, aggiungere
-una chiave casuale lunga:
+senza scrivere alcuna configurazione nel database.
+
+Nella stessa cartella, copiare
+`aversa-appointments-connector-config.example.php` come
+`aversa-appointments-connector-config.php` e inserire una chiave casuale
+lunga:
 
 ```php
-define('AVERSA_APPOINTMENTS_CONNECTOR_SECRET', 'inserire-una-chiave-casuale-lunga');
+<?php
+defined('ABSPATH') || exit;
+return array('shared_secret' => 'inserire-una-chiave-casuale-lunga');
 ```
+
+Il file di configurazione reale è escluso dal repository. Essendo un file PHP,
+una richiesta diretta termina senza restituire la chiave; verificare comunque
+che il web server esegua PHP e non ne esponga mai il sorgente.
 
 Il WS esposto è:
 

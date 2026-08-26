@@ -10,7 +10,21 @@ defined('ABSPATH') || exit;
 const AVERSA_APPOINTMENTS_ROUTE = 'aversa/v1';
 
 function aversa_appointments_secret() {
-    return defined('AVERSA_APPOINTMENTS_CONNECTOR_SECRET') ? AVERSA_APPOINTMENTS_CONNECTOR_SECRET : '';
+    static $secret = null;
+    if ($secret !== null) {
+        return $secret;
+    }
+    $config_file = __DIR__ . '/aversa-appointments-connector-config.php';
+    if (is_readable($config_file)) {
+        $config = require $config_file;
+        if (is_array($config) && !empty($config['shared_secret'])) {
+            $secret = (string) $config['shared_secret'];
+            return $secret;
+        }
+    }
+    // Compatibilità con eventuali installazioni che usano wp-config.php.
+    $secret = defined('AVERSA_APPOINTMENTS_CONNECTOR_SECRET') ? AVERSA_APPOINTMENTS_CONNECTOR_SECRET : '';
+    return $secret;
 }
 
 function aversa_appointments_authorized(WP_REST_Request $request) {
