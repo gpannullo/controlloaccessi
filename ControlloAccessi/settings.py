@@ -357,6 +357,17 @@ PRENOTAZIONI_MAX_GIORNI = int(
     os.getenv("PRENOTAZIONI_MAX_GIORNI", "90")
 )
 
+# Connettore verso il WordPress storico. La chiave HMAC e l'endpoint sono
+# definiti solamente nell'ambiente di produzione.
+WORDPRESS_APPOINTMENTS = {
+    "ENABLED": os.getenv("WORDPRESS_APPOINTMENTS_ENABLED", "False").lower()
+    in {"1", "true", "yes", "on"},
+    "ENDPOINT": os.getenv("WORDPRESS_APPOINTMENTS_ENDPOINT", ""),
+    "SHARED_SECRET": os.getenv("WORDPRESS_APPOINTMENTS_SHARED_SECRET", ""),
+    "TIMEOUT": int(os.getenv("WORDPRESS_APPOINTMENTS_TIMEOUT", "30")),
+    "PAGE_SIZE": int(os.getenv("WORDPRESS_APPOINTMENTS_PAGE_SIZE", "100")),
+}
+
 # Nginx / reverse proxy
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 

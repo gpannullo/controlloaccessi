@@ -43,3 +43,80 @@ class Prenotazione(models.Model):
 
     def __str__(self):
         return f"{self.codice} — {self.cognome} {self.nome}"
+
+
+class MappaturaUfficioWordPress(models.Model):
+    """Corrispondenza fra le anagrafiche WordPress e gli uffici locali."""
+
+    unita_organizzativa_id = models.CharField(max_length=64)
+    luogo_id = models.CharField(max_length=64)
+    unita_organizzativa = models.CharField(max_length=255, blank=True)
+    ufficio = models.ForeignKey(
+        "access_control.Ufficio",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="mappature_wordpress",
+    )
+    aggiornato_il = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["unita_organizzativa_id", "luogo_id"],
+                name="mappatura_ufficio_wordpress_unica",
+            )
+        ]
+        ordering = ["unita_organizzativa", "luogo_id"]
+        verbose_name = "Mappatura ufficio WordPress"
+        verbose_name_plural = "Mappature uffici WordPress"
+
+    def __str__(self):
+        destinazione = self.ufficio or "da associare"
+        return f"{self.unita_organizzativa or self.unita_organizzativa_id} → {destinazione}"
+
+
+class AppuntamentoWordPress(models.Model):
+    """Archivio idempotente degli appuntamenti ricevuti dal WordPress storico."""
+
+    origine_id = models.BigIntegerField(unique=True, db_index=True)
+    origine_stato = models.CharField(max_length=32, blank=True)
+    origine_aggiornato_il = models.DateTimeField(db_index=True)
+    prenotato_il = models.DateTimeField(null=True, blank=True)
+    data_ora_inizio = models.DateTimeField(null=True, blank=True, db_index=True)
+    data_ora_fine = models.DateTimeField(null=True, blank=True)
+    unita_organizzativa_id = models.CharField(max_length=64, blank=True)
+    unita_organizzativa = models.CharField(max_length=255, blank=True)
+    luogo_id = models.CharField(max_length=64, blank=True)
+    servizio = models.CharField(max_length=255, blank=True)
+    email = models.EmailField(blank=True)
+    codice_fiscale = models.CharField(max_length=16, blank=True)
+    dettaglio_richiesta = models.TextField(blank=True)
+    ufficio = models.ForeignKey(
+        "access_control.Ufficio",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="appuntamenti_wordpress",
+    )
+    dati_origine = models.JSONField(default=dict, blank=True)
+    acquisito_il = models.DateTimeField(auto_now_add=True)
+    sincronizzato_il = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-data_ora_inizio", "-origine_id"]
+        verbose_name = "Appuntamento WordPress"
+        verbose_name_plural = "Appuntamenti WordPress"
+
+    def __str__(self):
+        return f"WP {self.origine_id} — {self.data_ora_inizio or 'senza data'}"
+
+
+class StatoSincronizzazioneWordPress(models.Model):
+    chiave = models.CharField(max_length=64, unique=True, default="appuntamenti")
+    cursore = models.DateTimeField(null=True, blank=True)
+    ultima_esecuzione_il = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Stato sincronizzazione WordPress"
+        verbose_name_plural = "Stati sincronizzazione WordPress"
