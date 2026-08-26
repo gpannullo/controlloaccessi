@@ -1,5 +1,6 @@
 import secrets
 
+from django.conf import settings
 from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models import Q
@@ -62,12 +63,92 @@ class SedeWordPress(models.Model):
         return self.nome
 
 
+class UnitaOrganizzativaWordPress(models.Model):
+    """Unità organizzativa pubblicata dal sito WordPress."""
+
+    origine_id = models.CharField(max_length=64, unique=True)
+    nome = models.CharField(max_length=255)
+    stato = models.CharField(max_length=32, blank=True)
+    ufficio = models.ForeignKey(
+        "access_control.Ufficio",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="unita_organizzative_wordpress",
+    )
+    aggiornato_il = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["nome"]
+        verbose_name = "Unità organizzativa WordPress"
+        verbose_name_plural = "Unità organizzative WordPress"
+
+    def __str__(self):
+        return self.nome
+
+
+class PersonaleWordPress(models.Model):
+    """Utente del sito WordPress, con le competenze ufficio amministrate in Django."""
+
+    origine_id = models.CharField(max_length=64, unique=True)
+    username = models.CharField(max_length=100)
+    nome = models.CharField(max_length=150, blank=True)
+    cognome = models.CharField(max_length=150, blank=True)
+    email = models.EmailField(blank=True)
+    attivo = models.BooleanField(default=True)
+    utente = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="profili_wordpress",
+    )
+    unita_organizzative = models.ManyToManyField(
+        UnitaOrganizzativaWordPress,
+        through="AssegnazionePersonaleWordPress",
+        blank=True,
+        related_name="personale_wordpress",
+    )
+    aggiornato_il = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["cognome", "nome", "username"]
+        verbose_name = "Persona WordPress"
+        verbose_name_plural = "Personale WordPress"
+
+    def __str__(self):
+        nominativo = f"{self.nome} {self.cognome}".strip()
+        return nominativo or self.username
+
+
+class AssegnazionePersonaleWordPress(models.Model):
+    personale = models.ForeignKey(PersonaleWordPress, on_delete=models.CASCADE)
+    unita_organizzativa = models.ForeignKey(UnitaOrganizzativaWordPress, on_delete=models.CASCADE)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["personale", "unita_organizzativa"],
+                name="assegnazione_personale_wordpress_unica",
+            )
+        ]
+        verbose_name = "Assegnazione personale WordPress"
+        verbose_name_plural = "Assegnazioni personale WordPress"
+
+
 class MappaturaUfficioWordPress(models.Model):
     """Corrispondenza fra le anagrafiche WordPress e gli uffici locali."""
 
     unita_organizzativa_id = models.CharField(max_length=64)
     luogo_id = models.CharField(max_length=64)
     unita_organizzativa = models.CharField(max_length=255, blank=True)
+    unita_organizzativa_wordpress = models.ForeignKey(
+        UnitaOrganizzativaWordPress,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="mappature_ufficio",
+    )
     sede = models.ForeignKey(
         SedeWordPress,
         on_delete=models.SET_NULL,

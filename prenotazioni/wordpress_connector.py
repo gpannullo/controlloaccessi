@@ -14,7 +14,7 @@ from django.utils import timezone
 
 from access_control.models import CalendarioApertura
 
-from .models import AppuntamentoWordPress, MappaturaUfficioWordPress, SedeWordPress, StatoSincronizzazioneWordPress
+from .models import AppuntamentoWordPress, AssegnazionePersonaleWordPress, MappaturaUfficioWordPress, PersonaleWordPress, SedeWordPress, StatoSincronizzazioneWordPress, UnitaOrganizzativaWordPress
 
 
 class WordPressConnectorError(RuntimeError):
@@ -150,7 +150,7 @@ def sincronizza_appuntamenti_wordpress():
 
 
 def sincronizza_anagrafiche_wordpress():
-    """Importa sedi, unità organizzative e calendari pubblicati su WordPress."""
+    """Importa le anagrafiche WordPress, senza creare oggetti applicativi locali."""
     config = settings.WORDPRESS_APPOINTMENTS
     if not config["ENABLED"] or not config["SHARED_SECRET"]:
         raise WordPressConnectorError("Connettore WordPress non abilitato o chiave non configurata.")
@@ -168,7 +168,16 @@ def sincronizza_anagrafiche_wordpress():
         )
         sedi += 1
 
-    unita = {str(item.get("id")): item.get("nome", "") for item in payload.get("uffici", []) if item.get("id")}
+    unita = {}
+    for item in payload.get("uffici", []):
+        if not item.get("id"):
+            continue
+        unita_id = str(item["id"])
+        unita[unita_id], _ = UnitaOrganizzativaWordPress.objects.update_or_create(
+            origine_id=unita_id,
+            defaults={"nome": item.get("nome", ""), "stato": item.get("stato", "")},
+        )
+
     mappature = 0
     for item in payload.get("calendari", []):
         unita_id, luogo_id = str(item.get("ufficio_id") or ""), str(item.get("sede_id") or "")
@@ -179,12 +188,40 @@ def sincronizza_anagrafiche_wordpress():
             unita_organizzativa_id=unita_id,
             luogo_id=luogo_id,
         )
-        mapping.unita_organizzativa = unita.get(unita_id, mapping.unita_organizzativa)
+        unita_wordpress = unita.get(unita_id)
+        mapping.unita_organizzativa = unita_wordpress.nome if unita_wordpress else mapping.unita_organizzativa
+        mapping.unita_organizzativa_wordpress = unita_wordpress
         mapping.sede = sede
         mapping.calendario_wordpress_id = str(item.get("id") or "")
         mapping.save()
         mappature += 1
-    return {"sedi": sedi, "mappature": mappature}
+
+    personale = 0
+    for item in payload.get("personale", []):
+        if not item.get("id"):
+            continue
+        persona, _ = PersonaleWordPress.objects.update_or_create(
+            origine_id=str(item["id"]),
+            defaults={
+                "username": item.get("username", ""),
+                "nome": item.get("nome", ""),
+                "cognome": item.get("cognome", ""),
+                "email": item.get("email", ""),
+                "attivo": bool(item.get("attivo", True)),
+            },
+        )
+        unita_ids = [str(unita_id) for unita_id in item.get("uffici", [])]
+        AssegnazionePersonaleWordPress.objects.filter(personale=persona).exclude(
+            unita_organizzativa__origine_id__in=unita_ids
+        ).delete()
+        for unita_id in unita_ids:
+            if unita_id in unita:
+                AssegnazionePersonaleWordPress.objects.get_or_create(
+                    personale=persona,
+                    unita_organizzativa=unita[unita_id],
+                )
+        personale += 1
+    return {"sedi": sedi, "unita_organizzative": len(unita), "mappature": mappature, "personale": personale}
 
 
 def _disponibilita_ufficio(ufficio):
@@ -227,4 +264,22 @@ def pubblica_calendario_wordpress(mappatura):
         raise WordPressConnectorError("WordPress non ha restituito l'identificativo del calendario.")
     mappatura.calendario_wordpress_id = str(calendario_id)
     mappatura.save(update_fields=["calendario_wordpress_id", "aggiornato_il"])
+    return response
+
+
+def pubblica_uffici_personale_wordpress(persona):
+    """Aggiorna su WordPress le sole competenze ufficio del personale selezionato."""
+    config = settings.WORDPRESS_APPOINTMENTS
+    if not config["ENABLED"] or not config["SHARED_SECRET"]:
+        raise WordPressConnectorError("Connettore WordPress non abilitato o chiave non configurata.")
+    endpoint = f'{_endpoint(config, "PERSONALE_ENDPOINT").rstrip("/")}/{persona.origine_id}/uffici'
+    response = _request(
+        endpoint,
+        config["SHARED_SECRET"],
+        config["TIMEOUT"],
+        method="POST",
+        payload={"uffici": list(persona.unita_organizzative.values_list("origine_id", flat=True))},
+    )
+    if not isinstance(response, dict) or not response.get("aggiornato"):
+        raise WordPressConnectorError("WordPress non ha confermato l'aggiornamento delle assegnazioni.")
     return response
