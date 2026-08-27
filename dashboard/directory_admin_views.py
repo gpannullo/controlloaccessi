@@ -191,7 +191,7 @@ def directory_users(request):
         request.session.pop(session_key, None)
         filtri = {}
     elif request.GET:
-        filtri = {"q": request.GET.get("q", ""), "tipo_attivita": request.GET.getlist("tipo_attivita"), "stato_presenza": request.GET.get("stato_presenza", ""), "stato_account": request.GET.get("stato_account", ""), "gruppo": request.GET.get("gruppo", "")}
+        filtri = {"q": request.GET.get("q", ""), "tipo_attivita": request.GET.getlist("tipo_attivita"), "stato_presenza": request.GET.get("stato_presenza", ""), "stato_account": request.GET.get("stato_account", ""), "gruppo": request.GET.get("gruppo", ""), "ufficio": request.GET.getlist("ufficio")}
         request.session[session_key] = filtri
     else:
         filtri = request.session.get(session_key, {})
@@ -203,13 +203,18 @@ def directory_users(request):
     presenza = filtri.get("stato_presenza", "")
     attivo = filtri.get("stato_account", "")
     gruppo = filtri.get("gruppo", "")
+    uffici_selezionati = filtri.get("ufficio", [])
+    if isinstance(uffici_selezionati, str):
+        uffici_selezionati = [uffici_selezionati] if uffici_selezionati else []
     if tipi: utenti = utenti.filter(tipo_attivita__in=tipi)
     if presenza: utenti = utenti.filter(stato_presenza=presenza)
     if attivo == "attivi": utenti = utenti.filter(is_active=True)
     elif attivo == "disattivi": utenti = utenti.filter(is_active=False)
     if gruppo: utenti = utenti.filter(groups__pk=gruppo)
+    if uffici_selezionati:
+        utenti = utenti.filter(groups__gruppi_organizzativi__ufficio_id__in=uffici_selezionati)
     risultati = utenti.distinct().order_by("last_name", "first_name", "username")
-    return render(request, "dashboard/directory_home.html", {"query": query, "utenti": risultati, "totale_utenti": User.objects.count(), "totale_filtrati": risultati.count(), "gruppi": Group.objects.order_by("name"), "tipi": tipi, "presenza": presenza, "attivo": attivo, "gruppo": gruppo})
+    return render(request, "dashboard/directory_home.html", {"query": query, "utenti": risultati, "totale_utenti": User.objects.count(), "totale_filtrati": risultati.count(), "gruppi": Group.objects.order_by("name"), "uffici": Ufficio.objects.filter(attivo=True).order_by("nome"), "uffici_selezionati": [str(pk) for pk in uffici_selezionati], "tipi": tipi, "presenza": presenza, "attivo": attivo, "gruppo": gruppo})
 
 
 @directory_admin_required
