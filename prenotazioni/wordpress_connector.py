@@ -5,6 +5,7 @@ import hmac
 import json
 import time
 from datetime import datetime, timedelta, timezone as datetime_timezone
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -55,8 +56,16 @@ def _request(url, secret, timeout, *, method="GET", payload=None):
             "X-Aversa-Signature": signature,
         },
     )
-    with urlopen(request, timeout=timeout) as response:  # nosec B310 - endpoint configurato dall'ente
-        return json.loads(response.read().decode("utf-8"))
+    try:
+        with urlopen(request, timeout=timeout) as response:  # nosec B310 - endpoint configurato dall'ente
+            return json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        dettaglio = exc.read().decode("utf-8", errors="replace").strip()
+        raise WordPressConnectorError(f"WordPress ha risposto con errore HTTP {exc.code}: {dettaglio[:500]}") from exc
+    except URLError as exc:
+        raise WordPressConnectorError(f"WordPress non è raggiungibile: {exc.reason}") from exc
+    except (TimeoutError, json.JSONDecodeError) as exc:
+        raise WordPressConnectorError(f"Risposta WordPress non valida o scaduta: {exc}") from exc
 
 
 def _endpoint(config, name):
