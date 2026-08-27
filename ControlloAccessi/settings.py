@@ -282,12 +282,12 @@ PORTINERIA_GROUP_NAME = os.getenv("PORTINERIA_GROUP_NAME", "Portineria")
 # Coda e-mail gestita da django-post-office. Le credenziali SMTP restano
 # esterne al repository e sono fornite con variabili d'ambiente.
 EMAIL_BACKEND = "post_office.EmailBackend"
-EMAIL_HOST = os.getenv("EMAIL_HOST", "mail.comune.aversa.ce.it")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
-EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "g.pannullo@comune.aversa.ce.it")
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", ""))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() in {"1", "true", "yes", "on"}
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@comune.aversa.ce.it")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "")
 # Recapito dell'ufficio competente per le richieste di aggiornamento anagrafico.
 ACCOUNT_UPDATE_CONTACT_EMAIL = os.getenv("ACCOUNT_UPDATE_CONTACT_EMAIL", EMAIL_HOST_USER)
 
