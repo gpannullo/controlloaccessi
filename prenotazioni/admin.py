@@ -64,10 +64,29 @@ class SedeWordPressAdmin(admin.ModelAdmin):
             self.message_user(request, f"Importate {risultato['sedi']} sedi, {risultato['unita_organizzative']} unità organizzative, {risultato['personale']} persone e {risultato['mappature']} calendari.", messages.SUCCESS)
 
 
+class CollegamentoUfficioFilter(admin.SimpleListFilter):
+    title = "Ufficio locale"
+    parameter_name = "ufficio_collegato"
+
+    def lookups(self, request, model_admin):
+        return (
+            ("collegato", "Collegato"),
+            ("non_collegato", "Non collegato"),
+        )
+
+    def queryset(self, request, queryset):
+        collegamento = self.value()
+        if collegamento == "collegato":
+            return queryset.filter(ufficio__isnull=False)
+        if collegamento == "non_collegato":
+            return queryset.filter(ufficio__isnull=True)
+        return queryset
+
+
 @admin.register(UnitaOrganizzativaWordPress)
 class UnitaOrganizzativaWordPressAdmin(admin.ModelAdmin):
     list_display = ("nome", "origine_id", "ufficio", "stato", "aggiornato_il")
-    list_filter = ("stato", "ufficio")
+    list_filter = ("stato", CollegamentoUfficioFilter, "ufficio")
     search_fields = ("nome", "origine_id", "ufficio__nome")
     autocomplete_fields = ("ufficio",)
     readonly_fields = ("origine_id", "aggiornato_il")
