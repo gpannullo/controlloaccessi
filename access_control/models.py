@@ -1,3 +1,5 @@
+from string import ascii_uppercase
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -16,11 +18,11 @@ class Ufficio(models.Model):
     )
 
     prefisso_coda = models.CharField(
-        max_length=1,
+        max_length=2,
         blank=True,
         verbose_name="Prefisso coda",
         help_text=(
-            "Una lettera visibile sul ticket (es. A per A001). "
+            "Generato automaticamente se non indicato (A, B, …, poi AB, AC, …). "
             "Impostare un prefisso diverso per ogni ufficio."
         ),
     )
@@ -108,13 +110,49 @@ class Ufficio(models.Model):
 
     def clean(self):
         super().clean()
+        self.prefisso_coda = (self.prefisso_coda or "").strip().upper()
         if self.prefisso_coda and (
             not self.prefisso_coda.isalpha()
-            or len(self.prefisso_coda) != 1
+            or len(self.prefisso_coda) not in {1, 2}
+            or (
+                len(self.prefisso_coda) == 2
+                and self.prefisso_coda[0] == self.prefisso_coda[1]
+            )
         ):
             raise ValidationError(
-                {"prefisso_coda": "Indicare una sola lettera."}
+                {"prefisso_coda": "Indicare una o due lettere diverse (es. A oppure AB)."}
             )
+        if self.prefisso_coda and Ufficio.objects.exclude(pk=self.pk).filter(
+            prefisso_coda__iexact=self.prefisso_coda
+        ).exists():
+            raise ValidationError(
+                {"prefisso_coda": "Questo prefisso è già assegnato a un altro ufficio."}
+            )
+
+    def _genera_prefisso_coda(self):
+        usati = {
+            valore.upper()
+            for valore in Ufficio.objects.exclude(pk=self.pk)
+            .exclude(prefisso_coda="")
+            .values_list("prefisso_coda", flat=True)
+        }
+        for lettera in ascii_uppercase:
+            if lettera not in usati:
+                return lettera
+        for prima in ascii_uppercase:
+            for seconda in ascii_uppercase:
+                prefisso = f"{prima}{seconda}"
+                if prima != seconda and prefisso not in usati:
+                    return prefisso
+        raise ValidationError(
+            {"prefisso_coda": "Non sono disponibili altri prefissi per gli uffici."}
+        )
+
+    def save(self, *args, **kwargs):
+        self.prefisso_coda = (self.prefisso_coda or "").strip().upper()
+        if not self.prefisso_coda:
+            self.prefisso_coda = self._genera_prefisso_coda()
+        return super().save(*args, **kwargs)
 
     @property
     def prefisso_coda_effettivo(self):
