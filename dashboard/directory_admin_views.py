@@ -15,6 +15,8 @@ from accounts.services.directory_admin_service import DirectoryAdminException, D
 from access_control.models import GruppoOrganizzativo, Ufficio
 from audit.services.audit_service import AuditService
 from dashboard.permissions import directory_admin_required
+from prenotazioni.models import PersonaleWordPress, UnitaOrganizzativaWordPress
+from prenotazioni.wordpress_connector import WordPressConnectorError, crea_unita_organizzativa_wordpress
 
 User = get_user_model()
 
@@ -325,6 +327,17 @@ def directory_user(request, pk):
         attivo=True,
         ufficio__attivo=True,
     ).exclude(django_group__user=utente).select_related("ufficio", "django_group").order_by("ufficio__nome", "nome")
+    unita_per_ufficio = {
+        unita.ufficio_id: unita
+        for unita in UnitaOrganizzativaWordPress.objects.filter(
+            ufficio__in=[assegnazione.ufficio for assegnazione in uffici_associati]
+        ).select_related("ufficio")
+    }
+    for assegnazione in uffici_associati:
+        assegnazione.unita_organizzativa_wordpress = unita_per_ufficio.get(assegnazione.ufficio_id)
+    persone_pubbliche = PersonaleWordPress.objects.filter(
+        utente=utente,
+    ).prefetch_related("unita_organizzative").order_by("cognome", "nome", "titolo")
     try:
         dettaglio = DirectoryAdminService().dettaglio(utente.username)
         gruppi_automatici = set(
@@ -352,6 +365,7 @@ def directory_user(request, pk):
         "domini_istituzionali": settings.INSTITUTIONAL_EMAIL_DOMAINS,
         "dominio_istituzionale": dominio_istituzionale,
         "gruppi_ad_disponibili": gruppi_ad_disponibili,
+        "persone_pubbliche": persone_pubbliche,
     })
 
 
@@ -438,6 +452,18 @@ def directory_action(request, pk):
             service.aggiungi_utente_al_gruppo(utente.username, assegnazione.directory_name)
             utente.groups.add(assegnazione.django_group)
             messaggio_successo = "Ufficio %s aggiunto all'account." % assegnazione.ufficio
+        elif azione == "crea_unita_organizzativa":
+            ufficio = get_object_or_404(
+                Ufficio.objects.distinct(),
+                pk=request.POST.get("ufficio"),
+                gruppi__django_group__user=utente,
+                gruppi__tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
+            )
+            esistente = UnitaOrganizzativaWordPress.objects.filter(ufficio=ufficio).first()
+            if esistente:
+                raise DirectoryAdminException("L'ufficio %s è già collegato all'unità organizzativa WordPress %s." % (ufficio, esistente.nome))
+            unita = crea_unita_organizzativa_wordpress(ufficio)
+            messaggio_successo = "Creata l'unità organizzativa %s su WordPress e collegata all'ufficio %s." % (unita.nome, ufficio.nome)
         elif azione == "aggiungi_gruppo_ad":
             nome_gruppo = request.POST.get("gruppo_ad", "").strip()
             if not nome_gruppo:

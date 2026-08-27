@@ -21,6 +21,7 @@
     <li class="nav-item" role="presentation"><button class="nav-link active" id="anagrafica-tab" data-bs-toggle="tab" data-bs-target="#anagrafica" type="button" role="tab">Anagrafica</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" id="uffici-tab" data-bs-toggle="tab" data-bs-target="#uffici" type="button" role="tab">Uffici</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" id="gruppi-tab" data-bs-toggle="tab" data-bs-target="#gruppi" type="button" role="tab">Gruppi AD</button></li>
+    {% if persone_pubbliche %}<li class="nav-item" role="presentation"><button class="nav-link" id="persone-pubbliche-tab" data-bs-toggle="tab" data-bs-target="#persone-pubbliche" type="button" role="tab">Persona pubblica</button></li>{% endif %}
   </ul>
 
   <div class="tab-content">
@@ -44,9 +45,29 @@
       </div>
     </section>
 
-    <section class="tab-pane fade" id="uffici" role="tabpanel" aria-labelledby="uffici-tab"><div class="card"><div class="card-body"><h2 class="h5">Uffici associati</h2><form method="post" action="{% url 'dashboard:directory_action' utente.pk %}" class="row g-2 align-items-end mb-4">{% csrf_token %}<input type="hidden" name="azione" value="aggiungi_ufficio"><div class="col-md"><label class="form-label" for="gruppo_organizzativo">Aggiungi ufficio</label><select class="form-select" id="gruppo_organizzativo" name="gruppo_organizzativo"><option value="">Seleziona un ufficio</option>{% for gruppo in gruppi_ufficio_disponibili %}<option value="{{ gruppo.pk }}">{{ gruppo.ufficio.nome }}{% if gruppo.nome != gruppo.ufficio.nome %} — {{ gruppo.nome }}{% endif %}</option>{% endfor %}</select></div><div class="col-md-auto"><button class="btn btn-danger">Aggiungi ufficio</button></div></form>{% for assegnazione in uffici_associati %}<div class="border rounded p-2 mb-2 d-flex justify-content-between align-items-center gap-2"><div><strong>{{ assegnazione.ufficio.nome }}</strong><br><small class="text-muted">Gruppo operativo: {{ assegnazione.directory_name }}</small></div><form method="post" action="{% url 'dashboard:directory_action' utente.pk %}" onsubmit="return confirm('Vuoi rimuovere l’ufficio {{ assegnazione.ufficio.nome }} dall’account?');">{% csrf_token %}<input type="hidden" name="azione" value="rimuovi_ufficio"><input type="hidden" name="gruppo_organizzativo" value="{{ assegnazione.pk }}"><button class="btn btn-sm btn-outline-danger">Rimuovi</button></form></div>{% empty %}<p class="text-muted mb-0">Nessun ufficio associato.</p>{% endfor %}</div></div></section>
+    <section class="tab-pane fade" id="uffici" role="tabpanel" aria-labelledby="uffici-tab">
+      <div class="card"><div class="card-body">
+        <h2 class="h5">Uffici associati</h2>
+        <form method="post" action="{% url 'dashboard:directory_action' utente.pk %}" class="row g-2 align-items-end mb-4">
+          {% csrf_token %}<input type="hidden" name="azione" value="aggiungi_ufficio">
+          <div class="col-md"><label class="form-label" for="gruppo_organizzativo">Aggiungi ufficio</label><select class="form-select" id="gruppo_organizzativo" name="gruppo_organizzativo"><option value="">Seleziona un ufficio</option>{% for gruppo in gruppi_ufficio_disponibili %}<option value="{{ gruppo.pk }}">{{ gruppo.ufficio.nome }}{% if gruppo.nome != gruppo.ufficio.nome %} — {{ gruppo.nome }}{% endif %}</option>{% endfor %}</select></div>
+          <div class="col-md-auto"><button class="btn btn-danger">Aggiungi ufficio</button></div>
+        </form>
+        {% for assegnazione in uffici_associati %}
+          <div class="border rounded p-2 mb-2 d-flex justify-content-between align-items-center gap-2">
+            <div><strong>{{ assegnazione.ufficio.nome }}</strong><br><small class="text-muted">Gruppo operativo: {{ assegnazione.directory_name }}</small>{% if assegnazione.unita_organizzativa_wordpress %}<br><small class="text-success">Unità organizzativa WordPress: {{ assegnazione.unita_organizzativa_wordpress.nome }}</small>{% else %}<br><small class="text-warning-emphasis">Nessuna unità organizzativa WordPress collegata.</small>{% endif %}</div>
+            <div class="d-flex gap-2 flex-wrap">
+              {% if not assegnazione.unita_organizzativa_wordpress %}<form method="post" action="{% url 'dashboard:directory_action' utente.pk %}" onsubmit="return confirm('Creare su WordPress l’unità organizzativa {{ assegnazione.ufficio.nome }}?');">{% csrf_token %}<input type="hidden" name="azione" value="crea_unita_organizzativa"><input type="hidden" name="ufficio" value="{{ assegnazione.ufficio_id }}"><button class="btn btn-sm btn-outline-success">Crea unità organizzativa</button></form>{% endif %}
+              <form method="post" action="{% url 'dashboard:directory_action' utente.pk %}" onsubmit="return confirm('Vuoi rimuovere l’ufficio {{ assegnazione.ufficio.nome }} dall’account?');">{% csrf_token %}<input type="hidden" name="azione" value="rimuovi_ufficio"><input type="hidden" name="gruppo_organizzativo" value="{{ assegnazione.pk }}"><button class="btn btn-sm btn-outline-danger">Rimuovi</button></form>
+            </div>
+          </div>
+        {% empty %}<p class="text-muted mb-0">Nessun ufficio associato.</p>{% endfor %}
+      </div></div>
+    </section>
 
     <section class="tab-pane fade" id="gruppi" role="tabpanel" aria-labelledby="gruppi-tab"><div class="card"><div class="card-body"><h2 class="h5">Gruppi AD aggiuntivi</h2><p class="text-muted">Qui puoi aggiungere gruppi AD non gestiti automaticamente da uffici o dalla mail istituzionale.</p><form method="post" action="{% url 'dashboard:directory_action' utente.pk %}" class="row g-2 align-items-end mb-4">{% csrf_token %}<input type="hidden" name="azione" value="aggiungi_gruppo_ad"><div class="col-md"><label class="form-label" for="gruppo_ad">Gruppo AD</label><select class="form-select" id="gruppo_ad" name="gruppo_ad"><option value="">Seleziona un gruppo</option>{% for gruppo in gruppi_ad_disponibili %}<option value="{{ gruppo }}">{{ gruppo }}</option>{% endfor %}</select></div><div class="col-md-auto"><button class="btn btn-danger">Aggiungi gruppo</button></div></form><h3 class="h6">Appartenenze attuali</h3><div class="row row-cols-1 row-cols-md-3 g-2">{% for gruppo in dettaglio.groups %}<div class="col"><div class="border rounded px-2 py-1">{{ gruppo }}</div></div>{% empty %}<p class="text-muted mb-0">Nessun gruppo AD associato.</p>{% endfor %}</div></div></div></section>
+
+    {% if persone_pubbliche %}<section class="tab-pane fade" id="persone-pubbliche" role="tabpanel" aria-labelledby="persone-pubbliche-tab"><div class="card"><div class="card-body"><h2 class="h5">Persona pubblica</h2>{% for persona in persone_pubbliche %}<div class="border rounded p-3 {% if not forloop.last %}mb-2{% endif %}"><div class="d-flex justify-content-between align-items-start gap-2"><div><strong>{{ persona }}</strong>{% if persona.titolo %}<div class="text-muted">{{ persona.titolo }}</div>{% endif %}</div>{% if persona.attivo %}<span class="badge text-bg-success">Attiva</span>{% else %}<span class="badge text-bg-secondary">Non attiva</span>{% endif %}</div><div class="small mt-2"><strong>Uffici WordPress:</strong> {% for unita in persona.unita_organizzative.all %}{{ unita.nome }}{% if not forloop.last %}, {% endif %}{% empty %}nessuno{% endfor %}</div></div>{% endfor %}</div></div></section>{% endif %}
   </div>
   {% endif %}
 </div>

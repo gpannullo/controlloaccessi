@@ -77,6 +77,7 @@ def _endpoint(config, name):
         "ANAGRAFICHE_ENDPOINT": "anagrafiche",
         "CALENDARI_ENDPOINT": "calendari",
         "PERSONE_PUBBLICHE_ENDPOINT": "persone-pubbliche",
+        "UNITE_ORGANIZZATIVE_ENDPOINT": "unita-organizzative",
     }
     try:
         return f"{base}/{percorsi[name]}"
@@ -317,3 +318,29 @@ def pubblica_persona_pubblica_wordpress(persona):
 def pubblica_organizzazioni_persona_pubblica_wordpress(persona):
     """Compatibilità: pubblica l'intera persona, incluse le organizzazioni."""
     return pubblica_persona_pubblica_wordpress(persona)
+
+
+def crea_unita_organizzativa_wordpress(ufficio):
+    """Crea l'unità organizzativa WordPress collegata all'ufficio locale."""
+    config = settings.WORDPRESS_APPOINTMENTS
+    if not config["ENABLED"] or not config["SHARED_SECRET"]:
+        raise WordPressConnectorError("Connettore WordPress non abilitato o chiave non configurata.")
+    response = _request(
+        _endpoint(config, "UNITE_ORGANIZZATIVE_ENDPOINT"),
+        config["SHARED_SECRET"],
+        config["TIMEOUT"],
+        method="POST",
+        payload={"nome": ufficio.nome},
+    )
+    origine_id = response.get("id") if isinstance(response, dict) else None
+    if not origine_id:
+        raise WordPressConnectorError("WordPress non ha restituito l'identificativo dell'unità organizzativa.")
+    unita, _ = UnitaOrganizzativaWordPress.objects.update_or_create(
+        origine_id=str(origine_id),
+        defaults={
+            "nome": response.get("nome") or ufficio.nome,
+            "stato": response.get("stato") or "publish",
+            "ufficio": ufficio,
+        },
+    )
+    return unita
