@@ -81,10 +81,11 @@ class AssegnazionePersonaleWordPressInline(admin.TabularInline):
 
 @admin.register(PersonaleWordPress)
 class PersonaleWordPressAdmin(admin.ModelAdmin):
-    list_display = ("titolo", "cognome", "nome", "competenze_brevi", "attivo", "uffici_assegnati", "utente", "aggiornato_il")
+    list_display = ("titolo", "cognome", "nome", "competenze_brevi", "attivo", "uffici_assegnati", "utente", "utente_django_attivo", "aggiornato_il")
     list_filter = ("attivo", "unita_organizzative")
     search_fields = ("titolo", "nome", "cognome", "competenze", "utente__username")
     autocomplete_fields = ("utente",)
+    list_select_related = ("utente",)
     readonly_fields = ("origine_id", "aggiornato_il")
     inlines = (AssegnazionePersonaleWordPressInline,)
     actions = ("collega_utenti_django", "pubblica_uffici_su_wordpress",)
@@ -105,6 +106,12 @@ class PersonaleWordPressAdmin(admin.ModelAdmin):
     @admin.display(description="Competenze")
     def competenze_brevi(self, obj):
         return obj.competenze[:80] + ("…" if len(obj.competenze) > 80 else "")
+
+    @admin.display(description="Utente Django attivo", boolean=True)
+    def utente_django_attivo(self, obj):
+        if not obj.utente_id:
+            return None
+        return obj.utente.is_active
 
     @admin.action(description="Pubblica le organizzazioni selezionate su WordPress")
     def pubblica_uffici_su_wordpress(self, request, queryset):
