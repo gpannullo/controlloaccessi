@@ -4,7 +4,7 @@ from access_control.models import Ufficio
 
 from .models import AssegnazionePersonaleWordPress, AppuntamentoWordPress, MappaturaUfficioWordPress, PersonaleWordPress, Prenotazione, SedeWordPress, StatoSincronizzazioneWordPress, UnitaOrganizzativaWordPress
 from .people_linking import collega_persone_pubbliche
-from .wordpress_connector import WordPressConnectorError, pubblica_calendario_wordpress, pubblica_persona_pubblica_wordpress, sincronizza_anagrafiche_wordpress
+from .wordpress_connector import WordPressConnectorError, pubblica_calendario_wordpress, pubblica_persona_pubblica_wordpress, pubblica_unita_organizzativa_wordpress, sincronizza_anagrafiche_wordpress
 
 
 @admin.register(Prenotazione)
@@ -92,7 +92,18 @@ class UnitaOrganizzativaWordPressAdmin(admin.ModelAdmin):
     search_fields = ("nome", "origine_id", "ufficio__nome")
     autocomplete_fields = ("ufficio",)
     readonly_fields = ("origine_id", "aggiornato_il")
-    actions = ("crea_uffici_locali",)
+    actions = ("crea_uffici_locali", "allinea_unita_organizzative_su_wordpress")
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if not change:
+            return
+        try:
+            pubblica_unita_organizzativa_wordpress(obj)
+        except WordPressConnectorError as exc:
+            self.message_user(request, f"Unità salvata localmente, ma non aggiornata su WordPress: {exc}", messages.ERROR)
+        else:
+            self.message_user(request, "Unità organizzativa aggiornata anche su WordPress.", messages.SUCCESS)
 
     @staticmethod
     def _codice_ufficio(unita):
@@ -131,6 +142,24 @@ class UnitaOrganizzativaWordPressAdmin(admin.ModelAdmin):
             request,
             f"Creati: {creati}; collegati a un ufficio esistente: {collegati}; già collegati: {gia_collegati}.",
             messages.SUCCESS,
+        )
+
+    @admin.action(description="Allinea forzatamente le unità organizzative selezionate su WordPress")
+    def allinea_unita_organizzative_su_wordpress(self, request, queryset):
+        aggiornate = errori = 0
+        for unita in queryset:
+            try:
+                pubblica_unita_organizzativa_wordpress(unita)
+            except WordPressConnectorError as exc:
+                errori += 1
+                self.message_user(request, f"{unita.nome}: {exc}", messages.ERROR)
+            else:
+                aggiornate += 1
+        livello = messages.WARNING if errori else messages.SUCCESS
+        self.message_user(
+            request,
+            f"Unità aggiornate su WordPress: {aggiornate}; errori: {errori}.",
+            livello,
         )
 
 

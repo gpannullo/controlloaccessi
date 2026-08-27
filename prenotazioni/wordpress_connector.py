@@ -346,6 +346,27 @@ def crea_unita_organizzativa_wordpress(ufficio):
     return unita
 
 
+def pubblica_unita_organizzativa_wordpress(unita):
+    """Aggiorna su WordPress i dati locali dell'Unità organizzativa."""
+    config = settings.WORDPRESS_APPOINTMENTS
+    if not config["ENABLED"] or not config["SHARED_SECRET"]:
+        raise WordPressConnectorError("Connettore WordPress non abilitato o chiave non configurata.")
+    endpoint = f'{_endpoint(config, "UNITE_ORGANIZZATIVE_ENDPOINT").rstrip("/")}/{unita.origine_id}'
+    response = _request(
+        endpoint,
+        config["SHARED_SECRET"],
+        config["TIMEOUT"],
+        method="POST",
+        payload={
+            "nome": unita.nome,
+            "attivo": unita.stato == "publish",
+        },
+    )
+    if not isinstance(response, dict) or not response.get("aggiornato"):
+        raise WordPressConnectorError("WordPress non ha confermato l'aggiornamento dell'Unità organizzativa.")
+    return response
+
+
 def crea_persona_pubblica_wordpress(utente):
     """Crea e collega a WordPress la Persona pubblica dell'utente Django."""
     if PersonaleWordPress.objects.filter(utente=utente).exists():
