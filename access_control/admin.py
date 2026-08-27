@@ -1,8 +1,5 @@
-from urllib.parse import urlencode
-
 from django.contrib import admin
 from django.db.models import Count, Q
-from django.http import HttpResponseRedirect
 
 from .models import (
     CalendarioApertura,
@@ -253,37 +250,4 @@ class GruppoOrganizzativoAdmin(admin.ModelAdmin):
     ):
         OfficeService().generate_from_groups(
             queryset
-        )
-
-    def changelist_view(
-        self,
-        request,
-        extra_context=None,
-    ):
-        """
-        Applica automaticamente il filtro
-        'Tipo = Organizzativo' solo al primo accesso.
-        """
-
-        if (
-            "tipo__exact" not in request.GET
-            and "_changelist_filters"
-            not in request.GET
-        ):
-            query = request.GET.copy()
-
-            query["tipo__exact"] = (
-                GruppoOrganizzativo
-                .Tipo
-                .ORGANIZZATIVO
-            )
-
-            return HttpResponseRedirect(
-                f"{request.path}?"
-                f"{urlencode(query)}"
-            )
-
-        return super().changelist_view(
-            request,
-            extra_context=extra_context,
         )
