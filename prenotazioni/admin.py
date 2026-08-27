@@ -200,7 +200,11 @@ class PersonaleWordPressAdmin(admin.ModelAdmin):
     list_select_related = ("utente",)
     readonly_fields = ("origine_id", "aggiornato_il")
     inlines = (AssegnazionePersonaleWordPressInline,)
-    actions = ("collega_utenti_django", "pubblica_persone_su_wordpress",)
+    actions = (
+        "collega_utenti_django",
+        "pubblica_persone_su_wordpress",
+        "rimuovi_persone_non_attive_dalle_unita_organizzative",
+    )
 
     @admin.action(description="Collega automaticamente agli utenti Django corrispondenti")
     def collega_utenti_django(self, request, queryset):
@@ -227,12 +231,35 @@ class PersonaleWordPressAdmin(admin.ModelAdmin):
 
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)
+        if not form.instance.attivo:
+            AssegnazionePersonaleWordPress.objects.filter(personale=form.instance).delete()
         try:
             pubblica_persona_pubblica_wordpress(form.instance)
         except WordPressConnectorError as exc:
             self.message_user(request, f"Persona salvata in Django, ma non pubblicata su WordPress: {exc}", messages.ERROR)
         else:
             self.message_user(request, "Persona pubblica aggiornata anche su WordPress.", messages.SUCCESS)
+
+    @admin.action(description="Rimuovi dalle unità organizzative le persone pubbliche non attive selezionate")
+    def rimuovi_persone_non_attive_dalle_unita_organizzative(self, request, queryset):
+        aggiornate = associazioni_rimosse = errori = 0
+        for persona in queryset.filter(attivo=False):
+            associazioni_rimosse += AssegnazionePersonaleWordPress.objects.filter(
+                personale=persona
+            ).delete()[0]
+            try:
+                pubblica_persona_pubblica_wordpress(persona)
+            except WordPressConnectorError as exc:
+                errori += 1
+                self.message_user(request, f"{persona}: {exc}", messages.ERROR)
+            else:
+                aggiornate += 1
+        livello = messages.WARNING if errori else messages.SUCCESS
+        self.message_user(
+            request,
+            f"Persone non attive aggiornate: {aggiornate}; associazioni rimosse: {associazioni_rimosse}; errori: {errori}.",
+            livello,
+        )
 
     @admin.action(description="Pubblica le persone selezionate su WordPress")
     def pubblica_persone_su_wordpress(self, request, queryset):
