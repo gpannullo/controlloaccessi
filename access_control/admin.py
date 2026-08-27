@@ -121,6 +121,7 @@ class GruppoOrganizzativoAdmin(admin.ModelAdmin):
         "tipo",
         "ufficio",
         "numero_utenti",
+        "dipendenti_collegati",
         "attivo",
         "sincronizzato",
     )
@@ -170,14 +171,17 @@ class GruppoOrganizzativoAdmin(admin.ModelAdmin):
             request
         )
 
-        return queryset.annotate(
-            numero_utenti_attivi=Count(
-                "django_group__user",
-                filter=Q(
-                    django_group__user__is_active=True,
-                ),
-                distinct=True,
+        return (
+            queryset.annotate(
+                numero_utenti_attivi=Count(
+                    "django_group__user",
+                    filter=Q(
+                        django_group__user__is_active=True,
+                    ),
+                    distinct=True,
+                )
             )
+            .prefetch_related("django_group__user_set")
         )
 
     @admin.display(
@@ -186,6 +190,17 @@ class GruppoOrganizzativoAdmin(admin.ModelAdmin):
     )
     def numero_utenti(self, obj):
         return obj.numero_utenti_attivi
+
+    @admin.display(description="Dipendenti collegati")
+    def dipendenti_collegati(self, obj):
+        utenti = obj.django_group.user_set.all()
+        nominativi = []
+        for utente in utenti:
+            nominativo = " ".join(
+                valore for valore in (utente.first_name, utente.last_name) if valore
+            )
+            nominativi.append(nominativo or utente.username)
+        return ", ".join(sorted(nominativi, key=str.casefold)) or "—"
 
     @admin.action(
         description="Attiva gruppi selezionati"
