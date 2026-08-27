@@ -423,6 +423,8 @@ def directory_action(request, pk):
                         "Buongiorno %s %s,\n\n"
                         "la password del suo account è stata reimpostata.\n"
                         "Username: %s\nPassword provvisoria: %s\n\n"
+                        "Per impostare o modificare una password, è disponibile il seguente portale di accesso:\n"
+                        "https://account.comune.aversa.ce.it/account/\n\n"
                         "Al primo accesso sarà richiesto di cambiare la password."
                     ) % (utente.first_name, utente.last_name, utente.username, password),
                 )
