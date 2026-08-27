@@ -1,5 +1,7 @@
 from django.contrib import admin, messages
 
+from access_control.models import Ufficio
+
 from .models import AssegnazionePersonaleWordPress, AppuntamentoWordPress, MappaturaUfficioWordPress, PersonaleWordPress, Prenotazione, SedeWordPress, StatoSincronizzazioneWordPress, UnitaOrganizzativaWordPress
 from .people_linking import collega_persone_pubbliche
 from .wordpress_connector import WordPressConnectorError, pubblica_calendario_wordpress, pubblica_persona_pubblica_wordpress, sincronizza_anagrafiche_wordpress
@@ -90,6 +92,46 @@ class UnitaOrganizzativaWordPressAdmin(admin.ModelAdmin):
     search_fields = ("nome", "origine_id", "ufficio__nome")
     autocomplete_fields = ("ufficio",)
     readonly_fields = ("origine_id", "aggiornato_il")
+    actions = ("crea_uffici_locali",)
+
+    @staticmethod
+    def _codice_ufficio(unita):
+        base = f"WP-UO-{unita.pk}"[:20]
+        codice = base
+        suffisso = 2
+        while Ufficio.objects.filter(codice=codice).exists():
+            codice = f"{base[:20 - len(str(suffisso))]}{suffisso}"
+            suffisso += 1
+        return codice
+
+    @admin.action(description="Crea uffici locali dalle unità organizzative selezionate")
+    def crea_uffici_locali(self, request, queryset):
+        creati = collegati = gia_collegati = 0
+        for unita in queryset.select_related("ufficio"):
+            if unita.ufficio_id:
+                gia_collegati += 1
+                continue
+            ufficio = Ufficio.objects.filter(nome__iexact=unita.nome).first()
+            if ufficio:
+                unita.ufficio = ufficio
+                unita.save(update_fields=["ufficio", "aggiornato_il"])
+                collegati += 1
+                continue
+            ufficio = Ufficio.objects.create(
+                codice=self._codice_ufficio(unita),
+                nome=unita.nome,
+                attivo=unita.stato == "publish",
+                riceve_pubblico=False,
+                note=f"Creato dall'Unità organizzativa WordPress {unita.origine_id}.",
+            )
+            unita.ufficio = ufficio
+            unita.save(update_fields=["ufficio", "aggiornato_il"])
+            creati += 1
+        self.message_user(
+            request,
+            f"Creati: {creati}; collegati a un ufficio esistente: {collegati}; già collegati: {gia_collegati}.",
+            messages.SUCCESS,
+        )
 
 
 class AssegnazionePersonaleWordPressInline(admin.TabularInline):
