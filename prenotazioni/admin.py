@@ -2,7 +2,7 @@ from django.contrib import admin, messages
 
 from .models import AssegnazionePersonaleWordPress, AppuntamentoWordPress, MappaturaUfficioWordPress, PersonaleWordPress, Prenotazione, SedeWordPress, StatoSincronizzazioneWordPress, UnitaOrganizzativaWordPress
 from .people_linking import collega_persone_pubbliche
-from .wordpress_connector import WordPressConnectorError, pubblica_calendario_wordpress, pubblica_organizzazioni_persona_pubblica_wordpress, sincronizza_anagrafiche_wordpress
+from .wordpress_connector import WordPressConnectorError, pubblica_calendario_wordpress, pubblica_persona_pubblica_wordpress, sincronizza_anagrafiche_wordpress
 
 
 @admin.register(Prenotazione)
@@ -110,7 +110,7 @@ class PersonaleWordPressAdmin(admin.ModelAdmin):
     list_select_related = ("utente",)
     readonly_fields = ("origine_id", "aggiornato_il")
     inlines = (AssegnazionePersonaleWordPressInline,)
-    actions = ("collega_utenti_django", "pubblica_uffici_su_wordpress",)
+    actions = ("collega_utenti_django", "pubblica_persone_su_wordpress",)
 
     @admin.action(description="Collega automaticamente agli utenti Django corrispondenti")
     def collega_utenti_django(self, request, queryset):
@@ -135,18 +135,27 @@ class PersonaleWordPressAdmin(admin.ModelAdmin):
             return None
         return obj.utente.is_active
 
-    @admin.action(description="Pubblica le organizzazioni selezionate su WordPress")
-    def pubblica_uffici_su_wordpress(self, request, queryset):
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        try:
+            pubblica_persona_pubblica_wordpress(form.instance)
+        except WordPressConnectorError as exc:
+            self.message_user(request, f"Persona salvata in Django, ma non pubblicata su WordPress: {exc}", messages.ERROR)
+        else:
+            self.message_user(request, "Persona pubblica aggiornata anche su WordPress.", messages.SUCCESS)
+
+    @admin.action(description="Pubblica le persone selezionate su WordPress")
+    def pubblica_persone_su_wordpress(self, request, queryset):
         eseguiti = 0
         for persona in queryset.prefetch_related("unita_organizzative"):
             try:
-                pubblica_organizzazioni_persona_pubblica_wordpress(persona)
+                pubblica_persona_pubblica_wordpress(persona)
             except WordPressConnectorError as exc:
                 self.message_user(request, f"{persona}: {exc}", messages.ERROR)
             else:
                 eseguiti += 1
         if eseguiti:
-            self.message_user(request, f"Pubblicate le organizzazioni di {eseguiti} persone pubbliche su WordPress.", messages.SUCCESS)
+            self.message_user(request, f"Pubblicate {eseguiti} persone pubbliche su WordPress.", messages.SUCCESS)
 
 
 @admin.register(AppuntamentoWordPress)

@@ -200,7 +200,7 @@ def sincronizza_anagrafiche_wordpress():
     for item in payload.get("persone_pubbliche", []):
         if not item.get("id"):
             continue
-        persona, _ = PersonaleWordPress.objects.update_or_create(
+        persona, creata = PersonaleWordPress.objects.get_or_create(
             origine_id=str(item["id"]),
             defaults={
                 "titolo": item.get("titolo") or "",
@@ -210,6 +210,11 @@ def sincronizza_anagrafiche_wordpress():
                 "attivo": bool(item.get("attivo", True)),
             },
         )
+        # Django è l'owner dell'anagrafica: da WordPress importiamo solo le
+        # persone non ancora presenti, senza sovrascrivere modifiche locali.
+        if not creata:
+            personale += 1
+            continue
         unita_ids = [str(unita_id) for unita_id in item.get("uffici", [])]
         AssegnazionePersonaleWordPress.objects.filter(personale=persona).exclude(
             unita_organizzativa__origine_id__in=unita_ids
@@ -267,19 +272,31 @@ def pubblica_calendario_wordpress(mappatura):
     return response
 
 
-def pubblica_organizzazioni_persona_pubblica_wordpress(persona):
-    """Aggiorna su WordPress le organizzazioni della persona pubblica selezionata."""
+def pubblica_persona_pubblica_wordpress(persona):
+    """Pubblica su WordPress l'anagrafica locale della persona pubblica."""
     config = settings.WORDPRESS_APPOINTMENTS
     if not config["ENABLED"] or not config["SHARED_SECRET"]:
         raise WordPressConnectorError("Connettore WordPress non abilitato o chiave non configurata.")
-    endpoint = f'{_endpoint(config, "PERSONE_PUBBLICHE_ENDPOINT").rstrip("/")}/{persona.origine_id}/organizzazioni'
+    endpoint = f'{_endpoint(config, "PERSONE_PUBBLICHE_ENDPOINT").rstrip("/")}/{persona.origine_id}'
     response = _request(
         endpoint,
         config["SHARED_SECRET"],
         config["TIMEOUT"],
         method="POST",
-        payload={"organizzazioni": list(persona.unita_organizzative.values_list("origine_id", flat=True))},
+        payload={
+            "titolo": persona.titolo,
+            "nome": persona.nome,
+            "cognome": persona.cognome,
+            "competenze": persona.competenze,
+            "attivo": persona.attivo,
+            "organizzazioni": list(persona.unita_organizzative.values_list("origine_id", flat=True)),
+        },
     )
     if not isinstance(response, dict) or not response.get("aggiornato"):
-        raise WordPressConnectorError("WordPress non ha confermato l'aggiornamento delle organizzazioni.")
+        raise WordPressConnectorError("WordPress non ha confermato l'aggiornamento della persona pubblica.")
     return response
+
+
+def pubblica_organizzazioni_persona_pubblica_wordpress(persona):
+    """Compatibilità: pubblica l'intera persona, incluse le organizzazioni."""
+    return pubblica_persona_pubblica_wordpress(persona)

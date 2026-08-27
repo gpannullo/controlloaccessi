@@ -209,6 +209,37 @@ function aversa_appointments_salva_organizzazioni_persona(WP_REST_Request $reque
     return rest_ensure_response(array('id' => $persona_id, 'aggiornato' => true));
 }
 
+function aversa_appointments_salva_persona_pubblica(WP_REST_Request $request) {
+    $persona_id = (int) $request->get_param('persona_id');
+    if (!$persona_id || get_post_type($persona_id) !== 'persona_pubblica') {
+        return new WP_Error('aversa_person_not_found', 'Persona pubblica WordPress non trovata.', array('status' => 404));
+    }
+    $parametri = $request->get_json_params();
+    $organizzazioni = isset($parametri['organizzazioni']) && is_array($parametri['organizzazioni']) ? $parametri['organizzazioni'] : array();
+    $organizzazioni_valide = array();
+    foreach ($organizzazioni as $ufficio_id) {
+        $ufficio_id = (int) $ufficio_id;
+        if (!$ufficio_id || get_post_type($ufficio_id) !== 'unita_organizzativa') {
+            return new WP_Error('aversa_bad_office', 'Una delle unità organizzative non è valida.', array('status' => 400));
+        }
+        $organizzazioni_valide[] = $ufficio_id;
+    }
+    $attivo = !empty($parametri['attivo']);
+    $esito = wp_update_post(array(
+        'ID' => $persona_id,
+        'post_title' => sanitize_text_field($parametri['titolo'] ?? ''),
+        'post_status' => $attivo ? 'publish' : 'private',
+    ), true);
+    if (is_wp_error($esito)) {
+        return $esito;
+    }
+    update_post_meta($persona_id, '_dci_persona_pubblica_nome', sanitize_text_field($parametri['nome'] ?? ''));
+    update_post_meta($persona_id, '_dci_persona_pubblica_cognome', sanitize_text_field($parametri['cognome'] ?? ''));
+    update_post_meta($persona_id, '_dci_persona_pubblica_competenze', wp_kses_post($parametri['competenze'] ?? ''));
+    update_post_meta($persona_id, '_dci_persona_pubblica_organizzazioni', array_values(array_unique($organizzazioni_valide)));
+    return rest_ensure_response(array('id' => $persona_id, 'aggiornato' => true));
+}
+
 function aversa_appointments_salva_calendario(WP_REST_Request $request) {
     global $wpdb;
     $parametri = $request->get_json_params();
@@ -284,6 +315,11 @@ add_action('rest_api_init', function () {
     register_rest_route(AVERSA_APPOINTMENTS_ROUTE, '/persone-pubbliche/(?P<persona_id>\d+)/organizzazioni', array(
         'methods' => WP_REST_Server::CREATABLE,
         'callback' => 'aversa_appointments_salva_organizzazioni_persona',
+        'permission_callback' => 'aversa_appointments_authorized',
+    ));
+    register_rest_route(AVERSA_APPOINTMENTS_ROUTE, '/persone-pubbliche/(?P<persona_id>\d+)', array(
+        'methods' => WP_REST_Server::CREATABLE,
+        'callback' => 'aversa_appointments_salva_persona_pubblica',
         'permission_callback' => 'aversa_appointments_authorized',
     ));
 });
