@@ -79,10 +79,32 @@ class AssegnazionePersonaleWordPressInline(admin.TabularInline):
     autocomplete_fields = ("unita_organizzativa",)
 
 
+class StatoUtenteDjangoFilter(admin.SimpleListFilter):
+    title = "Utente Django"
+    parameter_name = "utente_django_stato"
+
+    def lookups(self, request, model_admin):
+        return (
+            ("attivo", "Attivo"),
+            ("non_attivo", "Non attivo"),
+            ("non_associato", "Non associato"),
+        )
+
+    def queryset(self, request, queryset):
+        stato = self.value()
+        if stato == "attivo":
+            return queryset.filter(utente__is_active=True)
+        if stato == "non_attivo":
+            return queryset.filter(utente__isnull=False, utente__is_active=False)
+        if stato == "non_associato":
+            return queryset.filter(utente__isnull=True)
+        return queryset
+
+
 @admin.register(PersonaleWordPress)
 class PersonaleWordPressAdmin(admin.ModelAdmin):
     list_display = ("titolo", "cognome", "nome", "competenze_brevi", "attivo", "uffici_assegnati", "utente", "utente_django_attivo", "aggiornato_il")
-    list_filter = ("attivo", "unita_organizzative")
+    list_filter = ("attivo", StatoUtenteDjangoFilter, "unita_organizzative")
     search_fields = ("titolo", "nome", "cognome", "competenze", "utente__username")
     autocomplete_fields = ("utente",)
     list_select_related = ("utente",)
