@@ -73,7 +73,15 @@ def _endpoint(config, name):
     if endpoint:
         return endpoint
     base = config["ENDPOINT"].rsplit("/appuntamenti", 1)[0]
-    return f"{base}/{name.lower().replace('_endpoint', '')}"
+    percorsi = {
+        "ANAGRAFICHE_ENDPOINT": "anagrafiche",
+        "CALENDARI_ENDPOINT": "calendari",
+        "PERSONE_PUBBLICHE_ENDPOINT": "persone-pubbliche",
+    }
+    try:
+        return f"{base}/{percorsi[name]}"
+    except KeyError as exc:
+        raise WordPressConnectorError(f"Endpoint WordPress non riconosciuto: {name}") from exc
 
 
 def _mappatura(item):
