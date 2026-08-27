@@ -1,10 +1,39 @@
+import re
+import unicodedata
+
 from django.contrib import admin, messages
+from django.contrib.auth import get_user_model
 
 from access_control.models import Ufficio
+from accounts.services.directory_admin_service import DirectoryAdminException, DirectoryAdminService
+from audit.services.audit_service import AuditService
 
 from .models import AssegnazionePersonaleWordPress, AppuntamentoWordPress, MappaturaUfficioWordPress, PersonaleWordPress, Prenotazione, SedeWordPress, StatoSincronizzazioneWordPress, UnitaOrganizzativaWordPress
 from .people_linking import collega_persone_pubbliche
 from .wordpress_connector import WordPressConnectorError, pubblica_calendario_wordpress, pubblica_persona_pubblica_wordpress, pubblica_unita_organizzativa_wordpress, sincronizza_anagrafiche_wordpress
+
+
+User = get_user_model()
+
+
+def _username_da_persona_pubblica(nome, cognome, servizio):
+    """Propone iniziale.nome, aggiungendo un numero se necessario."""
+    def normalizza(valore):
+        valore = unicodedata.normalize("NFKD", valore or "").encode("ascii", "ignore").decode("ascii")
+        return re.sub(r"[^a-z0-9]", "", valore.lower())
+
+    nome_normalizzato = normalizza(nome)
+    cognome_normalizzato = normalizza(cognome)
+    if not nome_normalizzato or not cognome_normalizzato:
+        raise DirectoryAdminException("Nome e cognome della persona pubblica sono obbligatori.")
+
+    base = f"{nome_normalizzato[0]}.{cognome_normalizzato}"
+    suffisso = 1
+    while True:
+        username = base if suffisso == 1 else f"{base}{suffisso}"
+        if not User.objects.filter(username__iexact=username).exists() and not servizio.username_esiste(username):
+            return username
+        suffisso += 1
 
 
 @admin.register(Prenotazione)
@@ -201,10 +230,60 @@ class PersonaleWordPressAdmin(admin.ModelAdmin):
     readonly_fields = ("origine_id", "aggiornato_il")
     inlines = (AssegnazionePersonaleWordPressInline,)
     actions = (
+        "crea_utenti_ldap",
         "collega_utenti_django",
         "pubblica_persone_su_wordpress",
         "rimuovi_persone_non_attive_dalle_unita_organizzative",
     )
+
+    @admin.action(description="Crea gli account LDAP disabilitati per le persone selezionate")
+    def crea_utenti_ldap(self, request, queryset):
+        creati = gia_associati = non_attive = errori = 0
+        servizio = DirectoryAdminService()
+
+        for persona in queryset.select_related("utente"):
+            if persona.utente_id:
+                gia_associati += 1
+                continue
+            if not persona.attivo:
+                non_attive += 1
+                continue
+            try:
+                username = _username_da_persona_pubblica(persona.nome, persona.cognome, servizio)
+                servizio.crea_utente(
+                    username=username,
+                    first_name=persona.nome,
+                    last_name=persona.cognome,
+                    email="",
+                    personal_email="",
+                    mobile="",
+                )
+                utente = User(username=username, first_name=persona.nome, last_name=persona.cognome, is_active=False)
+                utente.set_unusable_password()
+                utente.save()
+                persona.utente = utente
+                persona.save(update_fields=["utente"])
+                AuditService.log(
+                    user=request.user,
+                    tipo="CREATE",
+                    oggetto=f"ActiveDirectory:{username}",
+                    descrizione=f"Creato account LDAP disabilitato dalla persona pubblica {persona}.",
+                    ip_address=request.META.get("REMOTE_ADDR"),
+                )
+            except Exception as exc:
+                errori += 1
+                self.message_user(request, f"{persona}: {exc}", messages.ERROR)
+            else:
+                creati += 1
+
+        livello = messages.WARNING if errori else messages.SUCCESS
+        self.message_user(
+            request,
+            "Account LDAP creati e collegati: %s; già associati: %s; persone non attive saltate: %s; errori: %s. "
+            "I nuovi account sono disabilitati e privi di password: completare anagrafica e recapiti, impostare la password e abilitarli dalla Gestione account."
+            % (creati, gia_associati, non_attive, errori),
+            livello,
+        )
 
     @admin.action(description="Collega automaticamente agli utenti Django corrispondenti")
     def collega_utenti_django(self, request, queryset):

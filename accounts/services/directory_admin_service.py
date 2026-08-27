@@ -262,7 +262,7 @@ class DirectoryAdminService(ActiveDirectoryService):
         finally:
             conn.unbind()
 
-    def crea_utente(self, username, first_name, last_name, email, personal_email, mobile, password, upn_domain=None):
+    def crea_utente(self, username, first_name, last_name, email, personal_email, mobile, password=None, upn_domain=None):
         self._require_writes()
         if not settings.DIRECTORY.get("USE_SSL", False):
             raise DirectoryAdminException("La creazione con password richiede LDAPS.")
@@ -289,14 +289,15 @@ class DirectoryAdminService(ActiveDirectoryService):
             if mobile.strip(): attributes["mobile"] = mobile.strip()
             if not conn.add(dn, ["top", "person", "organizationalPerson", "user"], attributes):
                 self._ok(conn, "Creazione utente")
-            # unicodePwd non si può valorizzare con LDAP Add: AD richiede una
-            # modifica separata su canale LDAPS/TLS.
-            conn.modify(dn, {
-                "unicodePwd": [(MODIFY_REPLACE, [('"%s"' % password).encode("utf-16-le")])],
-                "pwdLastSet": [(MODIFY_REPLACE, ["0"])],
-                "userAccountControl": [(MODIFY_REPLACE, ["512"])],
-            })
-            self._ok(conn, "Impostazione password e attivazione account")
+            if password:
+                # unicodePwd non si può valorizzare con LDAP Add: AD richiede una
+                # modifica separata su canale LDAPS/TLS.
+                conn.modify(dn, {
+                    "unicodePwd": [(MODIFY_REPLACE, [('"%s"' % password).encode("utf-16-le")])],
+                    "pwdLastSet": [(MODIFY_REPLACE, ["0"])],
+                    "userAccountControl": [(MODIFY_REPLACE, ["512"])],
+                })
+                self._ok(conn, "Impostazione password e attivazione account")
             return dn
         finally:
             conn.unbind()
