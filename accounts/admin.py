@@ -1,7 +1,9 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin
 
 from .models import CustomUser
+from prenotazioni.models import PersonaleWordPress
+from prenotazioni.wordpress_connector import WordPressConnectorError, crea_persona_pubblica_wordpress
 
 
 @admin.register(CustomUser)
@@ -61,6 +63,7 @@ class CustomUserAdmin(UserAdmin):
         "imposta_sportellisti",
         "imposta_tecnici",
         "imposta_disuso",
+        "crea_persone_pubbliche_wordpress",
     )
 
     @admin.action(
@@ -93,4 +96,25 @@ class CustomUserAdmin(UserAdmin):
     def imposta_disuso(self, request, queryset):
         queryset.update(
             tipo_attivita=CustomUser.TipoAttivita.DISUSO,
+        )
+
+    @admin.action(description="Crea le Persone pubbliche selezionate su WordPress")
+    def crea_persone_pubbliche_wordpress(self, request, queryset):
+        creati = gia_collegati = errori = 0
+        for utente in queryset.prefetch_related("groups__gruppi_organizzativi"):
+            if PersonaleWordPress.objects.filter(utente=utente).exists():
+                gia_collegati += 1
+                continue
+            try:
+                crea_persona_pubblica_wordpress(utente)
+            except WordPressConnectorError as exc:
+                errori += 1
+                self.message_user(request, f"{utente.username}: {exc}", messages.ERROR)
+            else:
+                creati += 1
+        livello = messages.WARNING if errori else messages.SUCCESS
+        self.message_user(
+            request,
+            f"Create: {creati}; già collegate: {gia_collegati}; errori: {errori}.",
+            livello,
         )

@@ -13,7 +13,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from access_control.models import CalendarioApertura
+from access_control.models import CalendarioApertura, GruppoOrganizzativo
 
 from .models import AppuntamentoWordPress, AssegnazionePersonaleWordPress, MappaturaUfficioWordPress, PersonaleWordPress, SedeWordPress, StatoSincronizzazioneWordPress, UnitaOrganizzativaWordPress
 
@@ -344,3 +344,51 @@ def crea_unita_organizzativa_wordpress(ufficio):
         },
     )
     return unita
+
+
+def crea_persona_pubblica_wordpress(utente):
+    """Crea e collega a WordPress la Persona pubblica dell'utente Django."""
+    if PersonaleWordPress.objects.filter(utente=utente).exists():
+        raise WordPressConnectorError(f"L'utente {utente.username} è già collegato a una Persona pubblica.")
+    config = settings.WORDPRESS_APPOINTMENTS
+    if not config["ENABLED"] or not config["SHARED_SECRET"]:
+        raise WordPressConnectorError("Connettore WordPress non abilitato o chiave non configurata.")
+    unita = UnitaOrganizzativaWordPress.objects.filter(
+        ufficio__gruppi__django_group__user=utente,
+        ufficio__gruppi__tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
+    ).distinct()
+    nome = utente.first_name.strip()
+    cognome = utente.last_name.strip()
+    titolo = " ".join(item for item in (nome, cognome) if item) or utente.username
+    response = _request(
+        _endpoint(config, "PERSONE_PUBBLICHE_ENDPOINT"),
+        config["SHARED_SECRET"],
+        config["TIMEOUT"],
+        method="POST",
+        payload={
+            "titolo": titolo,
+            "nome": nome,
+            "cognome": cognome,
+            "competenze": "",
+            "attivo": utente.is_active,
+            "organizzazioni": list(unita.values_list("origine_id", flat=True)),
+        },
+    )
+    origine_id = response.get("id") if isinstance(response, dict) else None
+    if not origine_id:
+        raise WordPressConnectorError("WordPress non ha restituito l'identificativo della Persona pubblica.")
+    persona = PersonaleWordPress.objects.create(
+        origine_id=str(origine_id),
+        titolo=response.get("titolo") or titolo,
+        nome=response.get("nome") or nome,
+        cognome=response.get("cognome") or cognome,
+        competenze="",
+        attivo=bool(response.get("attivo", utente.is_active)),
+        utente=utente,
+    )
+    for unita_organizzativa in unita:
+        AssegnazionePersonaleWordPress.objects.get_or_create(
+            personale=persona,
+            unita_organizzativa=unita_organizzativa,
+        )
+    return persona
