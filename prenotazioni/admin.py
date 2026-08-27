@@ -1,4 +1,5 @@
 import re
+import secrets
 import unicodedata
 
 from django.contrib import admin, messages
@@ -34,6 +35,19 @@ def _username_da_persona_pubblica(nome, cognome, servizio):
         if not User.objects.filter(username__iexact=username).exists() and not servizio.username_esiste(username):
             return username
         suffisso += 1
+
+
+def _password_provvisoria():
+    gruppi = (
+        "ABCDEFGHJKLMNPQRSTUVWXYZ",
+        "abcdefghijkmnopqrstuvwxyz",
+        "23456789",
+        "!@#$%",
+    )
+    caratteri = [secrets.choice(gruppo) for gruppo in gruppi]
+    caratteri.extend(secrets.choice("".join(gruppi)) for _ in range(12))
+    secrets.SystemRandom().shuffle(caratteri)
+    return "".join(caratteri)
 
 
 @admin.register(Prenotazione)
@@ -236,7 +250,7 @@ class PersonaleWordPressAdmin(admin.ModelAdmin):
         "rimuovi_persone_non_attive_dalle_unita_organizzative",
     )
 
-    @admin.action(description="Crea gli account LDAP disabilitati per le persone selezionate")
+    @admin.action(description="Crea gli account LDAP per le persone selezionate")
     def crea_utenti_ldap(self, request, queryset):
         creati = gia_associati = non_attive = errori = 0
         servizio = DirectoryAdminService()
@@ -257,8 +271,9 @@ class PersonaleWordPressAdmin(admin.ModelAdmin):
                     email="",
                     personal_email="",
                     mobile="",
+                    password=_password_provvisoria(),
                 )
-                utente = User(username=username, first_name=persona.nome, last_name=persona.cognome, is_active=False)
+                utente = User(username=username, first_name=persona.nome, last_name=persona.cognome, is_active=True)
                 utente.set_unusable_password()
                 utente.save()
                 persona.utente = utente
@@ -267,7 +282,7 @@ class PersonaleWordPressAdmin(admin.ModelAdmin):
                     user=request.user,
                     tipo="CREATE",
                     oggetto=f"ActiveDirectory:{username}",
-                    descrizione=f"Creato account LDAP disabilitato dalla persona pubblica {persona}.",
+                    descrizione=f"Creato account LDAP attivo dalla persona pubblica {persona}.",
                     ip_address=request.META.get("REMOTE_ADDR"),
                 )
             except Exception as exc:
@@ -280,7 +295,7 @@ class PersonaleWordPressAdmin(admin.ModelAdmin):
         self.message_user(
             request,
             "Account LDAP creati e collegati: %s; già associati: %s; persone non attive saltate: %s; errori: %s. "
-            "I nuovi account sono disabilitati e privi di password: completare anagrafica e recapiti, impostare la password e abilitarli dalla Gestione account."
+            "I nuovi account sono attivi e hanno una password provvisoria casuale con cambio obbligatorio: completare i recapiti e usare Reimposta password per inviarne una all'utente."
             % (creati, gia_associati, non_attive, errori),
             livello,
         )
