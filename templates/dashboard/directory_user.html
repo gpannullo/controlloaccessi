@@ -83,7 +83,29 @@
 
     <section class="tab-pane fade" id="gruppi" role="tabpanel" aria-labelledby="gruppi-tab"><div class="card"><div class="card-body"><h2 class="h5">Gruppi AD aggiuntivi</h2><p class="text-muted">Qui puoi aggiungere gruppi AD non gestiti automaticamente da uffici o dalla mail istituzionale.</p><form method="post" action="{% url 'dashboard:directory_action' utente.pk %}" class="row g-2 align-items-end mb-4">{% csrf_token %}<input type="hidden" name="azione" value="aggiungi_gruppo_ad"><div class="col-md"><label class="form-label" for="gruppo_ad">Gruppo AD</label><select class="form-select" id="gruppo_ad" name="gruppo_ad"><option value="">Seleziona un gruppo</option>{% for gruppo in gruppi_ad_disponibili %}<option value="{{ gruppo }}">{{ gruppo }}</option>{% endfor %}</select></div><div class="col-md-auto"><button class="btn btn-danger">Aggiungi gruppo</button></div></form><h3 class="h6">Appartenenze attuali</h3><div class="row row-cols-1 row-cols-md-3 g-2">{% for gruppo in dettaglio.groups %}<div class="col"><div class="border rounded px-2 py-1">{{ gruppo }}</div></div>{% empty %}<p class="text-muted mb-0">Nessun gruppo AD associato.</p>{% endfor %}</div></div></div></section>
 
-    {% if persone_pubbliche %}<section class="tab-pane fade" id="persone-pubbliche" role="tabpanel" aria-labelledby="persone-pubbliche-tab"><div class="card"><div class="card-body"><h2 class="h5">Persona pubblica</h2>{% for persona in persone_pubbliche %}<div class="border rounded p-3 {% if not forloop.last %}mb-2{% endif %}"><div class="d-flex justify-content-between align-items-start gap-2"><div><strong>{{ persona }}</strong>{% if persona.titolo %}<div class="text-muted">{{ persona.titolo }}</div>{% endif %}</div>{% if persona.attivo %}<span class="badge text-bg-success">Attiva</span>{% else %}<span class="badge text-bg-secondary">Non attiva</span>{% endif %}</div><div class="small mt-2"><strong>Uffici WordPress:</strong> {% for unita in persona.unita_organizzative.all %}{{ unita.nome }}{% if not forloop.last %}, {% endif %}{% empty %}nessuno{% endfor %}</div></div>{% endfor %}</div></div></section>{% endif %}
+    {% if persone_pubbliche %}
+    <section class="tab-pane fade" id="persone-pubbliche" role="tabpanel" aria-labelledby="persone-pubbliche-tab">
+      <div class="card"><div class="card-body">
+        <h2 class="h5">Persona pubblica</h2>
+        {% for persona in persone_pubbliche %}
+          <div class="border rounded p-3 {% if not forloop.last %}mb-2{% endif %}">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <div><strong>{{ persona }}</strong>{% if persona.titolo %}<div class="text-muted">{{ persona.titolo }}</div>{% endif %}</div>
+              {% if persona.attivo %}<span class="badge text-bg-success">Attiva</span>{% else %}<span class="badge text-bg-secondary">Non attiva</span>{% endif %}
+            </div>
+            <div class="small mt-3"><strong>Uffici WordPress associati</strong></div>
+            <div class="mt-2">
+              {% for unita in persona.unita_organizzative.all %}
+                <div class="border rounded p-2 mb-2"><strong>{{ unita.nome }}</strong></div>
+              {% empty %}
+                <p class="text-muted mb-0">Nessun ufficio WordPress associato.</p>
+              {% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+      </div></div>
+    </section>
+    {% endif %}
   </div>
   {% endif %}
 </div>
