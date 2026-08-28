@@ -120,7 +120,16 @@ class DirectoryAdministrationAccessMixin(ModuleAccessMixin):
 
     @classmethod
     def has_module_access(cls, user):
-        return bool(user.is_authenticated and user.is_superuser)
+        if not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+        return bool(
+            user.is_staff
+            and user.groups.filter(
+                name__iexact=settings.DIRECTORY["ADMINISTRATION_GROUP"],
+            ).exists()
+        )
 
 
 class AdminModuleAccessMiddleware:

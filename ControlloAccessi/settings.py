@@ -211,6 +211,7 @@ DIRECTORY = {
         ).split(",")
         if item.strip()
     ],
+    "ADMINISTRATION_GROUP": os.getenv("AD_ADMINISTRATION_GROUP", "Personale"),
     "GIUNTA_GROUP": "ASSESSORE",
     "CONSIGLIERI_GROUP": "CONSIGLIERE",
 }
