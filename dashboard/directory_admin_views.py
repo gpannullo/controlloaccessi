@@ -16,9 +16,21 @@ from access_control.models import GruppoOrganizzativo, Ufficio
 from audit.services.audit_service import AuditService
 from dashboard.permissions import directory_admin_required
 from prenotazioni.models import PersonaleWordPress, UnitaOrganizzativaWordPress
-from prenotazioni.wordpress_connector import WordPressConnectorError, crea_unita_organizzativa_wordpress
+from prenotazioni.wordpress_connector import (
+    WordPressConnectorError,
+    crea_unita_organizzativa_wordpress,
+    pubblica_persona_pubblica_wordpress,
+)
 
 User = get_user_model()
+
+
+def _unita_wordpress_attese_per_utente(utente):
+    """Unità WordPress che devono seguire gli uffici locali dell'utente."""
+    return UnitaOrganizzativaWordPress.objects.filter(
+        ufficio__gruppi__django_group__user=utente,
+        ufficio__gruppi__tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
+    ).distinct()
 
 
 def _username_base(first_name, last_name):
@@ -343,6 +355,23 @@ def directory_user(request, pk):
     persone_pubbliche = PersonaleWordPress.objects.filter(
         utente=utente,
     ).prefetch_related("unita_organizzative").order_by("cognome", "nome", "titolo")
+    unita_attese = list(_unita_wordpress_attese_per_utente(utente))
+    unita_attese_ids = {unita.pk for unita in unita_attese}
+    for persona in persone_pubbliche:
+        unita_attuali = list(persona.unita_organizzative.all())
+        persona.unita_mancanti = [
+            unita for unita in unita_attese if unita.pk not in {item.pk for item in unita_attuali}
+        ]
+        persona.unita_in_eccesso = [
+            unita for unita in unita_attuali if unita.pk not in unita_attese_ids
+        ]
+        persona.uffici_disallineati = bool(persona.unita_mancanti or persona.unita_in_eccesso)
+    for assegnazione in uffici_associati:
+        unita = assegnazione.unita_organizzativa_wordpress
+        assegnazione.persone_pubbliche_mancanti = [
+            persona for persona in persone_pubbliche
+            if unita and unita in persona.unita_mancanti
+        ]
     dettaglio = None
     gruppi_ad_disponibili = []
     dominio_istituzionale = ""
@@ -489,6 +518,16 @@ def directory_action(request, pk):
                 raise DirectoryAdminException("L'ufficio %s è già collegato all'unità organizzativa WordPress %s." % (ufficio, esistente.nome))
             unita = crea_unita_organizzativa_wordpress(ufficio)
             messaggio_successo = "Creata l'unità organizzativa %s su WordPress e collegata all'ufficio %s." % (unita.nome, ufficio.nome)
+        elif azione == "allinea_uffici_persona_pubblica":
+            persona = get_object_or_404(
+                PersonaleWordPress.objects.prefetch_related("unita_organizzative"),
+                pk=request.POST.get("persona_pubblica"),
+                utente=utente,
+            )
+            unita_attese = _unita_wordpress_attese_per_utente(utente)
+            persona.unita_organizzative.set(unita_attese)
+            pubblica_persona_pubblica_wordpress(persona)
+            messaggio_successo = "Uffici della persona pubblica %s allineati con gli uffici dell'account e aggiornati su WordPress." % persona
         elif azione == "aggiungi_gruppo_ad":
             nome_gruppo = request.POST.get("gruppo_ad", "").strip()
             if not nome_gruppo:

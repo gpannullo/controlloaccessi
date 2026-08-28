@@ -71,9 +71,10 @@
         </form>
         {% for assegnazione in uffici_associati %}
           <div class="border rounded p-2 mb-2 d-flex justify-content-between align-items-center gap-2">
-            <div><strong>{{ assegnazione.ufficio.nome }}</strong><br><small class="text-muted">Gruppo operativo: {{ assegnazione.directory_name }}</small>{% if assegnazione.unita_organizzativa_wordpress %}<br><small class="text-success">Unità organizzativa WordPress: {{ assegnazione.unita_organizzativa_wordpress.nome }}</small>{% else %}<br><small class="text-warning-emphasis">Nessuna unità organizzativa WordPress collegata.</small>{% endif %}</div>
+            <div><strong>{{ assegnazione.ufficio.nome }}</strong><br><small class="text-muted">Gruppo operativo: {{ assegnazione.directory_name }}</small>{% if assegnazione.unita_organizzativa_wordpress %}<br><small class="text-success">Unità organizzativa WordPress: {{ assegnazione.unita_organizzativa_wordpress.nome }}</small>{% if persone_pubbliche %}{% if assegnazione.persone_pubbliche_mancanti %}<br><small class="text-warning-emphasis">Manca nell’associazione WordPress di: {% for persona in assegnazione.persone_pubbliche_mancanti %}{{ persona }}{% if not forloop.last %}, {% endif %}{% endfor %}.</small>{% else %}<br><small class="text-success">Allineato con la persona pubblica.</small>{% endif %}{% endif %}{% else %}<br><small class="text-warning-emphasis">Nessuna unità organizzativa WordPress collegata.</small>{% endif %}</div>
             <div class="d-flex gap-2 flex-wrap">
               {% if not assegnazione.unita_organizzativa_wordpress %}<form method="post" action="{% url 'dashboard:directory_action' utente.pk %}" onsubmit="return confirm('Creare su WordPress l’unità organizzativa {{ assegnazione.ufficio.nome }}?');">{% csrf_token %}<input type="hidden" name="azione" value="crea_unita_organizzativa"><input type="hidden" name="ufficio" value="{{ assegnazione.ufficio_id }}"><button class="btn btn-sm btn-outline-success">Crea unità organizzativa</button></form>{% endif %}
+              {% for persona in assegnazione.persone_pubbliche_mancanti %}<form method="post" action="{% url 'dashboard:directory_action' utente.pk %}" onsubmit="return confirm('Allineare tutti gli uffici di {{ persona }} con quelli dell’account?');">{% csrf_token %}<input type="hidden" name="azione" value="allinea_uffici_persona_pubblica"><input type="hidden" name="persona_pubblica" value="{{ persona.pk }}"><button class="btn btn-sm btn-outline-warning">Allinea {{ persona }}</button></form>{% endfor %}
               <form method="post" action="{% url 'dashboard:directory_action' utente.pk %}" onsubmit="return confirm('Vuoi rimuovere l’ufficio {{ assegnazione.ufficio.nome }} dall’account?');">{% csrf_token %}<input type="hidden" name="azione" value="rimuovi_ufficio"><input type="hidden" name="gruppo_organizzativo" value="{{ assegnazione.pk }}"><button class="btn btn-sm btn-outline-danger">Rimuovi</button></form>
             </div>
           </div>
@@ -93,10 +94,20 @@
               <div><strong>{{ persona }}</strong>{% if persona.titolo %}<div class="text-muted">{{ persona.titolo }}</div>{% endif %}</div>
               {% if persona.attivo %}<span class="badge text-bg-success">Attiva</span>{% else %}<span class="badge text-bg-secondary">Non attiva</span>{% endif %}
             </div>
+            {% if persona.uffici_disallineati %}
+              <div class="alert alert-warning py-2 mt-3 mb-0">
+                <strong>Uffici non allineati con l’account.</strong>
+                {% if persona.unita_mancanti %}<div class="small">Da aggiungere: {% for unita in persona.unita_mancanti %}{{ unita.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}.</div>{% endif %}
+                {% if persona.unita_in_eccesso %}<div class="small">Da rimuovere: {% for unita in persona.unita_in_eccesso %}{{ unita.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}.</div>{% endif %}
+                <form method="post" action="{% url 'dashboard:directory_action' utente.pk %}" class="mt-2" onsubmit="return confirm('Allineare gli uffici WordPress di {{ persona }} con quelli dell’account?');">{% csrf_token %}<input type="hidden" name="azione" value="allinea_uffici_persona_pubblica"><input type="hidden" name="persona_pubblica" value="{{ persona.pk }}"><button class="btn btn-sm btn-warning">Allinea uffici</button></form>
+              </div>
+            {% else %}
+              <div class="small text-success mt-3">Uffici WordPress allineati con l’account.</div>
+            {% endif %}
             <div class="small mt-3"><strong>Uffici WordPress associati</strong></div>
             <div class="mt-2">
               {% for unita in persona.unita_organizzative.all %}
-                <div class="border rounded p-2 mb-2"><strong>{{ unita.nome }}</strong></div>
+                <div class="border rounded p-2 mb-2 {% if unita in persona.unita_in_eccesso %}border-warning{% endif %}"><strong>{{ unita.nome }}</strong>{% if unita in persona.unita_in_eccesso %}<small class="text-warning-emphasis d-block">Non associato a un ufficio dell’account.</small>{% endif %}</div>
               {% empty %}
                 <p class="text-muted mb-0">Nessun ufficio WordPress associato.</p>
               {% endfor %}
