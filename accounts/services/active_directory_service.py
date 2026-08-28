@@ -21,6 +21,7 @@ class ActiveDirectoryService(DirectoryService):
         "mail",
         "otherMailbox",
         "mobile",
+        "employeeID",
         "memberOf",
         "userAccountControl",
         "msDS-UserPasswordExpiryTimeComputed",
@@ -243,6 +244,7 @@ class ActiveDirectoryService(DirectoryService):
 
                 "personal_email": entry.otherMailbox.values[0] if hasattr(entry, "otherMailbox") and entry.otherMailbox.values else "",
                 "mobile": str(entry.mobile) if entry.mobile else "",
+                "badge": str(entry.employeeID.value or "") if getattr(entry, "employeeID", None) else "",
 
                 "groups": member_of,
 

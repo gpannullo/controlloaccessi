@@ -26,6 +26,7 @@ class UserSyncService:
                     "password_senza_scadenza": u.get("password_never_expires", False),
                     "email_personale": u.get("personal_email", ""),
                     "cellulare_personale": u.get("mobile", ""),
+                    "badge": u.get("badge") or None,
                 }
             )
 

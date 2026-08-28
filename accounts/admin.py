@@ -1,6 +1,8 @@
 from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin
 
+from accounts.services.directory_admin_service import DirectoryAdminService
+
 from .models import CustomUser
 from prenotazioni.models import PersonaleWordPress
 from prenotazioni.wordpress_connector import WordPressConnectorError, crea_persona_pubblica_wordpress
@@ -33,6 +35,9 @@ class CustomUserAdmin(UserAdmin):
         "date_joined",
         "presenza_verificata_il",
         "presenza_fonte",
+        "ultima_timbratura_il",
+        "ultima_timbratura_verso",
+        "ultima_timbratura_causale",
     )
 
     fieldsets = UserAdmin.fieldsets + (
@@ -45,6 +50,9 @@ class CustomUserAdmin(UserAdmin):
                     "stato_presenza",
                     "presenza_verificata_il",
                     "presenza_fonte",
+                    "ultima_timbratura_il",
+                    "ultima_timbratura_verso",
+                    "ultima_timbratura_causale",
                 )
             },
         ),
@@ -70,6 +78,11 @@ class CustomUserAdmin(UserAdmin):
         "imposta_disuso",
         "crea_persone_pubbliche_wordpress",
     )
+
+    def save_model(self, request, obj, form, change):
+        if change and "badge" in form.changed_data:
+            DirectoryAdminService().imposta_badge(obj.username, obj.badge)
+        super().save_model(request, obj, form, change)
 
     @admin.action(
         description="Imposta come Amministrativista",

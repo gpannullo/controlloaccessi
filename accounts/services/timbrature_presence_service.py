@@ -136,7 +136,11 @@ class TimbraturePresenceService:
         timbrature = self.analizza(contenuto)
         oggi = timezone.localdate()
         ultima_per_badge = {}
+        ultima_storica_per_badge = {}
         for timbratura in timbrature:
+            precedente_storica = ultima_storica_per_badge.get(timbratura.badge)
+            if precedente_storica is None or timbratura.rilevata_il > precedente_storica.rilevata_il:
+                ultima_storica_per_badge[timbratura.badge] = timbratura
             if timbratura.rilevata_il.date() != oggi:
                 continue
             precedente = ultima_per_badge.get(timbratura.badge)
@@ -151,6 +155,7 @@ class TimbraturePresenceService:
         aggiornati = presenti = assenti = 0
         for utente in utenti:
             timbratura = ultima_per_badge.get(utente.badge)
+            ultima_timbratura = ultima_storica_per_badge.get(utente.badge)
             stato = User.StatoPresenza.PRESENTE if timbratura and timbratura.verso == "I" else User.StatoPresenza.ASSENTE
             if stato == User.StatoPresenza.PRESENTE:
                 presenti += 1
@@ -159,12 +164,26 @@ class TimbraturePresenceService:
             utente.stato_presenza = stato
             utente.presenza_verificata_il = adesso
             utente.presenza_fonte = self.fonte
+            utente.ultima_timbratura_il = (
+                timezone.make_aware(ultima_timbratura.rilevata_il, timezone.get_current_timezone())
+                if ultima_timbratura
+                else None
+            )
+            utente.ultima_timbratura_verso = ultima_timbratura.verso if ultima_timbratura else ""
+            utente.ultima_timbratura_causale = ultima_timbratura.causale if ultima_timbratura else ""
             aggiornati += 1
 
         if utenti:
             User.objects.bulk_update(
                 utenti,
-                ["stato_presenza", "presenza_verificata_il", "presenza_fonte"],
+                [
+                    "stato_presenza",
+                    "presenza_verificata_il",
+                    "presenza_fonte",
+                    "ultima_timbratura_il",
+                    "ultima_timbratura_verso",
+                    "ultima_timbratura_causale",
+                ],
             )
 
         return RisultatoImportazioneTimbrature(

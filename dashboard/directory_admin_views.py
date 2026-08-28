@@ -385,6 +385,11 @@ def directory_action(request, pk):
             first_name = request.POST.get("first_name", "").strip()
             last_name = request.POST.get("last_name", "").strip()
             personal_email = request.POST.get("personal_email", "").strip()
+            badge = request.POST.get("badge", "").strip()
+            if badge and (not badge.isdigit() or len(badge) != 10):
+                raise DirectoryAdminException("Il badge deve essere composto da 10 cifre.")
+            if badge and User.objects.exclude(pk=utente.pk).filter(badge=badge).exists():
+                raise DirectoryAdminException("Il badge è già assegnato a un altro utente.")
             service.aggiorna_anagrafica(
                 utente.username,
                 first_name,
@@ -402,8 +407,14 @@ def directory_action(request, pk):
                 utente.groups.add(gruppo_mdaemon)
             else:
                 utente.groups.remove(gruppo_mdaemon)
-            User.objects.filter(pk=utente.pk).update(first_name=first_name, last_name=last_name, email=email_istituzionale or personal_email)
-            messaggio_successo = "Anagrafica e impostazioni della mail istituzionale aggiornate."
+            service.imposta_badge(utente.username, badge)
+            User.objects.filter(pk=utente.pk).update(
+                first_name=first_name,
+                last_name=last_name,
+                email=email_istituzionale or personal_email,
+                badge=badge or None,
+            )
+            messaggio_successo = "Anagrafica, badge e impostazioni della mail istituzionale aggiornati."
         elif azione == "stato":
             service.imposta_attivo(utente.username, request.POST.get("attivo") == "true")
         elif azione == "password":

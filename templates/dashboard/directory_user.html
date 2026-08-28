@@ -19,6 +19,7 @@
   {% if dettaglio %}
   <ul class="nav nav-tabs mb-3" id="utente-tabs" role="tablist">
     <li class="nav-item" role="presentation"><button class="nav-link active" id="anagrafica-tab" data-bs-toggle="tab" data-bs-target="#anagrafica" type="button" role="tab">Anagrafica</button></li>
+    {% if dettaglio.badge or utente.badge %}<li class="nav-item" role="presentation"><button class="nav-link" id="presenza-tab" data-bs-toggle="tab" data-bs-target="#presenza" type="button" role="tab">Presenza</button></li>{% endif %}
     <li class="nav-item" role="presentation"><button class="nav-link" id="uffici-tab" data-bs-toggle="tab" data-bs-target="#uffici" type="button" role="tab">Uffici</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" id="gruppi-tab" data-bs-toggle="tab" data-bs-target="#gruppi" type="button" role="tab">Gruppi AD</button></li>
     {% if persone_pubbliche %}<li class="nav-item" role="presentation"><button class="nav-link" id="persone-pubbliche-tab" data-bs-toggle="tab" data-bs-target="#persone-pubbliche" type="button" role="tab">Persona pubblica</button></li>{% endif %}
@@ -35,6 +36,7 @@
             <label class="form-label" for="last_name">Cognome</label><input id="last_name" class="form-control mb-2" name="last_name" value="{{ dettaglio.last_name }}">
             <label class="form-label" for="personal_email">E-mail personale</label><input id="personal_email" type="email" class="form-control mb-2" name="personal_email" value="{{ dettaglio.personal_email }}">
             <label class="form-label" for="mobile">Cellulare</label><input id="mobile" type="tel" class="form-control mb-3" name="mobile" value="{{ dettaglio.mobile }}">
+            <label class="form-label" for="badge">Badge presenze</label><input id="badge" type="text" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" class="form-control mb-1" name="badge" value="{{ dettaglio.badge|default:utente.badge }}"><div class="form-text mb-3">Codice di 10 cifre, salvato anche nell'attributo LDAP employeeID.</div>
             <hr>
             <div class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" role="switch" id="mail_istituzionale" name="mail_istituzionale" {% if 'MDAEMON' in dettaglio.groups %}checked{% endif %}><label class="form-check-label" for="mail_istituzionale">Mail istituzionale</label></div>
             <div id="mail-istituzionale-campi"><label class="form-label" for="dominio_istituzionale">Dominio e-mail istituzionale</label><select class="form-select mb-1" id="dominio_istituzionale" name="dominio_istituzionale">{% for dominio in domini_istituzionali %}<option value="{{ dominio }}" {% if dominio == dominio_istituzionale %}selected{% endif %}>@{{ dominio }}</option>{% endfor %}</select><div class="form-text mb-3">Indirizzo previsto: <span id="indirizzo-istituzionale">{{ utente.username }}{% if dominio_istituzionale %}@{{ dominio_istituzionale }}{% endif %}</span>. L'attivazione aggiunge il gruppo MDAEMON.</div></div>
@@ -44,6 +46,20 @@
         <div class="col-lg-5"><div class="d-grid gap-3"><div class="card"><div class="card-body"><h2 class="h5">Gestione account</h2><p class="text-muted">La nuova password provvisoria verrà inviata a <strong>{{ dettaglio.personal_email|default:"nessuna e-mail personale" }}</strong> e dovrà essere cambiata al primo accesso.</p>{% if not dettaglio.personal_email %}<p class="small text-danger">Inserisci prima un’e-mail personale per poter reimpostare la password.</p>{% endif %}<div class="d-flex gap-2 flex-wrap"><form method="post" action="{% url 'dashboard:directory_action' utente.pk %}" {% if dettaglio.active %}onsubmit="return confirm('Sei sicuro di voler disattivare questo account? L’utente non potrà più accedere.');"{% endif %}>{% csrf_token %}<input type="hidden" name="azione" value="stato"><input type="hidden" name="attivo" value="{% if dettaglio.active %}false{% else %}true{% endif %}"><button class="btn btn-outline-danger">{% if dettaglio.active %}Disattiva account{% else %}Attiva account{% endif %}</button></form><form method="post" action="{% url 'dashboard:directory_action' utente.pk %}" onsubmit="return confirm('Vuoi reimpostare la password e inviarla all’e-mail personale dell’utente?');">{% csrf_token %}<input type="hidden" name="azione" value="password"><button class="btn btn-danger" {% if not dettaglio.personal_email %}disabled aria-disabled="true"{% endif %}>Reimposta password</button></form></div></div></div><div class="card"><div class="card-body"><h2 class="h5">Abilitazioni di accesso</h2><div class="d-flex justify-content-between align-items-center gap-2 border-bottom pb-3 mb-3"><strong>Desktop remoto</strong><form method="post" action="{% url 'dashboard:directory_action' utente.pk %}">{% csrf_token %}<input type="hidden" name="azione" value="accesso_remoto"><input type="hidden" name="abilita" value="{% if 'ACCESSO-RDP' in dettaglio.groups %}false{% else %}true{% endif %}"><button class="btn btn-sm {% if 'ACCESSO-RDP' in dettaglio.groups %}btn-outline-danger{% else %}btn-danger{% endif %}">{% if 'ACCESSO-RDP' in dettaglio.groups %}Disabilita{% else %}Abilita{% endif %}</button></form></div><div class="d-flex justify-content-between align-items-center gap-2"><strong>Accesso Remoto (VPN)</strong><form method="post" action="{% url 'dashboard:directory_action' utente.pk %}">{% csrf_token %}<input type="hidden" name="azione" value="smartworking"><input type="hidden" name="abilita" value="{% if 'VPN_COMMON_RULES' in dettaglio.groups %}false{% else %}true{% endif %}"><button class="btn btn-sm {% if 'VPN_COMMON_RULES' in dettaglio.groups %}btn-outline-danger{% else %}btn-danger{% endif %}">{% if 'VPN_COMMON_RULES' in dettaglio.groups %}Disabilita{% else %}Abilita{% endif %}</button></form></div></div></div></div>
       </div>
     </section>
+
+    {% if dettaglio.badge or utente.badge %}
+    <section class="tab-pane fade" id="presenza" role="tabpanel" aria-labelledby="presenza-tab">
+      <div class="card"><div class="card-body">
+        <h2 class="h5">Presenza</h2>
+        <dl class="row mb-0">
+          <dt class="col-sm-4">Badge</dt><dd class="col-sm-8">{{ dettaglio.badge|default:utente.badge }}</dd>
+          <dt class="col-sm-4">Stato attuale</dt><dd class="col-sm-8">{% if utente.stato_presenza == 'PRE' %}<span class="badge text-bg-success">Presente</span>{% elif utente.stato_presenza == 'ASS' %}<span class="badge text-bg-danger">Non presente</span>{% else %}<span class="badge text-bg-secondary">Non verificata</span>{% endif %}</dd>
+          <dt class="col-sm-4">Ultimo controllo</dt><dd class="col-sm-8">{{ utente.presenza_verificata_il|date:"d/m/Y H:i"|default:"—" }}</dd>
+          <dt class="col-sm-4">Ultimo record letto</dt><dd class="col-sm-8">{% if utente.ultima_timbratura_il %}{{ utente.ultima_timbratura_il|date:"d/m/Y H:i" }} — {% if utente.ultima_timbratura_verso == 'I' %}Entrata{% else %}Uscita{% endif %} (causale {{ utente.ultima_timbratura_causale }}){% else %}—{% endif %}</dd>
+        </dl>
+      </div></div>
+    </section>
+    {% endif %}
 
     <section class="tab-pane fade" id="uffici" role="tabpanel" aria-labelledby="uffici-tab">
       <div class="card"><div class="card-body">

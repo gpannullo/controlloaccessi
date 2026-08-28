@@ -51,6 +51,7 @@ class DirectoryAdminService(ActiveDirectoryService):
                 "email": str(entry.mail or ""),
                 "personal_email": other_mailbox.values[0] if other_mailbox and other_mailbox.values else "",
                 "mobile": str(entry.mobile or ""),
+                "badge": str(entry.employeeID.value or "") if getattr(entry, "employeeID", None) else "",
                 "active": not bool(uac & 2),
                 "password_expiry": scadenza_password,
                 "password_never_expires": bool(uac & 0x10000),
@@ -79,6 +80,22 @@ class DirectoryAdminService(ActiveDirectoryService):
                     ]
             conn.modify(entry.entry_dn, changes)
             self._ok(conn, "Aggiornamento anagrafica")
+        finally:
+            conn.unbind()
+
+    def imposta_badge(self, username, badge):
+        """Allinea il badge locale con l'attributo standard AD employeeID."""
+        self._require_writes()
+        conn, entry = self._user(username)
+        try:
+            valore = (badge or "").strip()
+            modifica = (
+                [(MODIFY_REPLACE, [valore])]
+                if valore
+                else [(MODIFY_DELETE, [])]
+            )
+            conn.modify(entry.entry_dn, {"employeeID": modifica})
+            self._ok(conn, "Aggiornamento badge")
         finally:
             conn.unbind()
 
