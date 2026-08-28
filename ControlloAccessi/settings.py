@@ -169,12 +169,15 @@ AUTHENTICATION_BACKENDS = [
 DIRECTORY_PROVIDER = "ACTIVE_DIRECTORY"
 
 DIRECTORY = {
-    # Configurazione LDAPS del primo Domain Controller.
-    "SERVER": "srvdomain.comuneaversa.local",
-    "PORT": 636,
-    "USE_SSL": True,
-    "TLS_CA_CERT_FILE": BASE_DIR / "cert" / "srvdomain-ldaps.cer",
-    "TLS_VALIDATE": True,
+    # Configurazione LDAPS del primo Domain Controller. I valori possono
+    # essere differenziati tra gli ambienti tramite /etc/controlloaccessi.env.
+    "SERVER": os.getenv("AD_SERVER", "srvdomain.comuneaversa.local"),
+    "PORT": int(os.getenv("AD_PORT", "636")),
+    "USE_SSL": os.getenv("AD_USE_SSL", "True").lower() in {"1", "true", "yes", "on"},
+    "TLS_CA_CERT_FILE": os.getenv(
+        "AD_TLS_CA_CERT_FILE", str(BASE_DIR / "cert" / "srvdomain-ldaps.cer")
+    ),
+    "TLS_VALIDATE": os.getenv("AD_TLS_VALIDATE", "True").lower() in {"1", "true", "yes", "on"},
     "DOMAIN": os.getenv("AD_DOMAIN", "comuneaversa.local"),
     "BASE_DN": os.getenv(
         "AD_BASE_DN",
