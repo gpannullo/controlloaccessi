@@ -89,6 +89,10 @@ class ActiveDirectoryService(DirectoryService):
                     user=self.bind_user,
                     password=self.bind_password,
                     auto_bind=True,
+                    # Il controller puo' restituire referral LDAP verso endpoint
+                    # non pubblicati/risolvibili. Le operazioni devono restare sul
+                    # Domain Controller LDAPS configurato esplicitamente.
+                    auto_referrals=False,
                 )
             except LDAPSocketOpenError as exc:
                 last_error = exc
@@ -113,6 +117,7 @@ class ActiveDirectoryService(DirectoryService):
                 user=f"{username.strip()}@{self.domain}",
                 password=password_attuale,
                 auto_bind=True,
+                auto_referrals=False,
             )
         except LDAPBindError as exc:
             raise ValueError("La password attuale non è corretta.") from exc
@@ -171,6 +176,7 @@ class ActiveDirectoryService(DirectoryService):
                 user=f"{username}@{self.domain}",
                 password=password,
                 auto_bind=True,
+                auto_referrals=False,
             )
 
             stato = "authenticated" if conn.bound else "invalid"
