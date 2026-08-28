@@ -277,6 +277,16 @@ PRESENCE_CHECK_ENABLED = os.getenv(
     "False",
 ).lower() in {"1", "true", "yes", "on"}
 
+# Importazione presenze dal file timbrature esposto via SFTP/SSH.
+PRESENCE_SSH_ENABLED = os.getenv("PRESENCE_SSH_ENABLED", "False").lower() in {"1", "true", "yes", "on"}
+PRESENCE_SSH_HOST = os.getenv("PRESENCE_SSH_HOST", "")
+PRESENCE_SSH_PORT = int(os.getenv("PRESENCE_SSH_PORT", "22"))
+PRESENCE_SSH_USERNAME = os.getenv("PRESENCE_SSH_USERNAME", "")
+PRESENCE_SSH_PRIVATE_KEY = os.getenv("PRESENCE_SSH_PRIVATE_KEY", "")
+PRESENCE_SSH_KNOWN_HOSTS = os.getenv("PRESENCE_SSH_KNOWN_HOSTS", "")
+PRESENCE_SSH_REMOTE_PATH = os.getenv("PRESENCE_SSH_REMOTE_PATH", "/C:/h/timbrature.txt")
+PRESENCE_SSH_INTERVAL_SECONDS = int(os.getenv("PRESENCE_SSH_INTERVAL_SECONDS", "60"))
+
 PORTINERIA_GROUP_NAME = os.getenv("PORTINERIA_GROUP_NAME", "Portineria")
 
 # Coda e-mail gestita da django-post-office. Le credenziali SMTP restano

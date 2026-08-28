@@ -1,6 +1,7 @@
 Django==5.2.15
 gunicorn
 ldap3
+paramiko>=3.5,<4
 psycopg[binary]
 python-escpos
 django-post_office==3.11.2

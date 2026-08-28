@@ -12,6 +12,7 @@ class CustomUserAdmin(UserAdmin):
         "username",
         "first_name",
         "last_name",
+        "badge",
         "tipo_attivita",
         "stato_presenza",
         "is_active",
@@ -24,6 +25,8 @@ class CustomUserAdmin(UserAdmin):
         "is_active",
         "is_staff",
     )
+
+    search_fields = UserAdmin.search_fields + ("badge",)
 
     readonly_fields = (
         "last_login",
@@ -38,6 +41,7 @@ class CustomUserAdmin(UserAdmin):
             {
                 "fields": (
                     "tipo_attivita",
+                    "badge",
                     "stato_presenza",
                     "presenza_verificata_il",
                     "presenza_fonte",
@@ -52,6 +56,7 @@ class CustomUserAdmin(UserAdmin):
             {
                 "fields": (
                     "tipo_attivita",
+                    "badge",
                     "stato_presenza",
                 )
             },

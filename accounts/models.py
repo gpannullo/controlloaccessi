@@ -37,6 +37,14 @@ class CustomUser(AbstractUser):
     password_senza_scadenza = models.BooleanField(default=False, editable=False)
     email_personale = models.EmailField(blank=True, editable=False)
     cellulare_personale = models.CharField(max_length=50, blank=True, editable=False)
+    badge = models.CharField(
+        max_length=50,
+        unique=True,
+        null=True,
+        blank=True,
+        verbose_name="Badge presenze",
+        help_text="Codice riportato nel file delle timbrature.",
+    )
 
     livello_sicurezza = models.PositiveSmallIntegerField(
         default=1,
