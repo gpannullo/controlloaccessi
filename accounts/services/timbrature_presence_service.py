@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 _TRACCIATO = re.compile(
-    r"^(?P<badge>\d+)(?P<verso>[IU])(?P<causale>\d{3})(?P<data>\d{6})(?P<ora>\d{4})$"
+    r"^(?P<badge>\d{10})(?P<verso>[IU])(?P<causale>\d{4})(?P<data>\d{6})(?P<ora>\d{4})$"
 )
 
 
