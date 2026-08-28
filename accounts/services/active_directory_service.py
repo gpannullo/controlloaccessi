@@ -2,10 +2,11 @@ from datetime import datetime
 from datetime import timezone as datetime_timezone
 
 import ssl
+import time
 from pathlib import Path
 
 from ldap3 import ALL, Connection, MODIFY_ADD, MODIFY_DELETE, Server, SUBTREE, Tls
-from ldap3.core.exceptions import LDAPBindError
+from ldap3.core.exceptions import LDAPBindError, LDAPSocketOpenError
 from django.conf import settings
 from ldap3.utils.conv import escape_filter_chars
 
@@ -34,7 +35,15 @@ class ActiveDirectoryService(DirectoryService):
     ]
 
     def __init__(self):
-        server_name = settings.DIRECTORY["SERVER"].removeprefix("ldap://").removeprefix("ldaps://").rstrip("/")
+        server_name = (
+            str(settings.DIRECTORY["SERVER"])
+            .strip()
+            .removeprefix("ldap://")
+            .removeprefix("ldaps://")
+            .rstrip("/")
+        )
+        if not server_name:
+            raise ValueError("AD_SERVER non configurato.")
         ca_cert_file = settings.DIRECTORY.get("TLS_CA_CERT_FILE")
         ca_cert_data = None
         if ca_cert_file:
@@ -69,15 +78,23 @@ class ActiveDirectoryService(DirectoryService):
         return snapshot
 
     def _connection(self):
-
-        conn = Connection(
-            self.server,
-            user=self.bind_user,
-            password=self.bind_password,
-            auto_bind=True,
-        )
-
-        return conn
+        # Il DNS del Domain Controller può essere momentaneamente indisponibile:
+        # un secondo tentativo evita di degradare l'intera scheda utente per un
+        # errore transitorio di apertura socket.
+        last_error = None
+        for attempt in range(2):
+            try:
+                return Connection(
+                    self.server,
+                    user=self.bind_user,
+                    password=self.bind_password,
+                    auto_bind=True,
+                )
+            except LDAPSocketOpenError as exc:
+                last_error = exc
+                if attempt == 0:
+                    time.sleep(1)
+        raise last_error
 
     def authenticate(self, username: str, password: str) -> bool:
 

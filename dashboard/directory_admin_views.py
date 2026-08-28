@@ -343,25 +343,32 @@ def directory_user(request, pk):
     persone_pubbliche = PersonaleWordPress.objects.filter(
         utente=utente,
     ).prefetch_related("unita_organizzative").order_by("cognome", "nome", "titolo")
+    dettaglio = None
+    gruppi_ad_disponibili = []
+    dominio_istituzionale = ""
     try:
         dettaglio = DirectoryAdminService().dettaglio(utente.username)
+    except Exception as exc:
+        messages.error(request, "Impossibile leggere AD: %s" % exc)
+
+    if dettaglio is not None:
         gruppi_automatici = set(
             GruppoOrganizzativo.objects.filter(
                 tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO
             ).values_list("directory_name", flat=True)
         )
         gruppi_automatici.add("MDAEMON")
-        gruppi_ad_disponibili = [
-            gruppo["name"] for gruppo in DirectoryAdminService().lista_gruppi()
-            if gruppo["name"] not in gruppi_automatici and gruppo["name"] not in dettaglio["groups"]
-        ]
-        dominio_istituzionale = ""
+        try:
+            gruppi_ad_disponibili = [
+                gruppo["name"] for gruppo in DirectoryAdminService().lista_gruppi()
+                if gruppo["name"] not in gruppi_automatici and gruppo["name"] not in dettaglio["groups"]
+            ]
+        except Exception as exc:
+            messages.warning(request, "Impossibile caricare i gruppi AD disponibili: %s" % exc)
         if "@" in dettaglio["email"]:
             candidato = dettaglio["email"].rsplit("@", 1)[1].lower()
             if candidato in settings.INSTITUTIONAL_EMAIL_DOMAINS:
                 dominio_istituzionale = candidato
-    except Exception as exc:
-        dettaglio = None; gruppi_ad_disponibili = []; dominio_istituzionale = ""; messages.error(request, "Impossibile leggere AD: %s" % exc)
     return render(request, "dashboard/directory_user.html", {
         "utente": utente,
         "dettaglio": dettaglio,
