@@ -14,6 +14,7 @@ from django.views.decorators.http import (
     require_POST,
 )
 
+from ControlloAccessi.settings import DIRECTORY
 from common.exceptions import (
     BusinessException,
     TicketPrinterException,
@@ -629,8 +630,8 @@ def amministratori(request):
         request,
         "visitors/amministratori.html",
         {
-            "giunta": prepara_gruppo("Giunta"),
-            "consiglieri": prepara_gruppo("Consiglieri"),
+            "giunta": prepara_gruppo(DIRECTORY['GIUNTA_GROUP']),
+            "consiglieri": prepara_gruppo(DIRECTORY['CONSIGLIERI_GROUP']),
         },
     )
 

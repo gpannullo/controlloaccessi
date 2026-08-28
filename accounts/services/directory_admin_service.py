@@ -23,7 +23,12 @@ class DirectoryAdminService(ActiveDirectoryService):
     def _user(self, username):
         conn = self._connection()
         safe = escape_filter_chars(username.strip())
-        if not conn.search(self.base_dn, "(&(objectCategory=person)(objectClass=user)(sAMAccountName=%s))" % safe, attributes=self.USER_ATTRIBUTES, size_limit=1) or not conn.entries:
+        if not conn.search(
+            settings.DIRECTORY["USER_SEARCH_BASE"],
+            "(&(objectCategory=person)(objectClass=user)(sAMAccountName=%s))" % safe,
+            attributes=self.USER_ATTRIBUTES,
+            size_limit=1,
+        ) or not conn.entries:
             conn.unbind()
             raise DirectoryAdminException("Utente AD non trovato.")
         return conn, conn.entries[0]
@@ -173,7 +178,7 @@ class DirectoryAdminService(ActiveDirectoryService):
             current = set(entry.memberOf.values if hasattr(entry, "memberOf") else []); target = set()
             for nome in nomi:
                 safe = escape_filter_chars(nome)
-                if not conn.search(self.base_dn, "(&(objectClass=group)(cn=%s))" % safe, attributes=[], size_limit=1) or not conn.entries: raise DirectoryAdminException("Gruppo AD non trovato: %s." % nome)
+                if not conn.search(settings.DIRECTORY["GROUP_SEARCH_BASE"], "(&(objectClass=group)(cn=%s))" % safe, attributes=[], size_limit=1) or not conn.entries: raise DirectoryAdminException("Gruppo AD non trovato: %s." % nome)
                 target.add(conn.entries[0].entry_dn)
             for dn in current - target: conn.modify(dn, {"member": [(MODIFY_DELETE, [entry.entry_dn])]}); self._ok(conn, "Rimozione gruppo")
             for dn in target - current: conn.modify(dn, {"member": [(MODIFY_ADD, [entry.entry_dn])]}); self._ok(conn, "Aggiunta gruppo")
@@ -187,7 +192,7 @@ class DirectoryAdminService(ActiveDirectoryService):
         try:
             safe = escape_filter_chars(nome_gruppo.strip())
             if not conn.search(
-                self.base_dn,
+                settings.DIRECTORY["GROUP_SEARCH_BASE"],
                 "(&(objectClass=group)(cn=%s))" % safe,
                 attributes=[],
                 size_limit=1,
@@ -205,7 +210,7 @@ class DirectoryAdminService(ActiveDirectoryService):
         try:
             safe = escape_filter_chars(nome_gruppo.strip())
             if not conn.search(
-                self.base_dn,
+                settings.DIRECTORY["GROUP_SEARCH_BASE"],
                 "(&(objectClass=group)(cn=%s))" % safe,
                 attributes=[],
                 size_limit=1,
@@ -239,7 +244,7 @@ class DirectoryAdminService(ActiveDirectoryService):
                 self._ok(conn, "Rimozione mail istituzionale")
                 nome_gruppo, modifica = "MDAEMON", MODIFY_DELETE
             safe = escape_filter_chars(nome_gruppo)
-            if not conn.search(self.base_dn, "(&(objectClass=group)(cn=%s))" % safe, attributes=[], size_limit=1) or not conn.entries:
+            if not conn.search(settings.DIRECTORY["GROUP_SEARCH_BASE"], "(&(objectClass=group)(cn=%s))" % safe, attributes=[], size_limit=1) or not conn.entries:
                 raise DirectoryAdminException("Gruppo AD non trovato: MDAEMON.")
             gruppo_dn = conn.entries[0].entry_dn
             appartiene = gruppo_dn in set(entry.memberOf.values if hasattr(entry, "memberOf") else [])
@@ -257,7 +262,7 @@ class DirectoryAdminService(ActiveDirectoryService):
         aggiornati, saltati, errori = [], 0, []
         try:
             conn.search(
-                self.base_dn,
+                settings.DIRECTORY["USER_SEARCH_BASE"],
                 "(&(objectCategory=person)(objectClass=user))",
                 attributes=["sAMAccountName", "mail", "userPrincipalName"],
             )
@@ -327,7 +332,7 @@ class DirectoryAdminService(ActiveDirectoryService):
             safe = escape_filter_chars(username.strip())
             return bool(
                 conn.search(
-                    self.base_dn,
+                    settings.DIRECTORY["USER_SEARCH_BASE"],
                     "(&(objectCategory=person)(objectClass=user)(sAMAccountName=%s))" % safe,
                     attributes=[],
                     size_limit=1,
