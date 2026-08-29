@@ -14,15 +14,9 @@ def home_redirect(request):
     user = request.user
 
     if user.is_superuser:
-        return redirect("dashboard:home")
+        return redirect("home")
 
     if is_portineria_user(user):
         return redirect("dashboard:home")
 
-    if user.groups.filter(
-        gruppi_organizzativi__ufficio__isnull=False,
-        gruppi_organizzativi__ufficio__attivo=True,
-    ).exists():
-        return redirect("uffici:selezione")
-
-    return redirect("access_denied")
+    return redirect("home")

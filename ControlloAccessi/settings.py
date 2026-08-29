@@ -218,7 +218,7 @@ DIRECTORY = {
 
 
 LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "dashboard:home"
+LOGIN_REDIRECT_URL = "home"
 LOGOUT_REDIRECT_URL = "login"
 
 TICKET_PRINTER = {

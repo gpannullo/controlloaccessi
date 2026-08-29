@@ -11,6 +11,7 @@ from django.views.decorators.http import require_http_methods
 from accounts.services.active_directory_service import ActiveDirectoryService
 from accounts.services.directory_admin_service import DirectoryAdminException, DirectoryAdminService
 from access_control.models import GruppoOrganizzativo
+from common.module_access import PortineriaAccessMixin
 
 
 PENDING_PASSWORD_CHANGE = "initial_password_change"
@@ -25,7 +26,15 @@ def _safe_next(request, value):
 def _default_destination(request):
     if request.get_host().split(":", 1)[0].lower() == settings.PUBLIC_ACCOUNT_HOST:
         return reverse("my_account")
-    return settings.LOGIN_REDIRECT_URL
+    user = getattr(request, "user", None)
+    if (
+        user
+        and user.is_authenticated
+        and not user.is_superuser
+        and PortineriaAccessMixin.has_module_access(user)
+    ):
+        return reverse("dashboard:home")
+    return reverse("home")
 
 
 def _aggiorna_stato_password_locale(user):
@@ -43,7 +52,7 @@ class DirectoryLoginView(LoginView):
     def get_success_url(self):
         if self.request.get_host().split(":", 1)[0].lower() == settings.PUBLIC_ACCOUNT_HOST:
             return reverse("my_account")
-        return super().get_success_url()
+        return self.get_redirect_url() or _default_destination(self.request)
 
     def post(self, request, *args, **kwargs):
         username = request.POST.get("username", "").strip()
