@@ -18,12 +18,14 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.NOTICE(
                 "Persone da ripubblicare: {persone}; aggiunte nelle unità: {aggiunte}; rimozioni dalle unità: {rimozioni}.".format(
-                    persone=len(risultato["persone_da_pubblicare"]),
-                    aggiunte=len(risultato["aggiunte_in_unita"]),
-                    rimozioni=len(risultato["rimozioni_in_unita"]),
+                    persone=len(risultato["persone_da_ripubblicare"]),
+                    aggiunte=sum(len(voce["persone"]) for voce in risultato["aggiunte_in_unita"]),
+                    rimozioni=sum(len(voce["persone"]) for voce in risultato["rimozioni_in_unita"]),
                 )
             )
         )
+        for voce in risultato["persone_da_ripubblicare"]:
+            self.stdout.write("* {nome} (WordPress {persona_id})".format(**voce))
         for voce in risultato["aggiunte_in_unita"]:
             self.stdout.write("+ unità {unita_id}: persone {persone}".format(**voce))
         for voce in risultato["rimozioni_in_unita"]:

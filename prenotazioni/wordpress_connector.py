@@ -294,6 +294,7 @@ def simula_allineamento_persone_pubbliche_wordpress():
     aggiunte_in_unita = []
     rimozioni_in_unita = []
     persone_note = set(attese_per_persona)
+    persone_da_ripubblicare = set()
     for unita_id in set(unita_remote) | set(attese_per_unita):
         remote = unita_remote.get(unita_id, set())
         attese = attese_per_unita.get(unita_id, set())
@@ -301,11 +302,19 @@ def simula_allineamento_persone_pubbliche_wordpress():
         da_rimuovere = (remote & persone_note) - attese
         if da_aggiungere:
             aggiunte_in_unita.append({"unita_id": unita_id, "persone": sorted(da_aggiungere)})
+            persone_da_ripubblicare.update(da_aggiungere)
         if da_rimuovere:
             rimozioni_in_unita.append({"unita_id": unita_id, "persone": sorted(da_rimuovere)})
+            persone_da_ripubblicare.update(da_rimuovere)
+
+    persone_per_id = {str(persona.origine_id): str(persona) for persona in persone_locali}
 
     return {
         "persone_da_pubblicare": persone_da_pubblicare,
+        "persone_da_ripubblicare": [
+            {"persona_id": persona_id, "nome": persone_per_id.get(persona_id, "Persona non presente in Django")}
+            for persona_id in sorted(persone_da_ripubblicare, key=lambda item: persone_per_id.get(item, "").casefold())
+        ],
         "aggiunte_in_unita": aggiunte_in_unita,
         "rimozioni_in_unita": rimozioni_in_unita,
     }
