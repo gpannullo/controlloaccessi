@@ -23,15 +23,25 @@ class DirectoryAdminService(ActiveDirectoryService):
     def _user(self, username):
         conn = self._connection()
         safe = escape_filter_chars(username.strip())
-        if not conn.search(
-            settings.DIRECTORY["USER_SEARCH_BASE"],
-            "(&(objectCategory=person)(objectClass=user)(sAMAccountName=%s))" % safe,
-            attributes=self.USER_ATTRIBUTES,
-            size_limit=1,
-        ) or not conn.entries:
-            conn.unbind()
-            raise DirectoryAdminException("Utente AD non trovato.")
-        return conn, conn.entries[0]
+        user_filter = "(&(objectCategory=person)(objectClass=user)(sAMAccountName=%s))" % safe
+        search_bases = [settings.DIRECTORY["USER_SEARCH_BASE"]]
+        base_dn = settings.DIRECTORY["BASE_DN"]
+        if base_dn.casefold() != search_bases[0].casefold():
+            # Alcuni domini usano CN=Users oppure OU differenti: la base
+            # configurata è un'ottimizzazione, non deve impedire le operazioni.
+            search_bases.append(base_dn)
+
+        for search_base in search_bases:
+            if conn.search(
+                search_base,
+                user_filter,
+                attributes=self.USER_ATTRIBUTES,
+                size_limit=1,
+            ) and conn.entries:
+                return conn, conn.entries[0]
+
+        conn.unbind()
+        raise DirectoryAdminException("Utente AD non trovato.")
 
     @staticmethod
     def _ok(conn, operation):
