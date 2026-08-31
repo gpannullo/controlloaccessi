@@ -247,6 +247,70 @@ def sincronizza_anagrafiche_wordpress():
     return {"sedi": sedi, "unita_organizzative": len(unita), "mappature": mappature, "personale": personale}
 
 
+def simula_allineamento_persone_pubbliche_wordpress():
+    """Confronta le associazioni locali con entrambi i lati pubblicati su WordPress.
+
+    Non esegue scritture: serve a verificare preventivamente quali persone
+    dovranno essere ripubblicate dal connettore reciproco.
+    """
+    config = settings.WORDPRESS_APPOINTMENTS
+    if not config["ENABLED"] or not config["SHARED_SECRET"]:
+        raise WordPressConnectorError("Connettore WordPress non abilitato o chiave non configurata.")
+    payload = _request(_endpoint(config, "ANAGRAFICHE_ENDPOINT"), config["SHARED_SECRET"], config["TIMEOUT"])
+    if not isinstance(payload, dict):
+        raise WordPressConnectorError("Risposta anagrafiche WordPress non valida.")
+
+    persone_remote = {
+        str(item.get("id")): {str(unita_id) for unita_id in item.get("uffici", [])}
+        for item in payload.get("persone_pubbliche", [])
+        if item.get("id")
+    }
+    unita_remote = {
+        str(item.get("id")): {str(persona_id) for persona_id in item.get("persone", [])}
+        for item in payload.get("uffici", [])
+        if item.get("id")
+    }
+
+    attese_per_persona = {}
+    attese_per_unita = {}
+    persone_locali = PersonaleWordPress.objects.prefetch_related("unita_organizzative")
+    for persona in persone_locali:
+        persona_id = str(persona.origine_id)
+        unita_ids = {str(unita_id) for unita_id in persona.unita_organizzative.values_list("origine_id", flat=True)}
+        attese_per_persona[persona_id] = unita_ids
+        for unita_id in unita_ids:
+            attese_per_unita.setdefault(unita_id, set()).add(persona_id)
+
+    persone_da_pubblicare = []
+    for persona_id, attese in attese_per_persona.items():
+        remote = persone_remote.get(persona_id, set())
+        if remote != attese:
+            persone_da_pubblicare.append({
+                "persona_id": persona_id,
+                "aggiunte": sorted(attese - remote),
+                "rimozioni": sorted(remote - attese),
+            })
+
+    aggiunte_in_unita = []
+    rimozioni_in_unita = []
+    persone_note = set(attese_per_persona)
+    for unita_id in set(unita_remote) | set(attese_per_unita):
+        remote = unita_remote.get(unita_id, set())
+        attese = attese_per_unita.get(unita_id, set())
+        da_aggiungere = attese - remote
+        da_rimuovere = (remote & persone_note) - attese
+        if da_aggiungere:
+            aggiunte_in_unita.append({"unita_id": unita_id, "persone": sorted(da_aggiungere)})
+        if da_rimuovere:
+            rimozioni_in_unita.append({"unita_id": unita_id, "persone": sorted(da_rimuovere)})
+
+    return {
+        "persone_da_pubblicare": persone_da_pubblicare,
+        "aggiunte_in_unita": aggiunte_in_unita,
+        "rimozioni_in_unita": rimozioni_in_unita,
+    }
+
+
 def _disponibilita_ufficio(ufficio):
     minuti = settings.PRENOTAZIONI_DURATA_SLOT_MINUTI
     disponibilita = {str(giorno): [] for giorno in range(7)}

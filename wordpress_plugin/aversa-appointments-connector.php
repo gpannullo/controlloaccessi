@@ -138,6 +138,58 @@ function aversa_appointments_posts($post_type) {
     }, $posts);
 }
 
+function aversa_appointments_identificativi_relazione($valori) {
+    if (!is_array($valori)) {
+        return array();
+    }
+    return array_values(array_unique(array_filter(array_map('absint', $valori))));
+}
+
+function aversa_appointments_valida_organizzazioni($organizzazioni) {
+    $organizzazioni_valide = array();
+    foreach ($organizzazioni as $ufficio_id) {
+        $ufficio_id = (int) $ufficio_id;
+        if (!$ufficio_id || get_post_type($ufficio_id) !== 'unita_organizzativa') {
+            return new WP_Error('aversa_bad_office', 'Una delle unità organizzative non è valida.', array('status' => 400));
+        }
+        $organizzazioni_valide[] = $ufficio_id;
+    }
+    return array_values(array_unique($organizzazioni_valide));
+}
+
+function aversa_appointments_sincronizza_organizzazioni_persona($persona_id, $organizzazioni) {
+    $chiave_persona = '_dci_persona_pubblica_organizzazioni';
+    $chiave_unita = '_dci_unita_organizzativa_persone_struttura';
+    $precedenti = aversa_appointments_identificativi_relazione(get_post_meta($persona_id, $chiave_persona, true));
+    $organizzazioni = aversa_appointments_identificativi_relazione($organizzazioni);
+
+    update_post_meta($persona_id, $chiave_persona, $organizzazioni);
+
+    foreach (array_unique(array_merge($precedenti, $organizzazioni)) as $unita_id) {
+        $persone = aversa_appointments_identificativi_relazione(get_post_meta($unita_id, $chiave_unita, true));
+        if (in_array($unita_id, $organizzazioni, true)) {
+            $persone[] = $persona_id;
+        } else {
+            $persone = array_diff($persone, array($persona_id));
+        }
+        update_post_meta($unita_id, $chiave_unita, aversa_appointments_identificativi_relazione($persone));
+    }
+}
+
+function aversa_appointments_unita_organizzative() {
+    $unita = aversa_appointments_posts('unita_organizzativa');
+    foreach ($unita as &$elemento) {
+        $elemento['persone'] = array_map(
+            'strval',
+            aversa_appointments_identificativi_relazione(
+                get_post_meta((int) $elemento['id'], '_dci_unita_organizzativa_persone_struttura', true)
+            )
+        );
+    }
+    unset($elemento);
+    return $unita;
+}
+
 function aversa_appointments_anagrafiche(WP_REST_Request $request) {
     global $wpdb;
     $calendari = $wpdb->get_results(
@@ -153,7 +205,7 @@ function aversa_appointments_anagrafiche(WP_REST_Request $request) {
     );
     return rest_ensure_response(array(
         'sedi' => aversa_appointments_posts('luogo'),
-        'uffici' => aversa_appointments_posts('unita_organizzativa'),
+        'uffici' => aversa_appointments_unita_organizzative(),
         'persone_pubbliche' => aversa_appointments_persone_pubbliche(),
         'calendari' => array_map(function ($calendario) {
             return array(
@@ -197,15 +249,11 @@ function aversa_appointments_salva_organizzazioni_persona(WP_REST_Request $reque
     }
     $parametri = $request->get_json_params();
     $organizzazioni = isset($parametri['organizzazioni']) && is_array($parametri['organizzazioni']) ? $parametri['organizzazioni'] : array();
-    $organizzazioni_valide = array();
-    foreach ($organizzazioni as $ufficio_id) {
-        $ufficio_id = (int) $ufficio_id;
-        if (!$ufficio_id || get_post_type($ufficio_id) !== 'unita_organizzativa') {
-            return new WP_Error('aversa_bad_office', 'Una delle unità organizzative non è valida.', array('status' => 400));
-        }
-        $organizzazioni_valide[] = $ufficio_id;
+    $organizzazioni_valide = aversa_appointments_valida_organizzazioni($organizzazioni);
+    if (is_wp_error($organizzazioni_valide)) {
+        return $organizzazioni_valide;
     }
-    update_post_meta($persona_id, '_dci_persona_pubblica_organizzazioni', array_values(array_unique($organizzazioni_valide)));
+    aversa_appointments_sincronizza_organizzazioni_persona($persona_id, $organizzazioni_valide);
     return rest_ensure_response(array('id' => $persona_id, 'aggiornato' => true));
 }
 
@@ -216,13 +264,9 @@ function aversa_appointments_salva_persona_pubblica(WP_REST_Request $request) {
     }
     $parametri = $request->get_json_params();
     $organizzazioni = isset($parametri['organizzazioni']) && is_array($parametri['organizzazioni']) ? $parametri['organizzazioni'] : array();
-    $organizzazioni_valide = array();
-    foreach ($organizzazioni as $ufficio_id) {
-        $ufficio_id = (int) $ufficio_id;
-        if (!$ufficio_id || get_post_type($ufficio_id) !== 'unita_organizzativa') {
-            return new WP_Error('aversa_bad_office', 'Una delle unità organizzative non è valida.', array('status' => 400));
-        }
-        $organizzazioni_valide[] = $ufficio_id;
+    $organizzazioni_valide = aversa_appointments_valida_organizzazioni($organizzazioni);
+    if (is_wp_error($organizzazioni_valide)) {
+        return $organizzazioni_valide;
     }
     $attivo = !empty($parametri['attivo']);
     $esito = wp_update_post(array(
@@ -236,7 +280,7 @@ function aversa_appointments_salva_persona_pubblica(WP_REST_Request $request) {
     update_post_meta($persona_id, '_dci_persona_pubblica_nome', sanitize_text_field($parametri['nome'] ?? ''));
     update_post_meta($persona_id, '_dci_persona_pubblica_cognome', sanitize_text_field($parametri['cognome'] ?? ''));
     update_post_meta($persona_id, '_dci_persona_pubblica_competenze', wp_kses_post($parametri['competenze'] ?? ''));
-    update_post_meta($persona_id, '_dci_persona_pubblica_organizzazioni', array_values(array_unique($organizzazioni_valide)));
+    aversa_appointments_sincronizza_organizzazioni_persona($persona_id, $organizzazioni_valide);
     return rest_ensure_response(array('id' => $persona_id, 'aggiornato' => true));
 }
 
@@ -249,13 +293,9 @@ function aversa_appointments_crea_persona_pubblica(WP_REST_Request $request) {
         return new WP_Error('aversa_bad_person_name', 'Indicare almeno nome, cognome o titolo della Persona pubblica.', array('status' => 400));
     }
     $organizzazioni = isset($parametri['organizzazioni']) && is_array($parametri['organizzazioni']) ? $parametri['organizzazioni'] : array();
-    $organizzazioni_valide = array();
-    foreach ($organizzazioni as $ufficio_id) {
-        $ufficio_id = (int) $ufficio_id;
-        if (!$ufficio_id || get_post_type($ufficio_id) !== 'unita_organizzativa') {
-            return new WP_Error('aversa_bad_office', 'Una delle unità organizzative non è valida.', array('status' => 400));
-        }
-        $organizzazioni_valide[] = $ufficio_id;
+    $organizzazioni_valide = aversa_appointments_valida_organizzazioni($organizzazioni);
+    if (is_wp_error($organizzazioni_valide)) {
+        return $organizzazioni_valide;
     }
     $persona_id = wp_insert_post(array(
         'post_type' => 'persona_pubblica',
@@ -268,7 +308,7 @@ function aversa_appointments_crea_persona_pubblica(WP_REST_Request $request) {
     update_post_meta($persona_id, '_dci_persona_pubblica_nome', $nome);
     update_post_meta($persona_id, '_dci_persona_pubblica_cognome', $cognome);
     update_post_meta($persona_id, '_dci_persona_pubblica_competenze', wp_kses_post($parametri['competenze'] ?? ''));
-    update_post_meta($persona_id, '_dci_persona_pubblica_organizzazioni', array_values(array_unique($organizzazioni_valide)));
+    aversa_appointments_sincronizza_organizzazioni_persona($persona_id, $organizzazioni_valide);
     return rest_ensure_response(array(
         'id' => (int) $persona_id,
         'titolo' => get_the_title($persona_id),
