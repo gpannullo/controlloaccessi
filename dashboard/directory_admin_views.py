@@ -452,7 +452,10 @@ def directory_action(request, pk):
             )
             messaggio_successo = "Anagrafica, badge e impostazioni della mail istituzionale aggiornati."
         elif azione == "stato":
-            service.imposta_attivo(utente.username, request.POST.get("attivo") == "true")
+            attivo = request.POST.get("attivo") == "true"
+            service.imposta_attivo(utente.username, attivo)
+            utente.is_active = attivo
+            utente.save(update_fields=["is_active"])
         elif azione == "password":
             destinatario = service.dettaglio(utente.username).get("personal_email", "").strip()
             if not destinatario:

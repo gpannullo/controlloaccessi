@@ -80,6 +80,8 @@ class CustomUserAdmin(UserAdmin):
     )
 
     def save_model(self, request, obj, form, change):
+        if change and "is_active" in form.changed_data:
+            DirectoryAdminService().imposta_attivo(obj.username, obj.is_active)
         if change and "badge" in form.changed_data:
             DirectoryAdminService().imposta_badge(obj.username, obj.badge)
         super().save_model(request, obj, form, change)
