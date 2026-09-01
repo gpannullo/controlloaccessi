@@ -334,10 +334,20 @@ class PersonaleWordPressAdmin(admin.ModelAdmin):
         else:
             self.message_user(request, "Persona pubblica aggiornata anche su WordPress.", messages.SUCCESS)
 
-    @admin.action(description="Rimuovi dalle unità organizzative le persone pubbliche non attive selezionate")
+    @admin.action(description="Disabilita e rimuovi dalle unità le persone con account Django non attivo")
     def rimuovi_persone_non_attive_dalle_unita_organizzative(self, request, queryset):
-        aggiornate = associazioni_rimosse = errori = 0
-        for persona in queryset.filter(attivo=False):
+        aggiornate = associazioni_rimosse = disabilitate = ignorate = errori = 0
+        for persona in queryset.select_related("utente"):
+            # La fonte del provvedimento è lo stato dell'account, non quello
+            # della Persona pubblica. Le persone senza account o con account
+            # ancora attivo non devono subire alcuna modifica.
+            if not persona.utente_id or persona.utente.is_active:
+                ignorate += 1
+                continue
+            if persona.attivo:
+                persona.attivo = False
+                persona.save(update_fields=["attivo", "aggiornato_il"])
+                disabilitate += 1
             associazioni_rimosse += AssegnazionePersonaleWordPress.objects.filter(
                 personale=persona
             ).delete()[0]
@@ -351,7 +361,7 @@ class PersonaleWordPressAdmin(admin.ModelAdmin):
         livello = messages.WARNING if errori else messages.SUCCESS
         self.message_user(
             request,
-            f"Persone non attive aggiornate: {aggiornate}; associazioni rimosse: {associazioni_rimosse}; errori: {errori}.",
+            f"Persone disabilitate: {disabilitate}; aggiornate su WordPress: {aggiornate}; associazioni rimosse: {associazioni_rimosse}; ignorate: {ignorate}; errori: {errori}.",
             livello,
         )
 
