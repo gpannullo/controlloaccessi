@@ -21,11 +21,11 @@ class CalendarioAperturaInline(admin.TabularInline):
 
 
 class UfficioGruppiOrganizzativiFilter(admin.SimpleListFilter):
-    title = "Gruppi organizzativi"
+    title = "Collegamento a Gruppo organizzativo"
     parameter_name = "gruppi_organizzativi"
 
     def lookups(self, request, model_admin):
-        return (("collegati", "Uffici collegati"), ("non_collegati", "Uffici non collegati"))
+        return (("collegati", "Collegati"), ("non_collegati", "Non collegati"))
 
     def queryset(self, request, queryset):
         if self.value() == "collegati":
@@ -58,6 +58,7 @@ class UfficioAdmin(admin.ModelAdmin):
         "responsabile",
         "riceve_pubblico",
         "gruppi_organizzativi",
+        "unita_organizzative_wordpress",
         "numero_dipendenti",
         "dipendenti_agganciati",
         "attivo",
@@ -89,11 +90,20 @@ class UfficioAdmin(admin.ModelAdmin):
     actions = ("disabilita_uffici",)
 
     def get_queryset(self, request):
-        return super().get_queryset(request).prefetch_related("gruppi__django_group__user_set")
+        return super().get_queryset(request).prefetch_related(
+            "gruppi__django_group__user_set",
+            "unita_organizzative_wordpress",
+        )
 
     @admin.display(description="Gruppi organizzativi")
     def gruppi_organizzativi(self, obj):
         return ", ".join(sorted((gruppo.nome for gruppo in obj.gruppi.all()), key=str.casefold)) or "—"
+
+    @admin.display(description="Unità organizzative WordPress")
+    def unita_organizzative_wordpress(self, obj):
+        return ", ".join(
+            sorted((unita.nome for unita in obj.unita_organizzative_wordpress.all()), key=str.casefold)
+        ) or "—"
 
     def numero_dipendenti(self, obj):
         utenti_ids = set()
