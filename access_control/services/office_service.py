@@ -23,7 +23,7 @@ class OfficeService:
             ):
                 continue
 
-            if gruppo.ufficio:
+            if gruppo.uffici.exists():
                 continue
 
             codice = self.generate_code(
@@ -36,13 +36,12 @@ class OfficeService:
                     "nome": gruppo.nome,
                     "attivo": True,
                     "riceve_pubblico": True,
+                    "gruppo_operativo": gruppo,
                 },
             )
-
-            gruppo.ufficio = ufficio
-            gruppo.save(
-                update_fields=["ufficio"]
-            )
+            if not created and ufficio.gruppo_operativo_id is None:
+                ufficio.gruppo_operativo = gruppo
+                ufficio.save(update_fields=["gruppo_operativo"])
 
             if created:
                 creati += 1
@@ -180,9 +179,9 @@ class OfficeService:
             Ufficio.objects
             .filter(
                 attivo=True,
-                gruppi__attivo=True,
-                gruppi__django_group__user__is_active=True,
-                gruppi__django_group__user__stato_presenza=(
+                assegnazioni_personale__attiva=True,
+                assegnazioni_personale__utente__is_active=True,
+                assegnazioni_personale__utente__stato_presenza=(
                     User.StatoPresenza.PRESENTE
                 ),
             )

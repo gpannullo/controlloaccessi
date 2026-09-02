@@ -32,41 +32,15 @@ class CapacityService:
             False,
         )
 
-        utenti_ids = set()
-
-        gruppi = (
-            ufficio.gruppi
-            .filter(attivo=True)
-            .select_related("django_group")
-        )
-
-        for gruppo in gruppi:
-            utenti = (
-                gruppo.django_group
-                .user_set
-                .filter(
-                    is_active=True,
-                    tipo_attivita=(
-                        User.TipoAttivita.SPORTELLISTA
-                    ),
-                )
-            )
-
-            if controllo_presenze:
-                utenti = utenti.filter(
-                    stato_presenza=(
-                        User.StatoPresenza.PRESENTE
-                    ),
-                )
-
-            utenti_ids.update(
-                utenti.values_list(
-                    "pk",
-                    flat=True,
-                )
-            )
-
-        return len(utenti_ids)
+        utenti = User.objects.filter(
+            assegnazioni_ufficio__ufficio=ufficio,
+            assegnazioni_ufficio__attiva=True,
+            is_active=True,
+            tipo_attivita=User.TipoAttivita.SPORTELLISTA,
+        ).distinct()
+        if controllo_presenze:
+            utenti = utenti.filter(stato_presenza=User.StatoPresenza.PRESENTE)
+        return utenti.count()
 
     @staticmethod
     def tempo_medio_servizio(ufficio):

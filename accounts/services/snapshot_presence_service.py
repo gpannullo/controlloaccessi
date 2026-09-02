@@ -19,26 +19,11 @@ class SnapshotPresenzaService:
 
     @staticmethod
     def _utenti_ufficio(ufficio):
-        utenti_ids = set()
-
-        gruppi = (
-            ufficio.gruppi
-            .filter(attivo=True)
-            .select_related("django_group")
-        )
-
-        for gruppo in gruppi:
-            utenti_ids.update(
-                gruppo.django_group
-                .user_set
-                .filter(is_active=True)
-                .values_list("pk", flat=True)
-            )
-
         return User.objects.filter(
-            pk__in=utenti_ids,
+            assegnazioni_ufficio__ufficio=ufficio,
+            assegnazioni_ufficio__attiva=True,
             is_active=True,
-        )
+        ).distinct()
 
     @classmethod
     def crea_snapshot_ufficio(cls, ufficio, rilevato_il=None):

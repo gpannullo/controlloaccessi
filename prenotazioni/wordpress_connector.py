@@ -448,8 +448,8 @@ def crea_persona_pubblica_wordpress(utente):
     if not config["ENABLED"] or not config["SHARED_SECRET"]:
         raise WordPressConnectorError("Connettore WordPress non abilitato o chiave non configurata.")
     unita = UnitaOrganizzativaWordPress.objects.filter(
-        ufficio__gruppi__django_group__user=utente,
-        ufficio__gruppi__tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
+        ufficio__assegnazioni_personale__utente=utente,
+        ufficio__assegnazioni_personale__attiva=True,
     ).distinct()
     nome = utente.first_name.strip()
     cognome = utente.last_name.strip()

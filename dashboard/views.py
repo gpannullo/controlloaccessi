@@ -29,31 +29,17 @@ GIORNI_SETTIMANA = [
 
 def _dipendenti_assegnati_ufficio(ufficio):
     """
-    Restituisce gli utenti attivi appartenenti ai gruppi
-    organizzativi collegati all'ufficio, senza duplicati.
+    Restituisce gli utenti attivi assegnati esplicitamente all'ufficio.
     """
-
-    utenti_ids = set()
-
-    gruppi = (
-        ufficio.gruppi
-        .filter(attivo=True)
-        .select_related("django_group")
-    )
-
-    for gruppo in gruppi:
-        ids_gruppo = (
-            gruppo.django_group
-            .user_set
-            .filter(is_active=True)
-            .values_list("pk", flat=True)
-        )
-
-        utenti_ids.update(ids_gruppo)
 
     return list(
         User.objects
-        .filter(pk__in=utenti_ids)
+        .filter(
+            assegnazioni_ufficio__ufficio=ufficio,
+            assegnazioni_ufficio__attiva=True,
+            is_active=True,
+        )
+        .distinct()
         .order_by(
             "last_name",
             "first_name",
@@ -207,7 +193,7 @@ def dashboard_home(request):
                 queryset=aperture_odierne,
                 to_attr="aperture_di_oggi",
             ),
-            "gruppi__django_group__user_set",
+            "assegnazioni_personale__utente",
         )
     )
 

@@ -26,8 +26,8 @@ def _operatori_disponibili_ufficio(ufficio):
     return User.objects.filter(
         is_active=True,
         stato_presenza=User.StatoPresenza.PRESENTE,
-        groups__gruppo_organizzativo__ufficio=ufficio,
-        groups__gruppo_organizzativo__attivo=True,
+        assegnazioni_ufficio__ufficio=ufficio,
+        assegnazioni_ufficio__attiva=True,
     ).exists()
 
 
@@ -62,8 +62,8 @@ def _uffici_utente(user):
         Ufficio.objects
         .filter(
             attivo=True,
-            gruppi__attivo=True,
-            gruppi__django_group__user=user,
+            assegnazioni_personale__utente=user,
+            assegnazioni_personale__attiva=True,
         )
         .distinct()
         .order_by("nome")

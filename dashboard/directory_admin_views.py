@@ -12,7 +12,7 @@ from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 
 from accounts.services.directory_admin_service import DirectoryAdminException, DirectoryAdminService
-from access_control.models import GruppoOrganizzativo, Ufficio
+from access_control.models import AssegnazioneUfficio, GruppoOrganizzativo, Ufficio
 from audit.services.audit_service import AuditService
 from dashboard.permissions import directory_admin_required
 from prenotazioni.models import PersonaleWordPress, UnitaOrganizzativaWordPress
@@ -28,8 +28,8 @@ User = get_user_model()
 def _unita_wordpress_attese_per_utente(utente):
     """Unità WordPress che devono seguire gli uffici locali dell'utente."""
     return UnitaOrganizzativaWordPress.objects.filter(
-        ufficio__gruppi__django_group__user=utente,
-        ufficio__gruppi__tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
+        ufficio__assegnazioni_personale__utente=utente,
+        ufficio__assegnazioni_personale__attiva=True,
     ).distinct()
 
 
@@ -76,11 +76,11 @@ def directory_home(request):
 
 
 def _directory_user_create_context(form_data=None):
-    gruppi_operativi = GruppoOrganizzativo.objects.filter(
-        tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
+    gruppi_operativi = Ufficio.objects.filter(
         attivo=True,
-        ufficio__attivo=True,
-    ).select_related("ufficio", "django_group").order_by("ufficio__nome", "nome")
+        gruppo_operativo__tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
+        gruppo_operativo__attivo=True,
+    ).select_related("gruppo_operativo").order_by("nome")
     return {
         "uffici": Ufficio.objects.filter(attivo=True).order_by("nome"),
         "gruppi_operativi": gruppi_operativi,
@@ -115,14 +115,15 @@ def directory_user_create_submit(request):
         mobile = request.POST.get("mobile", "").strip()
         if not first_name or not last_name or not email:
             raise DirectoryAdminException("Nome, cognome ed e-mail sono obbligatori.")
-        gruppo = get_object_or_404(
-            GruppoOrganizzativo.objects.select_related("ufficio", "django_group"),
-            pk=request.POST.get("gruppo_organizzativo"),
-            tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
+        ufficio = get_object_or_404(
+            Ufficio.objects.select_related("gruppo_operativo__django_group"),
+            pk=request.POST.get("ufficio"),
             attivo=True,
-            ufficio_id=request.POST.get("ufficio"),
-            ufficio__attivo=True,
+            gruppo_operativo__pk=request.POST.get("gruppo_organizzativo"),
+            gruppo_operativo__tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
+            gruppo_operativo__attivo=True,
         )
+        gruppo = ufficio.gruppo_operativo
         username = _username_proposto(first_name, last_name)
         password = _password_provvisoria()
         mail_istituzionale = request.POST.get("mail_istituzionale") == "on"
@@ -157,12 +158,17 @@ def directory_user_create_submit(request):
             utente.set_unusable_password()
             utente.save(update_fields=["password"])
         utente.groups.set(gruppi_locali)
+        AssegnazioneUfficio.objects.get_or_create(
+            utente=utente,
+            ufficio=ufficio,
+            defaults={"attiva": True},
+        )
         AuditService.log(
             user=request.user,
             tipo="CREATE",
             oggetto="ActiveDirectory:%s" % username,
             descrizione="Creato utente AD nell'ufficio %s e assegnato al gruppo %s%s" % (
-                gruppo.ufficio,
+                ufficio,
                 gruppo.directory_name,
                 " e MDAEMON (%s)" % email_directory if mail_istituzionale else "",
             ),
@@ -224,7 +230,7 @@ def directory_users(request):
     elif attivo == "disattivi": utenti = utenti.filter(is_active=False)
     if gruppo: utenti = utenti.filter(groups__pk=gruppo)
     if uffici_selezionati:
-        utenti = utenti.filter(groups__gruppo_organizzativo__ufficio_id__in=uffici_selezionati)
+        utenti = utenti.filter(assegnazioni_ufficio__ufficio_id__in=uffici_selezionati)
     risultati = utenti.distinct().order_by("last_name", "first_name", "username")
     return render(request, "dashboard/directory_home.html", {"query": query, "utenti": risultati, "totale_utenti": User.objects.count(), "totale_filtrati": risultati.count(), "gruppi": Group.objects.order_by("name"), "uffici": Ufficio.objects.filter(attivo=True).order_by("nome"), "uffici_selezionati": [str(pk) for pk in uffici_selezionati], "tipi": tipi, "presenza": presenza, "attivo": attivo, "gruppo": gruppo})
 
@@ -258,17 +264,16 @@ def directory_staff(request):
     else:
         uffici_selezionati = request.session.get(session_key, [])
     personale = User.objects.filter(
-        groups__gruppo_organizzativo__ufficio__isnull=False,
-        groups__gruppo_organizzativo__ufficio__attivo=True,
-    ).distinct().prefetch_related("groups__gruppo_organizzativo__ufficio").order_by("last_name", "first_name", "username")
+        assegnazioni_ufficio__attiva=True,
+        assegnazioni_ufficio__ufficio__attivo=True,
+    ).distinct().prefetch_related("assegnazioni_ufficio__ufficio").order_by("last_name", "first_name", "username")
     if uffici_selezionati:
-        personale = personale.filter(groups__gruppo_organizzativo__ufficio_id__in=uffici_selezionati).distinct()
+        personale = personale.filter(assegnazioni_ufficio__ufficio_id__in=uffici_selezionati).distinct()
     for utente in personale:
         assegnazioni = [
-            gruppo_operativo.ufficio
-            for gruppo in utente.groups.all()
-            for gruppo_operativo in [getattr(gruppo, "gruppo_organizzativo", None)]
-            if gruppo_operativo and gruppo_operativo.ufficio_id
+            assegnazione.ufficio
+            for assegnazione in utente.assegnazioni_ufficio.all()
+            if assegnazione.attiva
         ]
         utente.uffici_associati = list({ufficio.pk: ufficio for ufficio in assegnazioni}.values())
         utente.numero_uffici = len(utente.uffici_associati)
@@ -334,16 +339,14 @@ def directory_sync_mail_from_upn(request):
 @directory_admin_required
 def directory_user(request, pk):
     utente = get_object_or_404(User, pk=pk)
-    uffici_associati = GruppoOrganizzativo.objects.filter(
-        django_group__user=utente,
-        tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
-        ufficio__isnull=False,
-    ).select_related("ufficio", "django_group").order_by("ufficio__nome", "nome")
-    gruppi_ufficio_disponibili = GruppoOrganizzativo.objects.filter(
-        tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
+    uffici_associati = AssegnazioneUfficio.objects.filter(
+        utente=utente,
+        attiva=True,
+    ).select_related("ufficio", "ufficio__gruppo_operativo").order_by("ufficio__nome")
+    gruppi_ufficio_disponibili = Ufficio.objects.filter(
         attivo=True,
-        ufficio__attivo=True,
-    ).exclude(django_group__user=utente).select_related("ufficio", "django_group").order_by("ufficio__nome", "nome")
+        gruppo_operativo__attivo=True,
+    ).exclude(assegnazioni_personale__utente=utente, assegnazioni_personale__attiva=True).select_related("gruppo_operativo").order_by("nome")
     unita_per_ufficio = {
         unita.ufficio_id: unita
         for unita in UnitaOrganizzativaWordPress.objects.filter(
@@ -487,34 +490,32 @@ def directory_action(request, pk):
             )
         elif azione == "rimuovi_ufficio":
             assegnazione = get_object_or_404(
-                GruppoOrganizzativo.objects.select_related("django_group", "ufficio"),
+                AssegnazioneUfficio.objects.select_related("ufficio", "ufficio__gruppo_operativo"),
                 pk=request.POST.get("gruppo_organizzativo"),
-                django_group__user=utente,
-                tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
-                ufficio__isnull=False,
+                utente=utente,
+                attiva=True,
             )
-            service.rimuovi_da_gruppo(utente.username, assegnazione.directory_name)
-            utente.groups.remove(assegnazione.django_group)
+            from access_control.services.office_assignment_service import OfficeAssignmentService
+            OfficeAssignmentService().rimuovi(utente, assegnazione.ufficio)
             messaggio_successo = "Ufficio %s rimosso dall'account." % assegnazione.ufficio
         elif azione == "aggiungi_ufficio":
             assegnazione = get_object_or_404(
-                GruppoOrganizzativo.objects.select_related("django_group", "ufficio"),
+                Ufficio.objects.select_related("gruppo_operativo"),
                 pk=request.POST.get("gruppo_organizzativo"),
-                tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
                 attivo=True,
-                ufficio__attivo=True,
+                gruppo_operativo__attivo=True,
             )
-            if utente.groups.filter(pk=assegnazione.django_group_id).exists():
+            from access_control.services.office_assignment_service import OfficeAssignmentService
+            _, creata = OfficeAssignmentService().assegna(utente, assegnazione)
+            if not creata:
                 raise DirectoryAdminException("L'ufficio è già associato all'account.")
-            service.aggiungi_utente_al_gruppo(utente.username, assegnazione.directory_name)
-            utente.groups.add(assegnazione.django_group)
-            messaggio_successo = "Ufficio %s aggiunto all'account." % assegnazione.ufficio
+            messaggio_successo = "Ufficio %s aggiunto all'account." % assegnazione
         elif azione == "crea_unita_organizzativa":
             ufficio = get_object_or_404(
                 Ufficio.objects.distinct(),
                 pk=request.POST.get("ufficio"),
-                gruppi__django_group__user=utente,
-                gruppi__tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
+                assegnazioni_personale__utente=utente,
+                assegnazioni_personale__attiva=True,
             )
             esistente = UnitaOrganizzativaWordPress.objects.filter(ufficio=ufficio).first()
             if esistente:

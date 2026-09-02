@@ -51,8 +51,8 @@
         <label class="form-label" for="gruppo_organizzativo">Gruppo operativo AD</label>
         <select id="gruppo_organizzativo" class="form-select" name="gruppo_organizzativo" required>
           <option value="">Prima selezionare l'ufficio</option>
-          {% for gruppo in gruppi_operativi %}
-            <option value="{{ gruppo.pk }}" data-ufficio="{{ gruppo.ufficio_id }}" hidden {% if form_data.gruppo_organizzativo == gruppo.pk|stringformat:"s" %}selected{% endif %}>{{ gruppo.nome }} — {{ gruppo.directory_name }}</option>
+          {% for ufficio_gruppo in gruppi_operativi %}
+            <option value="{{ ufficio_gruppo.gruppo_operativo_id }}" data-ufficio="{{ ufficio_gruppo.pk }}" hidden {% if form_data.gruppo_organizzativo == ufficio_gruppo.gruppo_operativo_id|stringformat:"s" %}selected{% endif %}>{{ ufficio_gruppo.gruppo_operativo.nome }} — {{ ufficio_gruppo.gruppo_operativo.directory_name }}</option>
           {% endfor %}
         </select>
         <div class="form-text">Vengono mostrati solo i gruppi organizzativi dell'ufficio scelto.</div>

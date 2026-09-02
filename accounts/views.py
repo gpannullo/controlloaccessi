@@ -10,7 +10,7 @@ from django.views.decorators.http import require_http_methods
 
 from accounts.services.active_directory_service import ActiveDirectoryService
 from accounts.services.directory_admin_service import DirectoryAdminException, DirectoryAdminService
-from access_control.models import GruppoOrganizzativo
+from access_control.models import AssegnazioneUfficio, GruppoOrganizzativo
 from common.module_access import PortineriaAccessMixin
 
 
@@ -110,7 +110,7 @@ def my_account(request):
         dettaglio = DirectoryAdminService().dettaglio(request.user.username)
     except Exception as exc:
         dettaglio = None; messages.warning(request, "Dati directory non disponibili: %s" % exc)
-    uffici = GruppoOrganizzativo.objects.filter(django_group__user=request.user, tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO, ufficio__isnull=False).select_related("ufficio").order_by("ufficio__nome")
+    uffici = AssegnazioneUfficio.objects.filter(utente=request.user, attiva=True).select_related("ufficio", "ufficio__gruppo_operativo").order_by("ufficio__nome")
     return render(request, "accounts/my_account.html", {
         "dettaglio": dettaglio,
         "uffici": uffici,

@@ -69,6 +69,19 @@ class Ufficio(models.Model):
         related_name="uffici_responsabili"
     )
 
+    gruppo_operativo = models.ForeignKey(
+        "GruppoOrganizzativo",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="uffici",
+        verbose_name="Gruppo operativo",
+        help_text=(
+            "Gruppo Django/Active Directory ereditato dal personale assegnato "
+            "a questo ufficio. Più uffici possono usare lo stesso gruppo."
+        ),
+    )
+
     tempo_medio_servizio_default = models.PositiveSmallIntegerField(
         default=20,
         verbose_name="Tempo medio predefinito della visita (minuti)",
@@ -165,12 +178,10 @@ class Ufficio(models.Model):
 
     @property
     def numero_dipendenti(self):
-        totale = 0
-
-        for gruppo in self.gruppi.select_related("django_group"):
-            totale += gruppo.django_group.user_set.count()
-
-        return totale
+        return self.assegnazioni_personale.filter(
+            attiva=True,
+            utente__is_active=True,
+        ).count()
 
 
 class GruppoOrganizzativo(models.Model):
@@ -201,14 +212,6 @@ class GruppoOrganizzativo(models.Model):
         default=Tipo.TECNICO
     )
 
-    ufficio = models.ForeignKey(
-        Ufficio,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="gruppi"
-    )
-
     directory_sid = models.CharField(
         max_length=255,
         unique=True,
@@ -231,6 +234,56 @@ class GruppoOrganizzativo(models.Model):
 
     def __str__(self):
         return self.nome
+
+    @property
+    def ufficio(self):
+        """Compatibilità temporanea con le vecchie viste a singolo ufficio.
+
+        Il modello corretto è ``uffici``: un Gruppo Operativo può servire
+        più uffici. Le nuove viste non devono usare questa proprietà.
+        """
+        return self.uffici.order_by("nome").first()
+
+    @property
+    def ufficio_id(self):
+        ufficio = self.ufficio
+        return ufficio.pk if ufficio else None
+
+
+class AssegnazioneUfficio(models.Model):
+    """Assegnazione organizzativa esplicita di un dipendente a un ufficio.
+
+    Il gruppo operativo dell'ufficio determina le appartenenze Django e AD,
+    ma non decide da solo in quale ufficio il dipendente opera.
+    """
+
+    utente = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="assegnazioni_ufficio",
+    )
+    ufficio = models.ForeignKey(
+        Ufficio,
+        on_delete=models.CASCADE,
+        related_name="assegnazioni_personale",
+    )
+    attiva = models.BooleanField(default=True)
+    creata_il = models.DateTimeField(auto_now_add=True)
+    aggiornata_il = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["ufficio__nome", "utente__last_name", "utente__first_name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["utente", "ufficio"],
+                name="uk_assegnazione_ufficio_utente",
+            ),
+        ]
+        verbose_name = "Assegnazione ufficio"
+        verbose_name_plural = "Assegnazioni uffici"
+
+    def __str__(self):
+        return f"{self.utente} — {self.ufficio}"
 
 
 class CalendarioApertura(models.Model):

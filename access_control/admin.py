@@ -36,7 +36,6 @@ class GruppoOperativoInline(admin.StackedInline):
     extra = 1
     max_num = 1
     can_delete = False
-    autocomplete_fields = ("ufficio",)
     readonly_fields = ("directory_sid",)
     fieldsets = (
         (
@@ -47,7 +46,6 @@ class GruppoOperativoInline(admin.StackedInline):
                     "directory_name",
                     "directory_sid",
                     "tipo",
-                    "ufficio",
                     "attivo",
                     "sincronizzato",
                     "note",
@@ -68,16 +66,18 @@ class GruppoDjangoAdmin(GroupAdmin):
     """Gruppo Django con la sua estensione operativa nella stessa scheda."""
 
     inlines = (GruppoOperativoInline,)
-    list_display = ("name", "ufficio_operativo", "directory_name", "attivo_operativo")
+    list_display = ("name", "uffici_operativi", "directory_name", "attivo_operativo")
     search_fields = ("name", "gruppo_organizzativo__directory_name")
 
     def get_queryset(self, request):
-        return super().get_queryset(request).select_related("gruppo_organizzativo__ufficio")
+        return super().get_queryset(request).prefetch_related("gruppo_organizzativo__uffici")
 
-    @admin.display(description="Ufficio")
-    def ufficio_operativo(self, obj):
+    @admin.display(description="Uffici")
+    def uffici_operativi(self, obj):
         gruppo = getattr(obj, "gruppo_organizzativo", None)
-        return gruppo.ufficio if gruppo and gruppo.ufficio_id else "—"
+        if not gruppo:
+            return "—"
+        return ", ".join(ufficio.nome for ufficio in gruppo.uffici.all()) or "—"
 
     @admin.display(description="Directory name")
     def directory_name(self, obj):
@@ -99,9 +99,9 @@ class UfficioGruppiOrganizzativiFilter(admin.SimpleListFilter):
 
     def queryset(self, request, queryset):
         if self.value() == "collegati":
-            return queryset.filter(gruppi__isnull=False).distinct()
+            return queryset.filter(gruppo_operativo__isnull=False)
         if self.value() == "non_collegati":
-            return queryset.filter(gruppi__isnull=True)
+            return queryset.filter(gruppo_operativo__isnull=True)
         return queryset
 
 
@@ -114,9 +114,15 @@ class UfficioDipendentiFilter(admin.SimpleListFilter):
 
     def queryset(self, request, queryset):
         if self.value() == "con_dipendenti":
-            return queryset.filter(gruppi__django_group__user__is_active=True).distinct()
+            return queryset.filter(
+                assegnazioni_personale__attiva=True,
+                assegnazioni_personale__utente__is_active=True,
+            ).distinct()
         if self.value() == "senza_dipendenti":
-            return queryset.exclude(gruppi__django_group__user__is_active=True).distinct()
+            return queryset.exclude(
+                assegnazioni_personale__attiva=True,
+                assegnazioni_personale__utente__is_active=True,
+            ).distinct()
         return queryset
 
 
@@ -127,7 +133,7 @@ class UfficioAdmin(admin.ModelAdmin):
         "prefisso_coda",
         "responsabile",
         "riceve_pubblico",
-        "gruppi_organizzativi",
+        "gruppo_operativo",
         "unita_organizzative_wordpress",
         "numero_dipendenti",
         "dipendenti_agganciati",
@@ -151,6 +157,7 @@ class UfficioAdmin(admin.ModelAdmin):
 
     autocomplete_fields = (
         "responsabile",
+        "gruppo_operativo",
     )
 
     inlines = [
@@ -160,14 +167,16 @@ class UfficioAdmin(admin.ModelAdmin):
     actions = ("disabilita_uffici", "crea_gruppi_active_directory")
 
     def get_queryset(self, request):
-        return super().get_queryset(request).prefetch_related(
-            "gruppi__django_group__user_set",
+        return super().get_queryset(request).select_related(
+            "gruppo_operativo__django_group",
+        ).prefetch_related(
+            "assegnazioni_personale__utente",
             "unita_organizzative_wordpress",
         )
 
-    @admin.display(description="Gruppi organizzativi")
-    def gruppi_organizzativi(self, obj):
-        return ", ".join(sorted((gruppo.nome for gruppo in obj.gruppi.all()), key=str.casefold)) or "—"
+    @admin.display(description="Gruppo operativo")
+    def gruppo_operativo(self, obj):
+        return obj.gruppo_operativo or "—"
 
     @admin.display(description="Unità organizzative WordPress")
     def unita_organizzative_wordpress(self, obj):
@@ -176,25 +185,20 @@ class UfficioAdmin(admin.ModelAdmin):
         ) or "—"
 
     def numero_dipendenti(self, obj):
-        utenti_ids = set()
-
-        for gruppo in obj.gruppi.all():
-            utenti_ids.update(
-                utente.pk for utente in gruppo.django_group.user_set.all() if utente.is_active
-            )
-
-        return len(utenti_ids)
+        return sum(
+            1
+            for assegnazione in obj.assegnazioni_personale.all()
+            if assegnazione.attiva and assegnazione.utente.is_active
+        )
 
     numero_dipendenti.short_description = "Dipendenti"
 
     def dipendenti_agganciati(self, obj):
-        utenti = {}
-
-        for gruppo in obj.gruppi.all():
-            for utente in gruppo.django_group.user_set.all():
-                if not utente.is_active:
-                    continue
-                utenti[utente.pk] = utente
+        utenti = {
+            assegnazione.utente.pk: assegnazione.utente
+            for assegnazione in obj.assegnazioni_personale.all()
+            if assegnazione.attiva and assegnazione.utente.is_active
+        }
 
         if not utenti:
             return "—"
@@ -243,9 +247,7 @@ class UfficioAdmin(admin.ModelAdmin):
         directory = DirectoryAdminService()
 
         for ufficio in queryset.order_by("nome"):
-            gruppo_esistente = ufficio.gruppi.filter(
-                tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO
-            ).first()
+            gruppo_esistente = ufficio.gruppo_operativo
             if gruppo_esistente:
                 saltati += 1
                 continue
@@ -258,11 +260,6 @@ class UfficioAdmin(admin.ModelAdmin):
             gruppo_locale = GruppoOrganizzativo.objects.filter(
                 directory_name=nome_gruppo
             ).first()
-            if gruppo_locale and gruppo_locale.ufficio_id not in {None, ufficio.pk}:
-                errori.append(
-                    f"{ufficio.nome}: il gruppo locale '{nome_gruppo}' è già collegato a un altro ufficio."
-                )
-                continue
             if not gruppo_locale and GruppoOrganizzativo.objects.filter(nome=nome_gruppo).exists():
                 errori.append(
                     f"{ufficio.nome}: esiste già un Gruppo Organizzativo con questo nome."
@@ -279,7 +276,6 @@ class UfficioAdmin(admin.ModelAdmin):
                     if gruppo_locale:
                         gruppo_locale.django_group = django_group
                         gruppo_locale.tipo = GruppoOrganizzativo.Tipo.ORGANIZZATIVO
-                        gruppo_locale.ufficio = ufficio
                         gruppo_locale.directory_sid = risultato["sid"] or gruppo_locale.directory_sid
                         gruppo_locale.attivo = True
                         gruppo_locale.sincronizzato = True
@@ -291,10 +287,13 @@ class UfficioAdmin(admin.ModelAdmin):
                             directory_sid=risultato["sid"] or None,
                             django_group=django_group,
                             tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
-                            ufficio=ufficio,
                             attivo=True,
                             sincronizzato=True,
                         )
+                    ufficio.gruppo_operativo = gruppo_locale or GruppoOrganizzativo.objects.get(
+                        directory_name=nome_gruppo
+                    )
+                    ufficio.save(update_fields=["gruppo_operativo"])
                 if risultato["created"]:
                     creati += 1
                 else:
@@ -320,17 +319,14 @@ class GruppoOrganizzativoAdmin(admin.ModelAdmin):
     list_display = (
         "nome",
         "tipo",
-        "ufficio",
+        "uffici_collegati",
         "numero_utenti",
         "dipendenti_collegati",
         "attivo",
         "sincronizzato",
     )
 
-    autocomplete_fields = (
-        "ufficio",
-        "django_group",
-    )
+    autocomplete_fields = ("django_group",)
 
     list_filter = (
         "tipo",
@@ -402,6 +398,10 @@ class GruppoOrganizzativoAdmin(admin.ModelAdmin):
             )
             nominativi.append(nominativo or utente.username)
         return ", ".join(sorted(nominativi, key=str.casefold)) or "—"
+
+    @admin.display(description="Uffici")
+    def uffici_collegati(self, obj):
+        return ", ".join(ufficio.nome for ufficio in obj.uffici.all()) or "—"
 
     @admin.action(
         description="Attiva gruppi selezionati"
