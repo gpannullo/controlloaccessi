@@ -82,8 +82,8 @@ class UfficiAccessMixin(ModuleAccessMixin):
         if PortineriaAccessMixin.has_module_access(user):
             return False
         return user.groups.filter(
-            gruppi_organizzativi__attivo=True,
-            gruppi_organizzativi__ufficio__attivo=True,
+            gruppo_organizzativo__attivo=True,
+            gruppo_organizzativo__ufficio__attivo=True,
         ).exists()
 
 

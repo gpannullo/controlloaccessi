@@ -224,7 +224,7 @@ def directory_users(request):
     elif attivo == "disattivi": utenti = utenti.filter(is_active=False)
     if gruppo: utenti = utenti.filter(groups__pk=gruppo)
     if uffici_selezionati:
-        utenti = utenti.filter(groups__gruppi_organizzativi__ufficio_id__in=uffici_selezionati)
+        utenti = utenti.filter(groups__gruppo_organizzativo__ufficio_id__in=uffici_selezionati)
     risultati = utenti.distinct().order_by("last_name", "first_name", "username")
     return render(request, "dashboard/directory_home.html", {"query": query, "utenti": risultati, "totale_utenti": User.objects.count(), "totale_filtrati": risultati.count(), "gruppi": Group.objects.order_by("name"), "uffici": Ufficio.objects.filter(attivo=True).order_by("nome"), "uffici_selezionati": [str(pk) for pk in uffici_selezionati], "tipi": tipi, "presenza": presenza, "attivo": attivo, "gruppo": gruppo})
 
@@ -258,17 +258,17 @@ def directory_staff(request):
     else:
         uffici_selezionati = request.session.get(session_key, [])
     personale = User.objects.filter(
-        groups__gruppi_organizzativi__ufficio__isnull=False,
-        groups__gruppi_organizzativi__ufficio__attivo=True,
-    ).distinct().prefetch_related("groups__gruppi_organizzativi__ufficio").order_by("last_name", "first_name", "username")
+        groups__gruppo_organizzativo__ufficio__isnull=False,
+        groups__gruppo_organizzativo__ufficio__attivo=True,
+    ).distinct().prefetch_related("groups__gruppo_organizzativo__ufficio").order_by("last_name", "first_name", "username")
     if uffici_selezionati:
-        personale = personale.filter(groups__gruppi_organizzativi__ufficio_id__in=uffici_selezionati).distinct()
+        personale = personale.filter(groups__gruppo_organizzativo__ufficio_id__in=uffici_selezionati).distinct()
     for utente in personale:
         assegnazioni = [
             gruppo_operativo.ufficio
             for gruppo in utente.groups.all()
-            for gruppo_operativo in gruppo.gruppi_organizzativi.all()
-            if gruppo_operativo.ufficio_id
+            for gruppo_operativo in [getattr(gruppo, "gruppo_organizzativo", None)]
+            if gruppo_operativo and gruppo_operativo.ufficio_id
         ]
         utente.uffici_associati = list({ufficio.pk: ufficio for ufficio in assegnazioni}.values())
         utente.numero_uffici = len(utente.uffici_associati)

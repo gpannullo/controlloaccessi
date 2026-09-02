@@ -26,8 +26,8 @@ def _operatori_disponibili_ufficio(ufficio):
     return User.objects.filter(
         is_active=True,
         stato_presenza=User.StatoPresenza.PRESENTE,
-        groups__gruppi_organizzativi__ufficio=ufficio,
-        groups__gruppi_organizzativi__attivo=True,
+        groups__gruppo_organizzativo__ufficio=ufficio,
+        groups__gruppo_organizzativo__attivo=True,
     ).exists()
 
 

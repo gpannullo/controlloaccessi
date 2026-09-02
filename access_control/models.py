@@ -189,10 +189,10 @@ class GruppoOrganizzativo(models.Model):
         unique=True
     )
 
-    django_group = models.ForeignKey(
+    django_group = models.OneToOneField(
         Group,
         on_delete=models.CASCADE,
-        related_name="gruppi_organizzativi"
+        related_name="gruppo_organizzativo",
     )
 
     tipo = models.CharField(

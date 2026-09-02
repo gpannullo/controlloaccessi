@@ -157,7 +157,7 @@ class CustomUserAdmin(UserAdmin):
     @admin.action(description="Crea le Persone pubbliche selezionate su WordPress")
     def crea_persone_pubbliche_wordpress(self, request, queryset):
         creati = gia_collegati = errori = 0
-        for utente in queryset.prefetch_related("groups__gruppi_organizzativi"):
+        for utente in queryset.prefetch_related("groups__gruppo_organizzativo"):
             if PersonaleWordPress.objects.filter(utente=utente).exists():
                 gia_collegati += 1
                 continue

@@ -19,7 +19,7 @@ def _utenti_destinatari(comunicazione):
         return utenti
     filtri = Q(pk__in=comunicazione.destinatari.values("pk"))
     filtri |= Q(groups__in=comunicazione.gruppi.all())
-    filtri |= Q(groups__gruppi_organizzativi__ufficio__in=comunicazione.uffici.all())
+    filtri |= Q(groups__gruppo_organizzativo__ufficio__in=comunicazione.uffici.all())
     return utenti.filter(filtri).distinct()
 
 
