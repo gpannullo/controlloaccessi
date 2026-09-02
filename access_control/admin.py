@@ -1,4 +1,4 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.db.models import Count, Q
 
 from .models import (
@@ -20,6 +20,36 @@ class CalendarioAperturaInline(admin.TabularInline):
     )
 
 
+class UfficioGruppiOrganizzativiFilter(admin.SimpleListFilter):
+    title = "Gruppi organizzativi"
+    parameter_name = "gruppi_organizzativi"
+
+    def lookups(self, request, model_admin):
+        return (("collegati", "Uffici collegati"), ("non_collegati", "Uffici non collegati"))
+
+    def queryset(self, request, queryset):
+        if self.value() == "collegati":
+            return queryset.filter(gruppi__isnull=False).distinct()
+        if self.value() == "non_collegati":
+            return queryset.filter(gruppi__isnull=True)
+        return queryset
+
+
+class UfficioDipendentiFilter(admin.SimpleListFilter):
+    title = "Dipendenti attivi"
+    parameter_name = "dipendenti"
+
+    def lookups(self, request, model_admin):
+        return (("con_dipendenti", "Con dipendenti"), ("senza_dipendenti", "Senza dipendenti"))
+
+    def queryset(self, request, queryset):
+        if self.value() == "con_dipendenti":
+            return queryset.filter(gruppi__django_group__user__is_active=True).distinct()
+        if self.value() == "senza_dipendenti":
+            return queryset.exclude(gruppi__django_group__user__is_active=True).distinct()
+        return queryset
+
+
 @admin.register(Ufficio)
 class UfficioAdmin(admin.ModelAdmin):
     list_display = (
@@ -27,6 +57,7 @@ class UfficioAdmin(admin.ModelAdmin):
         "prefisso_coda",
         "responsabile",
         "riceve_pubblico",
+        "gruppi_organizzativi",
         "numero_dipendenti",
         "dipendenti_agganciati",
         "attivo",
@@ -35,6 +66,8 @@ class UfficioAdmin(admin.ModelAdmin):
     list_filter = (
         "attivo",
         "riceve_pubblico",
+        UfficioGruppiOrganizzativiFilter,
+        UfficioDipendentiFilter,
     )
 
     search_fields = (
@@ -53,19 +86,21 @@ class UfficioAdmin(admin.ModelAdmin):
         CalendarioAperturaInline,
     ]
 
+    actions = ("disabilita_uffici",)
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related("gruppi__django_group__user_set")
+
+    @admin.display(description="Gruppi organizzativi")
+    def gruppi_organizzativi(self, obj):
+        return ", ".join(sorted((gruppo.nome for gruppo in obj.gruppi.all()), key=str.casefold)) or "—"
+
     def numero_dipendenti(self, obj):
         utenti_ids = set()
 
-        for gruppo in obj.gruppi.select_related(
-            "django_group"
-        ):
+        for gruppo in obj.gruppi.all():
             utenti_ids.update(
-                gruppo.django_group.user_set.filter(
-                    is_active=True,
-                ).values_list(
-                    "pk",
-                    flat=True,
-                )
+                utente.pk for utente in gruppo.django_group.user_set.all() if utente.is_active
             )
 
         return len(utenti_ids)
@@ -75,14 +110,10 @@ class UfficioAdmin(admin.ModelAdmin):
     def dipendenti_agganciati(self, obj):
         utenti = {}
 
-        for gruppo in obj.gruppi.select_related(
-            "django_group"
-        ):
-            for utente in (
-                gruppo.django_group
-                .user_set
-                .filter(is_active=True)
-            ):
+        for gruppo in obj.gruppi.all():
+            for utente in gruppo.django_group.user_set.all():
+                if not utente.is_active:
+                    continue
                 utenti[utente.pk] = utente
 
         if not utenti:
@@ -112,6 +143,11 @@ class UfficioAdmin(admin.ModelAdmin):
     dipendenti_agganciati.short_description = (
         "Dipendenti agganciati"
     )
+
+    @admin.action(description="Disabilita gli uffici selezionati")
+    def disabilita_uffici(self, request, queryset):
+        aggiornati = queryset.filter(attivo=True).update(attivo=False)
+        self.message_user(request, f"Uffici disabilitati: {aggiornati}.", messages.SUCCESS)
 
 
 @admin.register(GruppoOrganizzativo)
