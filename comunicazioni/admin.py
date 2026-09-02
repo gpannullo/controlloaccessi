@@ -1,4 +1,8 @@
 from django.contrib import admin, messages
+from django.conf import settings
+from django.shortcuts import get_object_or_404, render
+from django.urls import path, reverse
+from django.utils.html import format_html
 
 from .models import ComunicazioneEmail, DestinatarioComunicazioneEmail
 from .services import ComunicazioneEmailError, accoda_comunicazione
@@ -17,7 +21,7 @@ class ComunicazioneEmailAdmin(admin.ModelAdmin):
     list_filter = ("stato", "destinazione", "tutti_gli_utenti_attivi")
     search_fields = ("oggetto", "messaggio")
     autocomplete_fields = ("destinatari", "gruppi", "uffici")
-    readonly_fields = ("stato", "creata_da", "creato_il", "accodata_il", "numero_destinatari")
+    readonly_fields = ("stato", "creata_da", "creato_il", "accodata_il", "numero_destinatari", "anteprima_messaggio")
     inlines = (DestinatarioComunicazioneInline,)
     actions = ("accoda_per_invio",)
 
@@ -26,9 +30,36 @@ class ComunicazioneEmailAdmin(admin.ModelAdmin):
             obj.creata_da = request.user
         super().save_model(request, obj, form, change)
 
+    def get_urls(self):
+        info = self.model._meta
+        urls = [
+            path(
+                "<int:object_id>/anteprima/",
+                self.admin_site.admin_view(self.anteprima_view),
+                name=f"{info.app_label}_{info.model_name}_anteprima",
+            )
+        ]
+        return urls + super().get_urls()
+
+    def anteprima_view(self, request, object_id):
+        comunicazione = get_object_or_404(self.get_queryset(request), pk=object_id)
+        return render(request, "admin/comunicazioni/comunicazioneemail/anteprima.html", {
+            **self.admin_site.each_context(request),
+            "title": f"Anteprima: {comunicazione.oggetto}",
+            "comunicazione": comunicazione,
+            "mittente": settings.DEFAULT_FROM_EMAIL,
+        })
+
     @admin.display(description="Destinatari accodati")
     def numero_destinatari(self, obj):
         return obj.invii.count()
+
+    @admin.display(description="Anteprima messaggio")
+    def anteprima_messaggio(self, obj):
+        if not obj or not obj.pk:
+            return "Salvare prima la bozza per visualizzare l'anteprima."
+        url = reverse("admin:comunicazioni_comunicazioneemail_anteprima", args=[obj.pk])
+        return format_html('<a class="button" href="{}" target="_blank">Apri anteprima</a>', url)
 
     @admin.action(description="Accoda le comunicazioni selezionate per l'invio")
     def accoda_per_invio(self, request, queryset):
