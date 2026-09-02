@@ -2,6 +2,8 @@ from django.contrib import admin, messages
 from django.contrib.auth.admin import GroupAdmin
 from django.contrib.auth.models import Group
 from django.contrib.admin.sites import NotRegistered
+from django import forms
+from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.db import transaction
 from django.db.models import Count, Q
 
@@ -10,11 +12,47 @@ from accounts.services.directory_admin_service import (
     DirectoryAdminService,
 )
 from .models import (
+    AssegnazioneUfficio,
     CalendarioApertura,
     GruppoOrganizzativo,
     Ufficio,
 )
+from .services.office_assignment_service import OfficeAssignmentService
 from .services.office_service import OfficeService
+
+
+class UfficioAdminForm(forms.ModelForm):
+    """Selezione esplicita del personale operativo dell'ufficio."""
+
+    persone_attive = forms.ModelMultipleChoiceField(
+        label="Persone attive nell'ufficio",
+        required=False,
+        queryset=None,
+        widget=FilteredSelectMultiple("persone attive", is_stacked=False),
+        help_text=(
+            "Le persone selezionate sono operative in questo ufficio. "
+            "Rimuovere una persona disattiva solo la sua assegnazione qui, "
+            "senza disabilitare il relativo account."
+        ),
+    )
+
+    class Meta:
+        model = Ufficio
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from django.contrib.auth import get_user_model
+
+        user_model = get_user_model()
+        self.fields["persone_attive"].queryset = user_model.objects.filter(
+            is_active=True,
+        ).order_by("last_name", "first_name", "username")
+        if self.instance and self.instance.pk:
+            self.initial["persone_attive"] = self.instance.assegnazioni_personale.filter(
+                attiva=True,
+                utente__is_active=True,
+            ).values_list("utente_id", flat=True)
 
 
 class CalendarioAperturaInline(admin.TabularInline):
@@ -128,6 +166,7 @@ class UfficioDipendentiFilter(admin.SimpleListFilter):
 
 @admin.register(Ufficio)
 class UfficioAdmin(admin.ModelAdmin):
+    form = UfficioAdminForm
     list_display = (
         "nome",
         "prefisso_coda",
@@ -165,6 +204,49 @@ class UfficioAdmin(admin.ModelAdmin):
     ]
 
     actions = ("disabilita_uffici", "crea_gruppi_active_directory")
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        if "persone_attive" not in form.cleaned_data:
+            return
+
+        ufficio = form.instance
+        selezionati = set(
+            form.cleaned_data["persone_attive"].values_list("pk", flat=True)
+        )
+        assegnazioni = {
+            assegnazione.utente_id: assegnazione
+            for assegnazione in ufficio.assegnazioni_personale.filter(attiva=True)
+        }
+        service = OfficeAssignmentService()
+        aggiunti = rimossi = 0
+        try:
+            for utente_id in selezionati - set(assegnazioni):
+                service.assegna(
+                    form.cleaned_data["persone_attive"].model.objects.get(pk=utente_id),
+                    ufficio,
+                )
+                aggiunti += 1
+            for assegnazione in assegnazioni.values():
+                if assegnazione.utente_id not in selezionati:
+                    service.rimuovi(assegnazione.utente, ufficio)
+                    rimossi += 1
+        except Exception as exc:
+            self.message_user(
+                request,
+                "Il salvataggio dell'ufficio è riuscito, ma le assegnazioni del personale "
+                "non sono state completate: %s" % exc,
+                messages.ERROR,
+            )
+            return
+
+        if aggiunti or rimossi:
+            self.message_user(
+                request,
+                "Personale aggiornato: %s attivato/i, %s disattivato/i per questo ufficio."
+                % (aggiunti, rimossi),
+                messages.SUCCESS,
+            )
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related(
