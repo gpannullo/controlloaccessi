@@ -1,5 +1,7 @@
 from django.contrib import admin, messages
+from django.contrib.auth.admin import GroupAdmin
 from django.contrib.auth.models import Group
+from django.contrib.admin.sites import NotRegistered
 from django.db import transaction
 from django.db.models import Count, Q
 
@@ -24,6 +26,68 @@ class CalendarioAperturaInline(admin.TabularInline):
         "giorno",
         "ora_inizio",
     )
+
+
+class GruppoOperativoInline(admin.StackedInline):
+    """Estensione organizzativa visualizzata nella scheda del Gruppo Django."""
+
+    model = GruppoOrganizzativo
+    fk_name = "django_group"
+    extra = 1
+    max_num = 1
+    can_delete = False
+    autocomplete_fields = ("ufficio",)
+    readonly_fields = ("directory_sid",)
+    fieldsets = (
+        (
+            "Configurazione Gruppo Operativo",
+            {
+                "fields": (
+                    "nome",
+                    "directory_name",
+                    "directory_sid",
+                    "tipo",
+                    "ufficio",
+                    "attivo",
+                    "sincronizzato",
+                    "note",
+                ),
+            },
+        ),
+    )
+
+
+try:
+    admin.site.unregister(Group)
+except NotRegistered:
+    pass
+
+
+@admin.register(Group)
+class GruppoDjangoAdmin(GroupAdmin):
+    """Gruppo Django con la sua estensione operativa nella stessa scheda."""
+
+    inlines = (GruppoOperativoInline,)
+    list_display = ("name", "ufficio_operativo", "directory_name", "attivo_operativo")
+    search_fields = ("name", "gruppo_organizzativo__directory_name")
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("gruppo_organizzativo__ufficio")
+
+    @admin.display(description="Ufficio")
+    def ufficio_operativo(self, obj):
+        gruppo = getattr(obj, "gruppo_organizzativo", None)
+        return gruppo.ufficio if gruppo and gruppo.ufficio_id else "—"
+
+    @admin.display(description="Directory name")
+    def directory_name(self, obj):
+        gruppo = getattr(obj, "gruppo_organizzativo", None)
+        return gruppo.directory_name if gruppo else "—"
+
+    @admin.display(description="Attivo", boolean=True)
+    def attivo_operativo(self, obj):
+        gruppo = getattr(obj, "gruppo_organizzativo", None)
+        return gruppo.attivo if gruppo else None
 
 
 class UfficioGruppiOrganizzativiFilter(admin.SimpleListFilter):
