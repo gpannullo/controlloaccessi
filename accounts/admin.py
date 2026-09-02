@@ -1,7 +1,11 @@
 from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin
 
-from accounts.services.directory_admin_service import DirectoryAdminService
+from accounts.services.directory_admin_service import (
+    DirectoryAdminException,
+    DirectoryAdminService,
+)
+from access_control.models import GruppoOrganizzativo
 
 from .models import CustomUser
 from prenotazioni.models import PersonaleWordPress
@@ -80,11 +84,43 @@ class CustomUserAdmin(UserAdmin):
     )
 
     def save_model(self, request, obj, form, change):
+        if change and "groups" in form.changed_data:
+            # save_related() viene eseguito dopo save_model(): conserviamo il
+            # solo sottoinsieme di gruppi che ha una controparte AD.
+            request._gruppi_ad_precedenti = set(
+                GruppoOrganizzativo.objects.filter(
+                    django_group__user=obj,
+                ).values_list("directory_name", flat=True)
+            )
         if change and "is_active" in form.changed_data:
             DirectoryAdminService().imposta_attivo(obj.username, obj.is_active)
         if change and "badge" in form.changed_data:
             DirectoryAdminService().imposta_badge(obj.username, obj.badge)
         super().save_model(request, obj, form, change)
+
+    def save_related(self, request, form, formsets, change):
+        if change and "groups" in form.changed_data:
+            gruppi_precedenti = getattr(request, "_gruppi_ad_precedenti", set())
+            gruppi_correnti = set(
+                GruppoOrganizzativo.objects.filter(
+                    django_group__in=form.cleaned_data["groups"],
+                ).values_list("directory_name", flat=True)
+            )
+            try:
+                DirectoryAdminService().sincronizza_gruppi_selezionati(
+                    form.instance.username,
+                    da_aggiungere=gruppi_correnti - gruppi_precedenti,
+                    da_rimuovere=gruppi_precedenti - gruppi_correnti,
+                )
+            except DirectoryAdminException as exc:
+                self.message_user(
+                    request,
+                    "I gruppi non sono stati salvati: Active Directory non è stata aggiornata (%s)." % exc,
+                    messages.ERROR,
+                )
+                # Non salviamo l'M2M locale: la modifica resta coerente con AD.
+                return
+        super().save_related(request, form, formsets, change)
 
     @admin.action(
         description="Imposta come Amministrativista",

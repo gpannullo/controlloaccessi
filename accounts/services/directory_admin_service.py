@@ -380,6 +380,71 @@ class DirectoryAdminService(ActiveDirectoryService):
         finally:
             conn.unbind()
 
+    def sincronizza_gruppi_selezionati(self, username, da_aggiungere, da_rimuovere):
+        """Sincronizza solo le appartenenze AD gestite dalla modifica admin.
+
+        Non usa :meth:`aggiorna_gruppi`, che ha semantica di sostituzione
+        completa e quindi potrebbe rimuovere gruppi AD non amministrati dal
+        portale. Le operazioni gia' eseguite vengono annullate se una delle
+        successive fallisce.
+        """
+        self._require_writes()
+        da_aggiungere = {nome.strip() for nome in da_aggiungere if nome and nome.strip()}
+        da_rimuovere = {nome.strip() for nome in da_rimuovere if nome and nome.strip()}
+        if not da_aggiungere and not da_rimuovere:
+            return
+
+        conn, entry = self._user(username)
+        operazioni_eseguite = []
+        try:
+            gruppi = {}
+            for nome in da_aggiungere | da_rimuovere:
+                safe = escape_filter_chars(nome)
+                if not conn.search(
+                    settings.DIRECTORY["GROUP_SEARCH_BASE"],
+                    "(&(objectClass=group)(cn=%s))" % safe,
+                    attributes=[],
+                    size_limit=1,
+                ) or not conn.entries:
+                    raise DirectoryAdminException("Gruppo AD non trovato: %s." % nome)
+                gruppi[nome] = conn.entries[0].entry_dn
+
+            appartenenze_correnti = set(
+                entry.memberOf.values if hasattr(entry, "memberOf") else []
+            )
+
+            try:
+                for nome in sorted(da_rimuovere, key=str.casefold):
+                    gruppo_dn = gruppi[nome]
+                    if gruppo_dn not in appartenenze_correnti:
+                        continue
+                    conn.modify(
+                        gruppo_dn,
+                        {"member": [(MODIFY_DELETE, [entry.entry_dn])]},
+                    )
+                    self._ok(conn, "Rimozione gruppo")
+                    operazioni_eseguite.append((MODIFY_DELETE, gruppo_dn))
+
+                for nome in sorted(da_aggiungere, key=str.casefold):
+                    gruppo_dn = gruppi[nome]
+                    if gruppo_dn in appartenenze_correnti:
+                        continue
+                    conn.modify(
+                        gruppo_dn,
+                        {"member": [(MODIFY_ADD, [entry.entry_dn])]},
+                    )
+                    self._ok(conn, "Aggiunta gruppo")
+                    operazioni_eseguite.append((MODIFY_ADD, gruppo_dn))
+            except DirectoryAdminException:
+                # Best effort: riporta AD allo stato precedente senza toccare
+                # gruppi estranei alla modifica corrente.
+                for operazione, gruppo_dn in reversed(operazioni_eseguite):
+                    inversa = MODIFY_ADD if operazione == MODIFY_DELETE else MODIFY_DELETE
+                    conn.modify(gruppo_dn, {"member": [(inversa, [entry.entry_dn])]})
+                raise
+        finally:
+            conn.unbind()
+
     def crea_gruppo(self, nome, descrizione=""):
         """Crea un gruppo di sicurezza globale nell'OU gruppi configurata.
 
