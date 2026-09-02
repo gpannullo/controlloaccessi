@@ -1,6 +1,12 @@
 from django.contrib import admin, messages
+from django.contrib.auth.models import Group
+from django.db import transaction
 from django.db.models import Count, Q
 
+from accounts.services.directory_admin_service import (
+    DirectoryAdminException,
+    DirectoryAdminService,
+)
 from .models import (
     CalendarioApertura,
     GruppoOrganizzativo,
@@ -87,7 +93,7 @@ class UfficioAdmin(admin.ModelAdmin):
         CalendarioAperturaInline,
     ]
 
-    actions = ("disabilita_uffici",)
+    actions = ("disabilita_uffici", "crea_gruppi_active_directory")
 
     def get_queryset(self, request):
         return super().get_queryset(request).prefetch_related(
@@ -158,6 +164,91 @@ class UfficioAdmin(admin.ModelAdmin):
     def disabilita_uffici(self, request, queryset):
         aggiornati = queryset.filter(attivo=True).update(attivo=False)
         self.message_user(request, f"Uffici disabilitati: {aggiornati}.", messages.SUCCESS)
+
+    @admin.action(
+        description="Crea gruppi Active Directory per gli uffici selezionati"
+    )
+    def crea_gruppi_active_directory(self, request, queryset):
+        """Crea/collega il gruppo AD e la relativa configurazione locale.
+
+        Per evitare associazioni ambigue, ogni ufficio usa il proprio nome
+        come CN e directory name. Un ufficio che possiede gia' un gruppo di
+        tipo organizzativo non viene modificato.
+        """
+        creati, collegati, saltati, errori = 0, 0, 0, []
+        directory = DirectoryAdminService()
+
+        for ufficio in queryset.order_by("nome"):
+            gruppo_esistente = ufficio.gruppi.filter(
+                tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO
+            ).first()
+            if gruppo_esistente:
+                saltati += 1
+                continue
+
+            nome_gruppo = ufficio.nome.strip()
+            if not nome_gruppo or len(nome_gruppo) > 150:
+                errori.append(f"{ufficio.nome}: nome non valido per un gruppo AD.")
+                continue
+
+            gruppo_locale = GruppoOrganizzativo.objects.filter(
+                directory_name=nome_gruppo
+            ).first()
+            if gruppo_locale and gruppo_locale.ufficio_id not in {None, ufficio.pk}:
+                errori.append(
+                    f"{ufficio.nome}: il gruppo locale '{nome_gruppo}' è già collegato a un altro ufficio."
+                )
+                continue
+            if not gruppo_locale and GruppoOrganizzativo.objects.filter(nome=nome_gruppo).exists():
+                errori.append(
+                    f"{ufficio.nome}: esiste già un Gruppo Organizzativo con questo nome."
+                )
+                continue
+
+            try:
+                risultato = directory.crea_gruppo(
+                    nome_gruppo,
+                    descrizione=f"Gruppo organizzativo dell'ufficio {ufficio.nome}",
+                )
+                with transaction.atomic():
+                    django_group, _ = Group.objects.get_or_create(name=nome_gruppo)
+                    if gruppo_locale:
+                        gruppo_locale.django_group = django_group
+                        gruppo_locale.tipo = GruppoOrganizzativo.Tipo.ORGANIZZATIVO
+                        gruppo_locale.ufficio = ufficio
+                        gruppo_locale.directory_sid = risultato["sid"] or gruppo_locale.directory_sid
+                        gruppo_locale.attivo = True
+                        gruppo_locale.sincronizzato = True
+                        gruppo_locale.save()
+                    else:
+                        GruppoOrganizzativo.objects.create(
+                            nome=nome_gruppo,
+                            directory_name=nome_gruppo,
+                            directory_sid=risultato["sid"] or None,
+                            django_group=django_group,
+                            tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
+                            ufficio=ufficio,
+                            attivo=True,
+                            sincronizzato=True,
+                        )
+                if risultato["created"]:
+                    creati += 1
+                else:
+                    collegati += 1
+            except DirectoryAdminException as exc:
+                errori.append(f"{ufficio.nome}: {exc}")
+            except Exception as exc:
+                errori.append(f"{ufficio.nome}: errore locale durante il collegamento ({exc}).")
+
+        if creati or collegati or saltati:
+            self.message_user(
+                request,
+                "Gruppi AD creati: %s. Gruppi AD già esistenti collegati: %s. Uffici già configurati: %s."
+                % (creati, collegati, saltati),
+                messages.SUCCESS,
+            )
+        for errore in errori:
+            self.message_user(request, errore, messages.ERROR)
 
 
 @admin.register(GruppoOrganizzativo)

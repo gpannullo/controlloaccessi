@@ -3,6 +3,7 @@ from django.conf import settings
 from django.utils import timezone
 from ldap3 import MODIFY_ADD, MODIFY_DELETE, MODIFY_REPLACE
 from ldap3.utils.conv import escape_filter_chars
+from ldap3.utils.dn import escape_rdn
 
 from .active_directory_service import ActiveDirectoryService
 
@@ -376,6 +377,63 @@ class DirectoryAdminService(ActiveDirectoryService):
         try:
             conn.search(self.base_dn, "(objectClass=group)", attributes=["cn", "description", "member"])
             return sorted([{"name": str(entry.cn), "description": str(entry.description or ""), "members": [dn.split(",", 1)[0][3:] for dn in entry.member.values] if hasattr(entry, "member") else []} for entry in conn.entries], key=lambda item: item["name"].casefold())
+        finally:
+            conn.unbind()
+
+    def crea_gruppo(self, nome, descrizione=""):
+        """Crea un gruppo di sicurezza globale nell'OU gruppi configurata.
+
+        Il valore restituito indica se il gruppo e' stato creato ora oppure
+        era gia' presente. In quest'ultimo caso l'azione amministrativa puo'
+        collegare in sicurezza il gruppo locale, senza creare duplicati AD.
+        """
+        self._require_writes()
+        nome = (nome or "").strip()
+        if not nome:
+            raise DirectoryAdminException("Indicare il nome del gruppo Active Directory.")
+
+        conn = self._connection()
+        try:
+            search_base = settings.DIRECTORY["GROUP_SEARCH_BASE"]
+            filtro = "(&(objectClass=group)(cn=%s))" % escape_filter_chars(nome)
+            if conn.search(
+                search_base,
+                filtro,
+                attributes=self.GROUP_ATTRIBUTES,
+                size_limit=1,
+            ) and conn.entries:
+                entry = conn.entries[0]
+                return {
+                    "created": False,
+                    "sid": str(entry.objectSid) if getattr(entry, "objectSid", None) else "",
+                }
+
+            group_dn = "CN=%s,%s" % (escape_rdn(nome), search_base)
+            attributes = {
+                # Gruppo globale di sicurezza: puo' essere assegnato agli
+                # utenti ed e' il tipo normalmente usato per gli uffici.
+                "groupType": "-2147483646",
+            }
+            if descrizione:
+                attributes["description"] = descrizione.strip()
+
+            conn.add(group_dn, ["top", "group"], attributes)
+            self._ok(conn, "Creazione gruppo Active Directory")
+
+            if not conn.search(
+                search_base,
+                filtro,
+                attributes=self.GROUP_ATTRIBUTES,
+                size_limit=1,
+            ) or not conn.entries:
+                raise DirectoryAdminException(
+                    "Gruppo creato in Active Directory, ma non rilevabile subito dopo la creazione."
+                )
+            entry = conn.entries[0]
+            return {
+                "created": True,
+                "sid": str(entry.objectSid) if getattr(entry, "objectSid", None) else "",
+            }
         finally:
             conn.unbind()
 
