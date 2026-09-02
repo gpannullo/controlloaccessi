@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     "spid_cie",
     "prenotazioni",
     "pdnd",
+    "comunicazioni",
 ]
 
 MIDDLEWARE = [
