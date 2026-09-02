@@ -193,7 +193,9 @@ DIRECTORY = {
     ),
     "GROUP_SEARCH_BASE": os.getenv(
         "AD_GROUP_SEARCH_BASE",
-        "OU=Groups,DC=comuneaversa,DC=local",
+        # Nel dominio i gruppi applicativi risiedono nel contenitore AD
+        # predefinito ``Users``; l'OU=Groups non è presente.
+        "CN=Users,DC=comuneaversa,DC=local",
     ),
     "AUTH_FORMAT": os.getenv("AD_AUTH_FORMAT", "UPN"),
     "DJANGO_STAFF_GROUPS": [
