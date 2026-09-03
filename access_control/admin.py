@@ -45,9 +45,15 @@ class UfficioAdminForm(forms.ModelForm):
         from django.contrib.auth import get_user_model
 
         user_model = get_user_model()
-        self.fields["persone_attive"].queryset = user_model.objects.filter(
-            is_active=True,
-        ).order_by("last_name", "first_name", "username")
+        # Il personale assegnabile non è l'intera anagrafica: ogni ufficio
+        # può scegliere soltanto tra i membri del proprio gruppo operativo
+        # (Django/AD). Lo stato dell'account non limita questa configurazione.
+        if self.instance and self.instance.gruppo_operativo_id:
+            self.fields["persone_attive"].queryset = user_model.objects.filter(
+                groups=self.instance.gruppo_operativo.django_group,
+            ).order_by("last_name", "first_name", "username")
+        else:
+            self.fields["persone_attive"].queryset = user_model.objects.none()
         if self.instance and self.instance.pk:
             self.initial["persone_attive"] = self.instance.assegnazioni_personale.filter(
                 attiva=True,
