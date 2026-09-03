@@ -42,7 +42,6 @@ class CustomUserAdmin(UserAdmin):
         "stato_presenza",
         "is_active",
         "is_staff",
-        UtenteUfficioFilter,
     )
 
     list_filter = (
@@ -50,6 +49,7 @@ class CustomUserAdmin(UserAdmin):
         "stato_presenza",
         "is_active",
         "is_staff",
+        UtenteUfficioFilter,
     )
 
     search_fields = UserAdmin.search_fields + ("badge",)
