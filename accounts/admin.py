@@ -12,17 +12,37 @@ from prenotazioni.models import PersonaleWordPress
 from prenotazioni.wordpress_connector import WordPressConnectorError, crea_persona_pubblica_wordpress
 
 
+class UtenteUfficioFilter(admin.SimpleListFilter):
+    title = "Assegnazione a ufficio"
+    parameter_name = "assegnazione_ufficio"
+
+    def lookups(self, request, model_admin):
+        return (
+            ("con_ufficio", "Con ufficio"),
+            ("senza_ufficio", "Senza ufficio"),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == "con_ufficio":
+            return queryset.filter(assegnazioni_ufficio__attiva=True).distinct()
+        if self.value() == "senza_ufficio":
+            return queryset.exclude(assegnazioni_ufficio__attiva=True).distinct()
+        return queryset
+
+
 @admin.register(CustomUser)
 class CustomUserAdmin(UserAdmin):
     list_display = (
         "username",
         "first_name",
         "last_name",
+        "uffici_assegnati",
         "badge",
         "tipo_attivita",
         "stato_presenza",
         "is_active",
         "is_staff",
+        UtenteUfficioFilter,
     )
 
     list_filter = (
@@ -82,6 +102,19 @@ class CustomUserAdmin(UserAdmin):
         "imposta_disuso",
         "crea_persone_pubbliche_wordpress",
     )
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related(
+            "assegnazioni_ufficio__ufficio",
+        )
+
+    @admin.display(description="Uffici assegnati")
+    def uffici_assegnati(self, obj):
+        return ", ".join(
+            assegnazione.ufficio.nome
+            for assegnazione in obj.assegnazioni_ufficio.all()
+            if assegnazione.attiva
+        ) or "—"
 
     def save_model(self, request, obj, form, change):
         if change and "groups" in form.changed_data:
