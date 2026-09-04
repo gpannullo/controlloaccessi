@@ -5,6 +5,7 @@ from django.utils import timezone
 from access_control.models import (
     CalendarioApertura,
     GruppoOrganizzativo,
+    IndisponibilitaUfficio,
     Ufficio,
 )
 
@@ -90,6 +91,14 @@ class OfficeService:
             data_ora
         )
 
+        if IndisponibilitaUfficio.objects.filter(
+            ufficio=ufficio,
+            attiva=True,
+            data_inizio__lte=data_ora.date(),
+            data_fine__gte=data_ora.date(),
+        ).exists():
+            return False
+
         return CalendarioApertura.objects.filter(
             ufficio=ufficio,
             giorno=data_ora.weekday(),
@@ -145,6 +154,12 @@ class OfficeService:
             data_ora
         )
 
+        indisponibili_oggi = IndisponibilitaUfficio.objects.filter(
+            attiva=True,
+            data_inizio__lte=data_ora.date(),
+            data_fine__gte=data_ora.date(),
+        ).values("ufficio_id")
+
         uffici = (
             Ufficio.objects
             .filter(
@@ -160,6 +175,7 @@ class OfficeService:
                     data_ora.time()
                 ),
             )
+            .exclude(pk__in=indisponibili_oggi)
             .distinct()
             .order_by("nome")
         )

@@ -81,6 +81,10 @@
                     </div>
                 {% endif %}
 
+                {% if puo_gestire_indisponibilita %}
+                    <a href="{% url 'uffici:indisponibilita' ufficio.pk %}" class="btn btn-outline-danger">Disponibilità al pubblico</a>
+                {% endif %}
+
                 <a
                         href="{% url 'home' %}"
                         class="btn btn-outline-secondary"

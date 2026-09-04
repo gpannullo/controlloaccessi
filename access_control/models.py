@@ -250,6 +250,41 @@ class GruppoOrganizzativo(models.Model):
         return ufficio.pk if ufficio else None
 
 
+class IndisponibilitaUfficio(models.Model):
+    """Periodo in cui un ufficio non può ricevere il pubblico."""
+
+    ufficio = models.ForeignKey(
+        Ufficio,
+        on_delete=models.CASCADE,
+        related_name="indisponibilita",
+    )
+    data_inizio = models.DateField()
+    data_fine = models.DateField()
+    motivo = models.CharField(max_length=255, blank=True)
+    attiva = models.BooleanField(default=True)
+    comunicata_da = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="indisponibilita_uffici_comunicate",
+    )
+    creata_il = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-data_inizio", "ufficio__nome"]
+        verbose_name = "Indisponibilità ufficio"
+        verbose_name_plural = "Indisponibilità uffici"
+
+    def clean(self):
+        super().clean()
+        if self.data_fine and self.data_inizio and self.data_fine < self.data_inizio:
+            raise ValidationError({"data_fine": "La data finale non può precedere la data iniziale."})
+
+    def __str__(self):
+        return f"{self.ufficio}: dal {self.data_inizio:%d/%m/%Y} al {self.data_fine:%d/%m/%Y}"
+
+
 class AssegnazioneUfficio(models.Model):
     """Assegnazione organizzativa esplicita di un dipendente a un ufficio.
 

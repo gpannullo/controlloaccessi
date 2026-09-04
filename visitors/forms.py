@@ -2,9 +2,25 @@ from django import forms
 from django.utils import timezone
 from datetime import timedelta
 
-from access_control.models import Ufficio
+from access_control.models import IndisponibilitaUfficio, Ufficio
 from access_control.services.office_service import OfficeService
 from visitors.models import AccessoVisitatore
+
+
+class IndisponibilitaUfficioForm(forms.ModelForm):
+    class Meta:
+        model = IndisponibilitaUfficio
+        fields = ("data_inizio", "data_fine", "motivo")
+        widgets = {
+            "data_inizio": forms.DateInput(attrs={"type": "date"}),
+            "data_fine": forms.DateInput(attrs={"type": "date"}),
+            "motivo": forms.TextInput(attrs={"placeholder": "Es. ferie del personale"}),
+        }
+        labels = {
+            "data_inizio": "Dal giorno",
+            "data_fine": "Al giorno",
+            "motivo": "Motivazione",
+        }
 
 
 class RegistrazioneVisitatoreForm(forms.Form):

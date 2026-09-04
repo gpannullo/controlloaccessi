@@ -81,10 +81,13 @@ class UfficiAccessMixin(ModuleAccessMixin):
             return True
         if PortineriaAccessMixin.has_module_access(user):
             return False
-        return user.assegnazioni_ufficio.filter(
-            attiva=True,
-            ufficio__attivo=True,
-        ).exists()
+        return (
+            user.assegnazioni_ufficio.filter(
+                attiva=True,
+                ufficio__attivo=True,
+            ).exists()
+            or user.uffici_responsabili.filter(attivo=True).exists()
+        )
 
 
 class DirigenzaAccessMixin(ModuleAccessMixin):

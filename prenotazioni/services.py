@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from django.conf import settings
 from django.utils import timezone
 
-from access_control.models import CalendarioApertura, Ufficio
+from access_control.models import CalendarioApertura, IndisponibilitaUfficio, Ufficio
 
 from .models import Prenotazione
 
@@ -20,6 +20,13 @@ def date_disponibili(ufficio):
 
 def slot_disponibili(ufficio, data):
     if data < timezone.localdate() or data > timezone.localdate() + timedelta(days=settings.PRENOTAZIONI_MAX_GIORNI):
+        return []
+    if IndisponibilitaUfficio.objects.filter(
+        ufficio=ufficio,
+        attiva=True,
+        data_inizio__lte=data,
+        data_fine__gte=data,
+    ).exists():
         return []
     aperture = CalendarioApertura.objects.filter(ufficio=ufficio, giorno=data.weekday(), su_appuntamento=True).order_by("ora_inizio")
     minuti = settings.PRENOTAZIONI_DURATA_SLOT_MINUTI

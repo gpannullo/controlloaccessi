@@ -1,5 +1,8 @@
 from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
+from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import (
     get_object_or_404,
@@ -8,9 +11,10 @@ from django.shortcuts import (
 )
 from django.views.decorators.http import require_POST, require_GET
 
-from access_control.models import Ufficio
+from access_control.models import IndisponibilitaUfficio, Ufficio
 from access_control.services.office_service import OfficeService
 from common.exceptions import BusinessException
+from visitors.forms import IndisponibilitaUfficioForm
 from visitors.models import AccessoVisitatore
 from visitors.permissions import ufficio_required
 from visitors.services.capacity_service import CapacityService
@@ -63,8 +67,12 @@ def _uffici_utente(user):
         Ufficio.objects
         .filter(
             attivo=True,
-            assegnazioni_personale__utente=user,
-            assegnazioni_personale__attiva=True,
+        ).filter(
+            Q(
+                assegnazioni_personale__utente=user,
+                assegnazioni_personale__attiva=True,
+            )
+            | Q(responsabile=user)
         )
         .distinct()
         .order_by("nome")
@@ -80,6 +88,40 @@ def _get_ufficio_autorizzato(user, ufficio_id):
     return get_object_or_404(
         _uffici_utente(user),
         pk=ufficio_id,
+    )
+
+
+@login_required
+def gestisci_indisponibilita(request, ufficio_id):
+    """Permette al responsabile di sospendere temporaneamente il ricevimento."""
+    ufficio = get_object_or_404(Ufficio, pk=ufficio_id)
+    if not request.user.is_superuser and ufficio.responsabile_id != request.user.pk:
+        raise PermissionDenied("Solo il responsabile dell'ufficio può gestire le indisponibilità.")
+
+    indisponibilita = ufficio.indisponibilita.select_related("comunicata_da").all()
+    if request.method == "POST" and request.POST.get("azione") == "revoca":
+        periodo = get_object_or_404(indisponibilita, pk=request.POST.get("periodo_id"))
+        periodo.attiva = False
+        periodo.save(update_fields=["attiva"])
+        messages.success(request, "Indisponibilità revocata.")
+        return redirect("uffici:indisponibilita", ufficio_id=ufficio.pk)
+
+    form = IndisponibilitaUfficioForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        periodo = form.save(commit=False)
+        periodo.ufficio = ufficio
+        periodo.comunicata_da = request.user
+        periodo.save()
+        messages.success(
+            request,
+            "Indisponibilità comunicata: l'ufficio non riceverà pubblico nel periodo indicato.",
+        )
+        return redirect("uffici:indisponibilita", ufficio_id=ufficio.pk)
+
+    return render(
+        request,
+        "visitors/gestione_indisponibilita.html",
+        {"ufficio": ufficio, "form": form, "indisponibilita": indisponibilita},
     )
 
 
@@ -192,6 +234,10 @@ def ufficio_dashboard(request, ufficio_id):
                 visite_in_corso
             ),
             "uffici_trasferimento": uffici_trasferimento,
+            "puo_gestire_indisponibilita": (
+                request.user.is_superuser
+                or ufficio.responsabile_id == request.user.pk
+            ),
         },
     )
 

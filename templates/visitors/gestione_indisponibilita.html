@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Indisponibilità {{ ufficio.nome }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+      <h1 class="h3 mb-1">Indisponibilità al pubblico</h1>
+      <p class="text-muted mb-0">{{ ufficio.nome }}</p>
+    </div>
+    <a class="btn btn-outline-secondary" href="{% url 'uffici:dashboard' ufficio.pk %}">Torna all'ufficio</a>
+  </div>
+
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+      {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <h2 class="h5">Comunica un periodo di chiusura</h2>
+      <p class="text-muted small">Durante il periodo indicato l'ufficio non sarà selezionabile per nuovi ricevimenti e i visitatori resteranno nella hall.</p>
+      <form method="post" class="row g-3">
+        {% csrf_token %}
+        {% for field in form %}
+          <div class="col-md-{% if field.name == 'motivo' %}6{% else %}3{% endif %}">
+            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+        {% endfor %}
+        <div class="col-12"><button class="btn btn-danger">Comunica indisponibilità</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h2 class="h5">Periodi comunicati</h2>
+      <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Dal</th><th>Al</th><th>Motivo</th><th>Stato</th><th></th></tr></thead><tbody>
+        {% for periodo in indisponibilita %}
+          <tr><td>{{ periodo.data_inizio|date:"d/m/Y" }}</td><td>{{ periodo.data_fine|date:"d/m/Y" }}</td><td>{{ periodo.motivo|default:"—" }}</td><td>{% if periodo.attiva %}<span class="badge text-bg-danger">Attiva</span>{% else %}<span class="badge text-bg-secondary">Revocata</span>{% endif %}</td><td>{% if periodo.attiva %}<form method="post" onsubmit="return confirm('Revocare questa indisponibilità?');">{% csrf_token %}<input type="hidden" name="azione" value="revoca"><input type="hidden" name="periodo_id" value="{{ periodo.pk }}"><button class="btn btn-sm btn-outline-secondary">Revoca</button></form>{% endif %}</td></tr>
+        {% empty %}<tr><td colspan="5" class="text-muted">Nessun periodo comunicato.</td></tr>
+        {% endfor %}
+      </tbody></table></div>
+    </div>
+  </div>
+</div>
+{% endblock %}

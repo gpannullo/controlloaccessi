@@ -15,6 +15,7 @@ from .models import (
     AssegnazioneUfficio,
     CalendarioApertura,
     GruppoOrganizzativo,
+    IndisponibilitaUfficio,
     Ufficio,
 )
 from .services.office_assignment_service import OfficeAssignmentService
@@ -69,6 +70,20 @@ class CalendarioAperturaInline(admin.TabularInline):
     ordering = (
         "giorno",
         "ora_inizio",
+    )
+
+
+class IndisponibilitaUfficioInline(admin.TabularInline):
+    model = IndisponibilitaUfficio
+    extra = 0
+    readonly_fields = ("comunicata_da", "creata_il")
+    fields = (
+        "data_inizio",
+        "data_fine",
+        "motivo",
+        "attiva",
+        "comunicata_da",
+        "creata_il",
     )
 
 
@@ -207,6 +222,7 @@ class UfficioAdmin(admin.ModelAdmin):
 
     inlines = [
         CalendarioAperturaInline,
+        IndisponibilitaUfficioInline,
     ]
 
     actions = ("disabilita_uffici", "crea_gruppi_active_directory")
