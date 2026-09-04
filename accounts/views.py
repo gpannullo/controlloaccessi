@@ -100,20 +100,24 @@ def initial_password_change(request):
 @login_required
 @require_http_methods(["GET", "POST"])
 def my_account(request):
+    tab = request.GET.get("tab", "anagrafica")
     if request.method == "POST":
         request.user.email_aggiuntiva = request.POST.get("email_aggiuntiva", "").strip()
         request.user.telefono_aggiuntivo = request.POST.get("telefono_aggiuntivo", "").strip()
         request.user.save(update_fields=["email_aggiuntiva", "telefono_aggiuntivo"])
         messages.success(request, "Recapiti aggiuntivi aggiornati.")
-        return redirect("my_account")
+        return redirect("%s?tab=anagrafica" % reverse("my_account"))
     try:
         dettaglio = DirectoryAdminService().dettaglio(request.user.username)
     except Exception as exc:
         dettaglio = None; messages.warning(request, "Dati directory non disponibili: %s" % exc)
     uffici = AssegnazioneUfficio.objects.filter(utente=request.user, attiva=True).select_related("ufficio", "ufficio__gruppo_operativo").order_by("ufficio__nome")
+    uffici_responsabili = request.user.uffici_responsabili.filter(attivo=True).order_by("nome")
     return render(request, "accounts/my_account.html", {
         "dettaglio": dettaglio,
         "uffici": uffici,
+        "uffici_responsabili": uffici_responsabili,
+        "tab": tab if tab in {"anagrafica", "uffici", "abilitazioni"} else "anagrafica",
         "account_update_contact_email": settings.ACCOUNT_UPDATE_CONTACT_EMAIL,
         "is_public_account": request.get_host().split(":", 1)[0].lower() == settings.PUBLIC_ACCOUNT_HOST,
     })
