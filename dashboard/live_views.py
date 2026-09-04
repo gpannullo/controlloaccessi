@@ -24,9 +24,7 @@ def stato_dashboard_portineria(request):
     )
 
     uffici_oggi = list(
-        OfficeService.get_offices_receiving_today(
-            adesso
-        )
+        OfficeService.get_offices_receiving_with_present_staff()
     )
 
     dati_uffici = []
@@ -52,8 +50,8 @@ def stato_dashboard_portineria(request):
             .count()
         )
 
-        operatori_disponibili = (
-            CapacityService.numero_operatori_attivi(
+        dipendenti_presenti = (
+            CapacityService.numero_dipendenti_presenti(
                 ufficio
             )
         )
@@ -65,8 +63,8 @@ def stato_dashboard_portineria(request):
                     visitatori_da_servire
                 ),
                 "registrati_oggi": registrati_oggi,
-                "operatori_disponibili": (
-                    operatori_disponibili
+                "dipendenti_presenti": (
+                    dipendenti_presenti
                 ),
             }
         )

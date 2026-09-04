@@ -697,60 +697,21 @@
                                                 {{ ufficio.nome }}
                                             </strong>
 
-                                            {% if ufficio.aperto_adesso %}
-
-                                                <span class="badge bg-success">
-                                                Aperto adesso
+                                            <span class="badge bg-success">
+                                                Personale presente
                                             </span>
-
-                                            {% else %}
-
-                                                <span
-                                                        class="badge bg-warning text-dark"
-                                                >
-                                                Non aperto adesso
-                                            </span>
-
-                                            {% endif %}
                                         </div>
 
                                         <div class="card-body">
 
-                                            <!-- ORARI -->
-
                                             <div class="mb-3">
-
                                                 <div class="small text-muted">
-                                                    Orari di oggi
+                                                    Ubicazione
                                                 </div>
-
-                                                {% for apertura in ufficio.aperture_di_oggi %}
-
-                                                    <div class="fw-semibold">
-
-                                                        {{ apertura.ora_inizio|time:"H:i" }}
-                                                        –
-                                                        {{ apertura.ora_fine|time:"H:i" }}
-
-                                                        {% if apertura.su_appuntamento %}
-
-                                                            <span
-                                                                    class="badge bg-info text-dark"
-                                                            >
-                                                            Su appuntamento
-                                                        </span>
-
-                                                        {% endif %}
-
-                                                    </div>
-
-                                                {% empty %}
-
-                                                    <div class="text-muted">
-                                                        Nessun orario configurato.
-                                                    </div>
-
-                                                {% endfor %}
+                                                <div class="fw-semibold">
+                                                    Piano: {{ ufficio.piano|default:"—" }}
+                                                    · Stanza: {{ ufficio.stanza|default:"—" }}
+                                                </div>
 
                                             </div>
 
@@ -823,13 +784,13 @@
                                                         <div
                                                                 class="fs-3 fw-bold text-success"
                                                                 data-office="{{ ufficio.pk }}"
-                                                                data-counter="operatori-disponibili"
+                                                                data-counter="dipendenti-presenti"
                                                         >
-                                                            {{ ufficio.numero_operatori_disponibili }}
+                                                            {{ ufficio.numero_dipendenti_presenti }}
                                                         </div>
 
                                                         <div class="small text-muted">
-                                                            Disponibili ora
+                                                            Dipendenti presenti
                                                         </div>
 
                                                     </div>
@@ -862,11 +823,11 @@
                                                                         {% firstof dipendente.get_full_name dipendente.username %}
                                                                     </span>
 
-                                                                    {% if dipendente in ufficio.operatori_disponibili %}
+                                                                    {% if dipendente in ufficio.dipendenti_presenti %}
                                                                         <span
                                                                             class="rounded-circle bg-success d-inline-block flex-shrink-0"
                                                                             style="width: .75rem; height: .75rem;"
-                                                                            aria-label="Disponibile al ricevimento"
+                                                                            aria-label="Presente"
                                                                         ></span>
                                                                     {% elif dipendente.stato_presenza == "ASS" %}
                                                                         <span
@@ -1270,8 +1231,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 updateOfficeCounter(
                     ufficio.id,
-                    "operatori-disponibili",
-                    ufficio.operatori_disponibili
+                    "dipendenti-presenti",
+                    ufficio.dipendenti_presenti
                 );
             });
 

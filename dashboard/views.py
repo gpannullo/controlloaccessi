@@ -157,7 +157,7 @@ def dashboard_home(request):
     # realmente selezionabili nel form "Nuovo ricevimento".
     uffici_prenotabili = (
         OfficeService
-        .get_offices_receiving_today(adesso)
+        .get_offices_receiving_with_present_staff()
     )
 
     aperture_odierne = (
@@ -168,7 +168,7 @@ def dashboard_home(request):
 
     uffici_che_ricevono_oggi = (
         OfficeService
-        .get_offices_receiving_today(adesso)
+        .get_offices_receiving_with_present_staff()
         .annotate(
             visitatori_in_coda=Count(
                 "visite",
@@ -200,25 +200,22 @@ def dashboard_home(request):
     uffici_oggi = []
 
     for ufficio in uffici_che_ricevono_oggi:
-        ufficio.aperto_adesso = OfficeService.is_open(
-            ufficio,
-            adesso,
-        )
-
         ufficio.dipendenti_assegnati = (
             _dipendenti_assegnati_ufficio(ufficio)
         )
 
-        ufficio.operatori_disponibili = (
-            _operatori_disponibili_ufficio(ufficio)
-        )
+        ufficio.dipendenti_presenti = [
+            dipendente
+            for dipendente in ufficio.dipendenti_assegnati
+            if dipendente.stato_presenza == User.StatoPresenza.PRESENTE
+        ]
 
         ufficio.numero_dipendenti_assegnati = len(
             ufficio.dipendenti_assegnati
         )
 
-        ufficio.numero_operatori_disponibili = len(
-            ufficio.operatori_disponibili
+        ufficio.numero_dipendenti_presenti = len(
+            ufficio.dipendenti_presenti
         )
 
         uffici_oggi.append(ufficio)

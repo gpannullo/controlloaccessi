@@ -136,7 +136,7 @@ class RegistrazioneVisitatoreForm(forms.Form):
         else:
             uffici = (
                 OfficeService
-                .get_offices_receiving_today()
+                .get_offices_receiving_with_present_staff()
             )
 
         self.fields["ufficio"].queryset = uffici

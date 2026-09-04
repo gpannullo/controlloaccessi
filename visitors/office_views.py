@@ -426,13 +426,6 @@ def aggiorna_coda_fuori(request, ufficio_id):
         ufficio_id,
     )
 
-    if not OfficeService.is_open(ufficio):
-        messages.warning(
-            request,
-            "L'ufficio è chiuso in questo momento: i visitatori restano nella hall.",
-        )
-        return redirect("uffici:dashboard", ufficio_id=ufficio.pk)
-
     numero_operatori = CapacityService.numero_dipendenti_presenti(ufficio)
 
     numero_gia_fuori = (

@@ -33,7 +33,7 @@ class UfficioAdminForm(forms.ModelForm):
         help_text=(
             "Le persone selezionate sono operative in questo ufficio. "
             "Rimuovere una persona disattiva solo la sua assegnazione qui, "
-            "senza disabilitare il relativo account."
+            "senza disabilitare il relativo account o modificare i gruppi AD/Django."
         ),
     )
 
@@ -188,7 +188,7 @@ class UfficioDipendentiFilter(admin.SimpleListFilter):
 class UfficioAdmin(admin.ModelAdmin):
     form = UfficioAdminForm
 
-    readonly_fields = ("membri_gruppo_operativo",)
+    readonly_fields = ("stato_personale", "membri_gruppo_operativo",)
     list_display = (
         "nome",
         "prefisso_coda",
@@ -301,6 +301,26 @@ class UfficioAdmin(admin.ModelAdmin):
             stato = "abilitato per questo ufficio" if utente.pk in assegnati else "non abilitato per questo ufficio"
             membri.append(f"{etichetta} ({stato})")
         return ", ".join(sorted(membri, key=str.casefold)) or "—"
+
+    @admin.display(description="Presenze del personale attivo nell'ufficio")
+    def stato_personale(self, obj):
+        """Mostra solo le persone abilitate per questo ufficio."""
+        assegnazioni = obj.assegnazioni_personale.filter(
+            attiva=True,
+            utente__is_active=True,
+        ).select_related("utente")
+        stati = {
+            "PRE": "presente",
+            "ASS": "assente",
+        }
+        persone = []
+        for assegnazione in assegnazioni:
+            utente = assegnazione.utente
+            nome = utente.get_full_name().strip() or utente.username
+            persone.append(
+                f"{nome}: {stati.get(utente.stato_presenza, 'non verificato')}"
+            )
+        return ", ".join(sorted(persone, key=str.casefold)) or "Nessun dipendente attivo assegnato."
 
     @admin.display(description="Unità organizzative WordPress")
     def unita_organizzative_wordpress(self, obj):
