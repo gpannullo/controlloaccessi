@@ -6,7 +6,7 @@ from access_control.models import AssegnazioneUfficio, GruppoOrganizzativo, Uffi
 
 
 class OfficeAssignmentService:
-    """Mantiene coerenti assegnazioni ufficio, gruppi Django e gruppi AD."""
+    """Gestisce le assegnazioni agli uffici e, in aggiunta, i gruppi necessari."""
 
     @staticmethod
     def _gruppi_gestiti():
@@ -87,8 +87,8 @@ class OfficeAssignmentService:
         ).first()
         if not assegnazione:
             return False
-        necessari = self._gruppi_necessari(utente, ufficio_rimosso=ufficio)
-        self._sincronizza_gruppi(utente, necessari)
+        # Disabling an office assignment is a local organizational choice:
+        # never modify the user's AD/Django group memberships here.
         assegnazione.attiva = False
         assegnazione.save(update_fields=["attiva", "aggiornata_il"])
         return True
