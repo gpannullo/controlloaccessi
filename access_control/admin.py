@@ -58,7 +58,6 @@ class UfficioAdminForm(forms.ModelForm):
         if self.instance and self.instance.pk:
             self.initial["persone_attive"] = self.instance.assegnazioni_personale.filter(
                 attiva=True,
-                utente__is_active=True,
             ).values_list("utente_id", flat=True)
 
 
@@ -188,6 +187,8 @@ class UfficioDipendentiFilter(admin.SimpleListFilter):
 @admin.register(Ufficio)
 class UfficioAdmin(admin.ModelAdmin):
     form = UfficioAdminForm
+
+    readonly_fields = ("membri_gruppo_operativo",)
     list_display = (
         "nome",
         "prefisso_coda",
@@ -275,12 +276,31 @@ class UfficioAdmin(admin.ModelAdmin):
             "gruppo_operativo__django_group",
         ).prefetch_related(
             "assegnazioni_personale__utente",
+            "gruppo_operativo__django_group__user_set",
             "unita_organizzative_wordpress",
         )
 
     @admin.display(description="Gruppo operativo")
     def gruppo_operativo(self, obj):
         return obj.gruppo_operativo or "—"
+
+    @admin.display(description="Membri del Gruppo Operativo")
+    def membri_gruppo_operativo(self, obj):
+        """Tutti gli utenti ereditati dal gruppo, anche non abilitati qui."""
+        gruppo = obj.gruppo_operativo
+        if not gruppo:
+            return "—"
+        assegnati = {
+            assegnazione.utente_id
+            for assegnazione in obj.assegnazioni_personale.all()
+            if assegnazione.attiva
+        }
+        membri = []
+        for utente in gruppo.django_group.user_set.all():
+            etichetta = utente.get_full_name().strip() or utente.username
+            stato = "abilitato per questo ufficio" if utente.pk in assegnati else "non abilitato per questo ufficio"
+            membri.append(f"{etichetta} ({stato})")
+        return ", ".join(sorted(membri, key=str.casefold)) or "—"
 
     @admin.display(description="Unità organizzative WordPress")
     def unita_organizzative_wordpress(self, obj):
