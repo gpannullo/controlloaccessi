@@ -19,6 +19,22 @@ User = get_user_model()
 class CapacityService:
 
     @staticmethod
+    def numero_dipendenti_presenti(ufficio):
+        """Conta i dipendenti assegnati, attivi e presenti.
+
+        Questa verifica è sempre rigorosa: serve a stabilire se il
+        visitatore può essere inviato fisicamente fuori dall'ufficio,
+        indipendentemente dall'eventuale configurazione generale dei
+        controlli presenze.
+        """
+        return User.objects.filter(
+            assegnazioni_ufficio__ufficio=ufficio,
+            assegnazioni_ufficio__attiva=True,
+            is_active=True,
+            stato_presenza=User.StatoPresenza.PRESENTE,
+        ).distinct().count()
+
+    @staticmethod
     def numero_operatori_attivi(ufficio):
         """
         Conta gli utenti attivi assegnati all'ufficio,

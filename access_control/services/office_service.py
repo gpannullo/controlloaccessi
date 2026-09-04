@@ -131,7 +131,6 @@ class OfficeService:
     def get_offices_receiving_today(
         cls,
         data_ora=None,
-        richiede_personale_presente=False,
     ):
         """
         Restituisce gli uffici che possono accettare
@@ -164,16 +163,6 @@ class OfficeService:
             .distinct()
             .order_by("nome")
         )
-
-        if richiede_personale_presente:
-            User = get_user_model()
-            uffici = uffici.filter(
-                assegnazioni_personale__attiva=True,
-                assegnazioni_personale__utente__is_active=True,
-                assegnazioni_personale__utente__stato_presenza=(
-                    User.StatoPresenza.PRESENTE
-                ),
-            ).distinct()
 
         return uffici
 

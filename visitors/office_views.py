@@ -9,6 +9,7 @@ from django.shortcuts import (
 from django.views.decorators.http import require_POST, require_GET
 
 from access_control.models import Ufficio
+from access_control.services.office_service import OfficeService
 from common.exceptions import BusinessException
 from visitors.models import AccessoVisitatore
 from visitors.permissions import ufficio_required
@@ -379,11 +380,14 @@ def aggiorna_coda_fuori(request, ufficio_id):
         ufficio_id,
     )
 
-    numero_operatori = (
-        CapacityService.numero_operatori_attivi(
-            ufficio
+    if not OfficeService.is_open(ufficio):
+        messages.warning(
+            request,
+            "L'ufficio è chiuso in questo momento: i visitatori restano nella hall.",
         )
-    )
+        return redirect("uffici:dashboard", ufficio_id=ufficio.pk)
+
+    numero_operatori = CapacityService.numero_dipendenti_presenti(ufficio)
 
     numero_gia_fuori = (
         OfficeQueueService
@@ -405,7 +409,7 @@ def aggiorna_coda_fuori(request, ufficio_id):
         messages.warning(
             request,
             (
-                "Non risultano sportellisti disponibili "
+                "Non risultano dipendenti assegnati e presenti "
                 "per questo ufficio."
             ),
         )

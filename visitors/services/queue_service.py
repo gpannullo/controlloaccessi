@@ -3,6 +3,7 @@ from django.utils import timezone
 
 from django.contrib.auth import get_user_model
 
+from access_control.services.office_service import OfficeService
 from visitors.services.capacity_service import CapacityService
 
 User = get_user_model()
@@ -185,13 +186,14 @@ class QueueService:
 
         ufficio = accesso.ufficio_destinazione
 
-        # La capacità della coda fuori porta coincide
-        # con il numero degli sportellisti disponibili.
+        # Fuori dall'ufficio si invia soltanto durante una fascia di
+        # apertura effettiva e se almeno un dipendente assegnato risulta
+        # presente. In tutti gli altri casi il visitatore resta nella hall.
+        ufficio_aperto = OfficeService.is_open(ufficio)
         capacita_fuori = (
-            CapacityService
-            .numero_operatori_attivi(
-                ufficio
-            )
+            CapacityService.numero_dipendenti_presenti(ufficio)
+            if ufficio_aperto
+            else 0
         )
 
         numero_fuori = (
