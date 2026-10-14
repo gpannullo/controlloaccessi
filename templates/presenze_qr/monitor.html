@@ -7,9 +7,9 @@
 body {margin:0;background:#eef3f7;color:#183249;font:20px Arial,sans-serif;text-align:center;}
 #panel {margin:24px auto;padding:20px;width:580px;background:white;border:1px solid #ccd5de;}
 h1 {font-size:30px;} h2 {font-size:24px;} #box {height:360px;}
-#qr {display:none;width:360px;height:360px;border:0;} #stato {font-weight:bold;} .small {font-size:16px;}
+#qr {display:none;width:360px;height:360px;border:0;} #stato {font-weight:bold;} .small {font-size:12px;}
 </style></head><body><div id="panel">
-<h1>Comune di Aversa</h1><h2>Presenze del personale</h2><p>{{ postazione.nome }}</p>
+<h1>Comune di Aversa</h1><h2>Servizio Presenze del personale non dipendente</h2><p>Postazione: {{ postazione.nome }}</p>
 <p>Inquadra il codice per registrare Entrata o Uscita</p>
 <div id="box"><img id="qr" alt="QR per timbrare" width="360" height="360"></div>
 <p id="stato">Generazione del codice...</p>
