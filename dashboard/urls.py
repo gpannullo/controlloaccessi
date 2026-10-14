@@ -1,4 +1,5 @@
 from django.urls import path
+from dashboard.staff_report import staff_monthly_report
 from visitors.report_views import report_visitatori
 
 from dashboard.dirigenza_views import (
@@ -58,6 +59,7 @@ urlpatterns = [
     path("gestione-account/users/sync-email-upn/", directory_sync_mail_from_upn, name="directory_sync_mail_from_upn"),
     path("gestione-account/groups/", directory_groups, name="directory_groups"),
     path("gestione-account/personale/", directory_staff, name="directory_staff"),
+    path("gestione-account/personale/statino/", staff_monthly_report, name="staff_monthly_report"),
     path("gestione-account/groups/rename/", directory_group_rename, name="directory_group_rename"),
     path("gestione-account/users/<int:pk>/", directory_user, name="directory_user"),
     path("gestione-account/users/<int:pk>/action/", directory_action, name="directory_action"),
