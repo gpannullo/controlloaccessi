@@ -13,12 +13,15 @@
             </p>
         </div>
 
+        <div class="d-flex flex-wrap gap-2">
+        <a href="{% url 'dashboard:report_visitatori' %}" class="btn btn-primary">Report visitatori</a>
         <a
             href="{% url 'dashboard:dirigenza_home' %}"
             class="btn btn-outline-primary"
         >
             Torna al pannello
         </a>
+        </div>
     </div>
 
     <form method="get" class="card shadow-sm border-0 mb-4">

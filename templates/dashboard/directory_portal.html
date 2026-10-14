@@ -1,42 +1,66 @@
 {% extends "base.html" %}
 
+{% block title %}Amministrazione Account{% endblock %}
+
 {% block content %}
 <div class="container py-5">
-  <div class="d-flex justify-content-between align-items-center gap-3 mb-4">
-  <div class="d-flex align-items-center gap-3">
-    <div class="rounded-circle bg-danger-subtle text-danger d-flex align-items-center justify-content-center" style="width: 64px; height: 64px;">
-      <span class="fs-3">AD</span>
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <div class="text-danger mb-1">Amministrazione</div>
+            <h1 class="h2 mb-1">Amministrazione Account</h1>
+            <p class="text-muted mb-0">Gestione delle utenze e consultazione dei dati organizzativi.</p>
+        </div>
+        <a class="btn btn-outline-danger" href="{% url 'home' %}">
+            <i class="bi bi-arrow-left me-1"></i>Torna alla home
+        </a>
     </div>
-    <div>
-      <h1 class="h2 mb-1">Amministrazione Account</h1>
-      <p class="text-muted mb-0">Gestione utenti, gruppi e credenziali di accesso.</p>
-    </div>
-  </div>
-    <a class="btn btn-outline-danger" href="{% url 'home' %}">Torna alla home</a>
-  </div>
 
-  <div class="row g-3">
-    <div class="col-md-6">
-      <a class="card h-100 shadow-sm text-decoration-none text-body" href="{% url 'dashboard:directory_staff' %}"><div class="card-body p-4"><h2 class="h4">Personale</h2><p class="text-muted">Elenco anagrafico del personale, recapiti e uffici associati.</p><span class="btn btn-danger">Gestisci personale</span></div></a>
-    </div>
-    <div class="col-md-6">
-      <a class="card h-100 shadow-sm text-decoration-none text-body" href="{% url 'dashboard:directory_users' %}">
-        <div class="card-body p-4">
-          <h2 class="h4">Utenti</h2>
-          <p class="text-muted">Ricerca, filtri, azioni massive e gestione del singolo account.</p>
-          <span class="btn btn-danger">Gestisci utenti</span>
+    <a class="card border-danger shadow-sm text-decoration-none text-body d-block mb-5" href="{% url 'dashboard:directory_users' %}">
+        <div class="card-body p-4 p-md-5 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-4">
+            <div>
+                <div class="d-flex align-items-center gap-3 mb-2">
+                    <span class="rounded-circle bg-danger text-white d-inline-flex align-items-center justify-content-center" style="width: 3rem; height: 3rem;">
+                        <i class="bi bi-people-fill fs-4"></i>
+                    </span>
+                    <h2 class="h3 mb-0">Gestione utenti</h2>
+                </div>
+                <p class="text-muted mb-0">Ricerca, filtri, azioni massive, creazione e gestione dei singoli account.</p>
+            </div>
+            <span class="btn btn-danger text-nowrap">Apri gestione utenti <i class="bi bi-arrow-right ms-1"></i></span>
         </div>
-      </a>
+    </a>
+
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <h2 class="h5 mb-0">Consultazioni</h2>
+        <span class="badge text-bg-secondary">Sola lettura</span>
     </div>
-    <div class="col-md-6">
-      <a class="card h-100 shadow-sm text-decoration-none text-body" href="{% url 'dashboard:directory_groups' %}">
-        <div class="card-body p-4">
-          <h2 class="h4">Gruppi</h2>
-          <p class="text-muted">Elenco dei gruppi, soggetti associati e rinomina.</p>
-          <span class="btn btn-danger">Gestisci gruppi</span>
+    <p class="text-muted small mb-3">Dati utili alla consultazione, senza modifiche ai gruppi o alle anagrafiche.</p>
+
+    <div class="row g-3">
+        <div class="col-md-6">
+            <a class="card h-100 shadow-sm text-decoration-none text-body" href="{% url 'dashboard:directory_staff' %}">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="bi bi-person-vcard fs-4 text-secondary"></i>
+                        <h3 class="h5 mb-0">Personale</h3>
+                    </div>
+                    <p class="text-muted mb-3">Elenco anagrafico del personale, recapiti e uffici associati.</p>
+                    <span class="btn btn-outline-secondary">Consulta personale</span>
+                </div>
+            </a>
         </div>
-      </a>
+        <div class="col-md-6">
+            <a class="card h-100 shadow-sm text-decoration-none text-body" href="{% url 'dashboard:directory_groups' %}">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="bi bi-collection fs-4 text-secondary"></i>
+                        <h3 class="h5 mb-0">Gruppi</h3>
+                    </div>
+                    <p class="text-muted mb-3">Elenco dei gruppi Active Directory e dei soggetti associati.</p>
+                    <span class="btn btn-outline-secondary">Consulta gruppi</span>
+                </div>
+            </a>
+        </div>
     </div>
-  </div>
 </div>
 {% endblock %}

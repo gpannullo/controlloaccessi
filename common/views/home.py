@@ -3,6 +3,7 @@ from django.shortcuts import render
 from django.utils import timezone
 from accounts.services.directory_admin_service import DirectoryAdminService
 from common.module_access import (
+    DirectoryAdministrationAccessMixin,
     DirigenzaAccessMixin,
     MonitorPortineriaAccessMixin,
     PortineriaAccessMixin,
@@ -23,6 +24,7 @@ def home(request):
     has_offices = UfficiAccessMixin.has_module_access(request.user)
     has_dirigenza = DirigenzaAccessMixin.has_module_access(request.user)
     can_portineria = PortineriaAccessMixin.has_module_access(request.user)
+    can_manage_directory = DirectoryAdministrationAccessMixin.has_module_access(request.user)
     password_expiry = None
     password_days_remaining = None
     password_never_expires = False
@@ -41,6 +43,7 @@ def home(request):
         "can_offices": has_offices,
         "can_dirigenza": has_dirigenza,
         "can_monitor": MonitorPortineriaAccessMixin.has_module_access(request.user),
+        "can_manage_directory": can_manage_directory,
         "password_expiry": password_expiry,
         "password_days_remaining": password_days_remaining,
         "password_never_expires": password_never_expires,

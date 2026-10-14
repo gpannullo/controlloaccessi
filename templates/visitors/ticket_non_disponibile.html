@@ -1,0 +1,35 @@
+{% load static %}
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ticket non disponibile · Comune di Aversa</title>
+    <style>
+        :root { color-scheme: light; }
+        * { box-sizing: border-box; }
+        body { min-height: 100vh; margin: 0; display: grid; place-items: center; padding: 1.5rem; font-family: Arial, sans-serif; color: #17324d; background: #f3f7fa; }
+        main { width: min(100%, 580px); padding: clamp(2rem, 7vw, 3.5rem); text-align: center; background: #fff; border-radius: 1rem; box-shadow: 0 6px 24px #17324d22; }
+        .brand { display: inline-flex; align-items: center; gap: .8rem; margin-bottom: 2.25rem; color: #005a9c; text-align: left; }
+        .brand-emblem { width: 3.8rem; height: 3.8rem; object-fit: contain; }
+        .brand-name { font-size: 1.2rem; font-weight: 700; line-height: 1.15; }
+        .brand-subtitle { display: block; margin-top: .18rem; color: #5d6a75; font-size: .83rem; font-weight: 400; }
+        .icon { width: 4rem; height: 4rem; margin: 0 auto 1.25rem; display: grid; place-items: center; border-radius: 50%; color: #8b1e2d; background: #fcecef; font-size: 2rem; font-weight: 700; }
+        h1 { margin: 0 0 .8rem; font-size: clamp(1.55rem, 6vw, 2.1rem); }
+        p { max-width: 28rem; margin: 0 auto; color: #5d6a75; font-size: 1.05rem; line-height: 1.55; }
+        .note { margin-top: 2rem; padding-top: 1.25rem; border-top: 1px solid #dce3e8; font-size: .9rem; }
+    </style>
+</head>
+<body>
+<main>
+    <div class="brand" aria-label="Comune di Aversa">
+                <img class="brand-emblem" src="{% static 'visitors/images/stemma-comune-aversa.jpg' %}" alt="Stemma del Comune di Aversa">
+        <div class="brand-name">Comune di Aversa<span class="brand-subtitle">Controllo accessi</span></div>
+    </div>
+    <div class="icon" aria-hidden="true">!</div>
+    <h1>Questo ticket non è più disponibile</h1>
+    <p>Il collegamento è scaduto oppure il ricevimento è già terminato.</p>
+    <p class="note">Per informazioni, rivolgersi alla portineria del Comune.</p>
+</main>
+</body>
+</html>

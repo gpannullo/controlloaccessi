@@ -6,7 +6,7 @@ from access_control.models import AssegnazioneUfficio, GruppoOrganizzativo, Uffi
 
 
 class OfficeAssignmentService:
-    """Gestisce esclusivamente le assegnazioni locali agli uffici."""
+    """Gestisce assegnazioni locali e aggiunta al gruppo AD dell'ufficio."""
 
     @staticmethod
     def _gruppi_gestiti():
@@ -62,8 +62,12 @@ class OfficeAssignmentService:
 
     @transaction.atomic
     def assegna(self, utente, ufficio):
-        if not ufficio.gruppo_operativo_id:
-            raise ValidationError("L'ufficio non ha un Gruppo Operativo configurato.")
+        gruppo = ufficio.gruppo_operativo if ufficio.gruppo_operativo_id else None
+        if gruppo and (gruppo.directory_name or "").strip():
+            DirectoryAdminService().aggiungi_utente_al_gruppo(
+                utente.username, gruppo.directory_name.strip(),
+            )
+            utente.groups.add(gruppo.django_group_id)
         assegnazione, creata = AssegnazioneUfficio.objects.get_or_create(
             utente=utente,
             ufficio=ufficio,
@@ -71,7 +75,6 @@ class OfficeAssignmentService:
         )
         if not creata and assegnazione.attiva:
             return assegnazione, False
-        # An office assignment must never alter AD/Django group memberships.
         if not assegnazione.attiva:
             assegnazione.attiva = True
             assegnazione.save(update_fields=["attiva", "aggiornata_il"])

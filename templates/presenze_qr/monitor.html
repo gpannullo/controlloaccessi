@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Monitor presenze{% endblock %}
+{% block content %}
+<main class="container py-4 text-center">
+  <h1>Comune di Aversa</h1><h2>Presenze del personale</h2><p class="fs-4">{{ postazione.nome }}</p>
+  <p class="fs-4">Inquadra il codice per registrare Entrata o Uscita</p>
+  <div style="min-height:360px"><img id="qr" hidden alt="QR monouso per timbrare" width="360" height="360" style="max-width:90vw;height:auto;background:white"></div>
+  <p id="stato" role="status">Generazione del codice…</p>
+  <p>Codice valido 30 secondi e per una sola timbratura.</p>
+  <button id="full" class="btn btn-outline-primary">Schermo intero</button>
+  <form id="csrf" hidden>{% csrf_token %}</form>
+</main>
+<script>
+(() => {
+  const img = document.getElementById('qr'), status = document.getElementById('stato');
+  let deadline = 0, generation = '', busy = false;
+  async function refresh() {
+    if (busy) return;
+    busy = true; const started = performance.now();
+    const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 4000);
+    try {
+      const response = await fetch('{% url "monitor_presenze_codice" postazione.pk %}', {method:'POST', body:new FormData(document.getElementById('csrf')), cache:'no-store', redirect:'error', signal:controller.signal});
+      if (!response.ok) throw new Error();
+      const data = await response.json();
+      deadline = performance.now() + Math.max(0, data.remaining_ms - (performance.now()-started));
+      if (generation !== data.generazione) {img.src = data.qr; generation = data.generazione;}
+      img.hidden = deadline <= performance.now();
+    } catch (_) { deadline = 0; img.hidden = true; status.textContent = 'Codice non disponibile. Controllare connessione e accesso.'; }
+    finally { clearTimeout(timer); busy = false; }
+  }
+  setInterval(() => {if (deadline) {const left = Math.ceil((deadline-performance.now())/1000); img.hidden = left <= 0; status.textContent = left > 0 ? 'Nuovo codice entro ' + left + ' secondi' : 'Aggiornamento codice…';}}, 100);
+  setInterval(refresh, 1000); refresh();
+  document.getElementById('full').onclick = () => document.documentElement.requestFullscreen();
+})();
+</script>
+{% endblock %}

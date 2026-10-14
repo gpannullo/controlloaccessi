@@ -95,8 +95,8 @@
 
         <div class="row g-3 mb-4">
 
-            <div class="col-sm-6 col-xl-3">
-                <div class="card h-100 shadow-sm">
+            <div class="col-sm-6 col-xl">
+                <div class="card h-100 shadow-sm" role="button" tabindex="0" style="cursor:pointer" data-bs-toggle="modal" data-bs-target="#coda-prioritaria-modal">
                     <div class="card-body">
 
                         <div class="text-muted">
@@ -110,12 +110,14 @@
                             {{ numero_prioritari }}
                         </div>
 
+                        <div class="small text-muted">Clicca per consultare</div>
+
                     </div>
                 </div>
             </div>
 
-            <div class="col-sm-6 col-xl-3">
-                <div class="card h-100 shadow-sm">
+            <div class="col-sm-6 col-xl">
+                <div class="card h-100 shadow-sm" role="button" tabindex="0" style="cursor:pointer" data-bs-toggle="modal" data-bs-target="#coda-hall-modal">
                     <div class="card-body">
 
                         <div class="text-muted">
@@ -129,12 +131,14 @@
                             {{ numero_hall }}
                         </div>
 
+                        <div class="small text-muted">Clicca per consultare</div>
+
                     </div>
                 </div>
             </div>
 
-            <div class="col-sm-6 col-xl-3">
-                <div class="card h-100 shadow-sm">
+            <div class="col-sm-6 col-xl">
+                <div class="card h-100 shadow-sm" role="button" tabindex="0" style="cursor:pointer" data-bs-toggle="modal" data-bs-target="#coda-fuori-modal">
                     <div class="card-body">
 
                         <div class="text-muted">
@@ -145,12 +149,14 @@
                             {{ numero_fuori }}
                         </div>
 
+                        <div class="small text-muted">Clicca per consultare</div>
+
                     </div>
                 </div>
             </div>
 
-            <div class="col-sm-6 col-xl-3">
-                <div class="card h-100 shadow-sm">
+            <div class="col-sm-6 col-xl">
+                <div class="card h-100 shadow-sm" role="button" tabindex="0" style="cursor:pointer" data-bs-toggle="modal" data-bs-target="#visite-in-corso-modal">
                     <div class="card-body">
 
                         <div class="text-muted">
@@ -161,10 +167,182 @@
                             {{ numero_in_ufficio }}
                         </div>
 
+                        <div class="small text-muted">Clicca per consultare</div>
+
                     </div>
                 </div>
             </div>
 
+            <div class="col-sm-6 col-xl">
+                <div class="card h-100 shadow-sm border-warning">
+                    <button
+                        type="button"
+                        class="btn text-start w-100 h-100 p-0 border-0"
+                        data-bs-toggle="modal"
+                        data-bs-target="#prenotati-non-arrivati-modal"
+                        aria-label="Consulta i prenotati non ancora arrivati"
+                    >
+                    <div class="card-body">
+
+                        <div class="text-muted">
+                            Prenotati non arrivati
+                        </div>
+
+                        <div id="numero-prenotati-non-arrivati" class="display-6 fw-semibold text-warning">
+                            {{ numero_prenotati_non_arrivati }}
+                        </div>
+
+                        <div class="small text-muted">
+                            Clicca per consultare l'elenco
+                        </div>
+
+                    </div>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <div
+            class="modal fade"
+            id="prenotati-non-arrivati-modal"
+            tabindex="-1"
+            aria-labelledby="prenotati-non-arrivati-titolo"
+            aria-hidden="true"
+        >
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-warning">
+                        <div>
+                            <h2 class="modal-title fs-5" id="prenotati-non-arrivati-titolo">
+                                Prenotati di oggi non ancora arrivati
+                            </h2>
+                            <div class="small text-dark-emphasis">{{ numero_prenotati_non_arrivati }} appuntamenti da registrare</div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+                    </div>
+                    <div class="modal-body">
+                        {% if prenotati_non_arrivati %}
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Ora</th>
+                                            <th scope="col">Richiedente</th>
+                                            <th scope="col">Telefono</th>
+                                            <th scope="col">Motivo</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for appuntamento in prenotati_non_arrivati %}
+                                            <tr>
+                                                <td class="fw-semibold">{{ appuntamento.data_ora|date:"H:i" }}</td>
+                                                <td>{{ appuntamento.cognome_cittadino }} {{ appuntamento.nome_cittadino }}</td>
+                                                <td>{{ appuntamento.telefono|default:"—" }}</td>
+                                                <td>{{ appuntamento.motivo|default:"—" }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p class="mb-0 text-muted">Non ci sono prenotati in attesa di registrazione.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="coda-prioritaria-modal" tabindex="-1" aria-labelledby="coda-prioritaria-titolo" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header bg-danger text-white">
+                        <div>
+                            <h2 class="modal-title fs-5" id="coda-prioritaria-titolo">Prioritari in hall</h2>
+                            <div class="small opacity-75">{{ numero_prioritari }} persone con precedenza</div>
+                        </div>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+                    </div>
+                    <div class="modal-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead><tr><th>Coda</th><th>Visitatore</th><th>Priorità</th><th>Arrivo</th></tr></thead>
+                                <tbody>
+                                    {% for accesso in coda_prioritaria %}
+                                        <tr><td class="fw-semibold">{{ accesso.numero_coda_formattato }}</td><td>{{ accesso.visitatore }}</td><td>{% if accesso.rientro_prioritario %}<span class="badge text-bg-warning">Rientro</span>{% else %}<span class="badge text-bg-danger">Appuntamento {{ accesso.appuntamento.data_ora|date:"H:i" }}</span>{% endif %}</td><td>{{ accesso.ingresso|date:"H:i" }}</td></tr>
+                                    {% empty %}
+                                        <tr><td colspan="4" class="text-center text-muted py-5">Nessun accesso prioritario in attesa.</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="coda-hall-modal" tabindex="-1" aria-labelledby="coda-hall-titolo" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header bg-secondary text-white">
+                        <div><h2 class="modal-title fs-5" id="coda-hall-titolo">Coda ordinaria nella hall</h2><div class="small opacity-75">{{ numero_hall }} persone in attesa</div></div>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+                    </div>
+                    <div class="modal-body p-0"><div class="table-responsive"><table class="table table-hover align-middle mb-0">
+                        <thead><tr><th>Coda</th><th>Tipo</th><th>Visitatore</th><th>Motivo</th><th>Arrivo</th><th class="text-end">Azione</th></tr></thead>
+                        <tbody>
+                            {% for accesso in coda_hall %}
+                                <tr><td class="fw-semibold">{{ accesso.numero_coda_formattato }}</td><td>{% if accesso.tipo_accesso == "VIS" %}<span class="badge text-bg-success">Visita</span>{% else %}<span class="badge text-bg-primary">Ricevimento</span>{% endif %}</td><td>{{ accesso.visitatore }}</td><td>{{ accesso.motivo|default:"—" }}</td><td>{{ accesso.ingresso|date:"H:i" }}</td><td class="text-end">{% if accesso.tipo_accesso == "VIS" %}<form method="post" action="{% url 'uffici:autorizza_salita_visita' ufficio.pk accesso.pk %}">{% csrf_token %}<button type="submit" class="btn btn-sm btn-outline-success">Autorizza salita</button></form>{% else %}<span class="small text-muted">Gestione automatica</span>{% endif %}</td></tr>
+                            {% empty %}
+                                <tr><td colspan="6" class="text-center text-muted py-5">Nessun visitatore nella hall.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table></div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="coda-fuori-modal" tabindex="-1" aria-labelledby="coda-fuori-titolo" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <div><h2 class="modal-title fs-5" id="coda-fuori-titolo">Coda fuori dall'ufficio</h2><div class="small opacity-75">{{ numero_fuori }} persone in attesa</div></div>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+                    </div>
+                    <div class="modal-body p-0"><div class="table-responsive"><table class="table table-hover align-middle mb-0">
+                        <thead><tr><th>Posizione</th><th>Coda</th><th>Tipo</th><th>Visitatore</th><th>Motivo</th><th>Attesa dal</th><th class="text-end">Azione</th></tr></thead>
+                        <tbody>
+                            {% for accesso in coda_fuori %}
+                                <tr><td>{{ forloop.counter }}</td><td class="fw-semibold">{{ accesso.numero_coda_formattato }}</td><td>{% if accesso.rientro_prioritario %}<span class="badge text-bg-warning">Rientro</span>{% elif accesso.tipo_accesso == "VIS" %}<span class="badge text-bg-success">Visita</span>{% elif accesso.appuntamento %}<span class="badge text-bg-danger">Appuntamento</span>{% else %}<span class="badge text-bg-primary">Ricevimento</span>{% endif %}</td><td>{{ accesso.visitatore }}</td><td>{{ accesso.motivo|default:"—" }}</td><td>{{ accesso.spostato_fuori_ufficio_il|date:"H:i" }}</td><td class="text-end">{% if accesso.tipo_accesso == "VIS" and not visita_corrente %}<form method="post" action="{% url 'uffici:fai_entrare_visitatore' ufficio.pk accesso.pk %}">{% csrf_token %}<button type="submit" class="btn btn-sm btn-success">Fai entrare</button></form>{% elif accesso.tipo_accesso == "VIS" %}<span class="small text-muted">Concludi prima la visita corrente</span>{% else %}<span class="small text-muted">Usa “Fai entrare il prossimo”</span>{% endif %}</td></tr>
+                            {% empty %}
+                                <tr><td colspan="7" class="text-center text-muted py-5">Nessun visitatore fuori dall'ufficio.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table></div></div>
+                    <div class="modal-footer"><form method="post" action="{% url 'uffici:aggiorna_coda_fuori' ufficio.pk %}">{% csrf_token %}<button type="submit" class="btn btn-outline-primary">Aggiorna coda fuori ufficio</button></form><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="visite-in-corso-modal" tabindex="-1" aria-labelledby="visite-in-corso-titolo" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header bg-success text-white">
+                        <div><h2 class="modal-title fs-5" id="visite-in-corso-titolo">Visitatori dentro l'ufficio</h2><div class="small opacity-75">{{ numero_in_ufficio }} visite in corso</div></div>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+                    </div>
+                    <div class="modal-body p-0"><div class="table-responsive"><table class="table table-hover align-middle mb-0">
+                        <thead><tr><th>Coda</th><th>Visitatore</th><th>Operatore</th><th>Stato</th></tr></thead>
+                        <tbody>
+                            {% for accesso in visite_in_corso %}
+                                <tr><td class="fw-semibold">{{ accesso.numero_coda_formattato }}</td><td>{{ accesso.visitatore }}</td><td>{% if accesso.operatore_assegnato %}{% firstof accesso.operatore_assegnato.get_full_name accesso.operatore_assegnato.username %}{% else %}—{% endif %}</td><td><span class="badge text-bg-success">In visita</span></td></tr>
+                            {% empty %}
+                                <tr><td colspan="4" class="text-center text-muted py-5">Nessuna visita in corso nell'ufficio.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table></div></div>
+                </div>
+            </div>
         </div>
 
         <!-- VISITA CORRENTE -->
@@ -265,6 +443,11 @@
                         </div>
 
                         <div class="col-lg-5">
+
+                            <form method="post" action="{% url 'uffici:salta_non_presente' ufficio.pk visita_corrente.pk %}" class="mb-3" onsubmit="return confirm('Il visitatore non si è presentato? Tornerà in fondo alla hall della sua categoria.');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline-warning w-100">Non presente — salta</button>
+                            </form>
 
                             <form
                                     method="post"
@@ -368,7 +551,7 @@
 
         {% endif %}
 
-        <div class="row g-4">
+        <div class="row g-4 d-none" aria-hidden="true">
 
             <!-- CODA FUORI DALL'UFFICIO -->
 
@@ -587,7 +770,7 @@
 
         <!-- CODE NELLA HALL -->
 
-        <div class="row g-4 mt-1">
+        <div class="row g-4 mt-1 d-none" aria-hidden="true">
 
             <div class="col-xl-6">
 
@@ -783,139 +966,65 @@
         </div>
 
     </div>
+<span id="office-live-state" hidden data-visit="{{ visita_corrente.pk|default_if_none:'' }}"></span>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-    const refreshUrl =
-        "{% url 'uffici:stato_live' ufficio.pk %}";
-
-    const refreshInterval = 10000;
-
-    let refreshInProgress = false;
-    let currentVisitId = (
-        {% if visita_corrente %}
-            {{ visita_corrente.pk }}
-        {% else %}
-            null
-        {% endif %}
-    );
-
-    function updateText(selector, value) {
-        document
-            .querySelectorAll(selector)
-            .forEach(function (element) {
-                element.textContent = value;
-            });
-    }
-
-    async function refreshOfficeCounters() {
-        if (
-            refreshInProgress ||
-            document.hidden
-        ) {
-            return;
-        }
-
-        refreshInProgress = true;
-
+    const modalIds = ["coda-prioritaria-modal", "coda-hall-modal", "coda-fuori-modal", "visite-in-corso-modal", "prenotati-non-arrivati-modal"];
+    const visitId = document.getElementById("office-live-state").dataset.visit;
+    let running = false;
+    async function refreshOffice() {
+        if (running || document.hidden) return;
+        running = true;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
         try {
-            const response = await fetch(
-                refreshUrl,
-                {
-                    headers: {
-                        "X-Requested-With": "XMLHttpRequest"
-                    },
-                    cache: "no-store"
+            const response = await fetch(window.location.pathname + window.location.search, {
+                cache: "no-store", signal: controller.signal,
+                headers: {"X-Requested-With": "XMLHttpRequest"}
+            });
+            if (!response.ok || response.redirected) throw new Error("Sessione o aggiornamento non disponibile");
+            const page = new DOMParser().parseFromString(await response.text(), "text/html");
+            const state = page.getElementById("office-live-state");
+            if (!state) throw new Error("Risposta ufficio non valida");
+            if (state.dataset.visit !== visitId) { window.location.reload(); return; }
+            // Keep the modal root and Bootstrap instance, including its open state.
+            for (const id of modalIds) {
+                const current = document.getElementById(id);
+                const fresh = page.getElementById(id);
+                if (!current || !fresh) throw new Error("Modal mancante: " + id);
+                for (const selector of [".modal-body", ".modal-header .small"]) {
+                    const target = current.querySelector(selector);
+                    const source = fresh.querySelector(selector);
+                    if (target && source) {
+                        const scroll = target.scrollTop;
+                        target.innerHTML = source.innerHTML;
+                        target.scrollTop = scroll;
+                    }
                 }
-            );
-
-            if (!response.ok) {
-                throw new Error(
-                    `Errore HTTP ${response.status}`
-                );
             }
-
-            const data = await response.json();
-
-            if (!data.success) {
-                return;
+            for (const id of ["numero-prioritari", "numero-hall", "numero-fuori", "numero-in-ufficio", "numero-prenotati-non-arrivati"]) {
+                const fresh = page.getElementById(id);
+                if (!fresh) continue;
+                document.querySelectorAll("#" + id + ', [data-counter="' + id + '"]').forEach(el => { el.textContent = fresh.textContent; });
             }
-
-            updateText(
-                "#numero-prioritari",
-                data.numero_prioritari
-            );
-
-            updateText(
-                '[data-counter="numero-prioritari"]',
-                data.numero_prioritari
-            );
-
-            updateText(
-                "#numero-hall",
-                data.numero_hall
-            );
-
-            updateText(
-                '[data-counter="numero-hall"]',
-                data.numero_hall
-            );
-
-            updateText(
-                "#numero-fuori",
-                data.numero_fuori
-            );
-
-            updateText(
-                '[data-counter="numero-fuori"]',
-                data.numero_fuori
-            );
-
-            updateText(
-                "#numero-in-ufficio",
-                data.numero_in_ufficio
-            );
-
-            updateText(
-                '[data-counter="numero-in-ufficio"]',
-                data.numero_in_ufficio
-            );
-
-            const newVisitId = data.visita_corrente
-                ? data.visita_corrente.id
-                : null;
-
-            /*
-             * Se cambia la visita corrente, ricarichiamo
-             * l'intera pagina perché devono cambiare anche
-             * pulsanti, nominativo e form di conclusione.
-             */
-            if (newVisitId !== currentVisitId) {
-                window.location.reload();
-            }
-
+            document.querySelectorAll(".office-refresh-error").forEach(el => el.remove());
         } catch (error) {
-            console.error(
-                "Aggiornamento ufficio non riuscito:",
-                error
-            );
-        } finally {
-            refreshInProgress = false;
-        }
-    }
-
-    window.setInterval(
-        refreshOfficeCounters,
-        refreshInterval
-    );
-
-    document.addEventListener(
-        "visibilitychange",
-        function () {
-            if (!document.hidden) {
-                refreshOfficeCounters();
+            console.error("Aggiornamento ufficio non riuscito", error);
+            for (const id of modalIds) {
+                const content = document.querySelector("#" + id + " .modal-content");
+                if (content && !content.querySelector(".office-refresh-error")) {
+                    const warning = document.createElement("div");
+                    warning.className = "alert alert-warning m-2 office-refresh-error";
+                    warning.setAttribute("role", "status");
+                    warning.textContent = "Aggiornamento non riuscito: i dati mostrati potrebbero non essere aggiornati.";
+                    content.prepend(warning);
+                }
             }
-        }
-    );
+        } finally { clearTimeout(timeout); running = false; }
+    }
+    modalIds.forEach(id => document.getElementById(id)?.addEventListener("show.bs.modal", refreshOffice));
+    setInterval(refreshOffice, 10000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshOffice(); });
 });
 </script>
 {% endblock %}

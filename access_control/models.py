@@ -121,6 +121,17 @@ class Ufficio(models.Model):
     def __str__(self):
         return self.nome
 
+    def sincronizza_wordpress(self):
+        """Pubblica le unità WordPress mappate a questo ufficio.
+
+        Il metodo è richiamabile sia dall'admin sia dalle future pagine
+        dell'account dei dipendenti; non viene eseguito dal ``save()`` base
+        perché le assegnazioni del personale sono salvate successivamente.
+        """
+        from .services.wordpress_sync_service import sincronizza_ufficio_wordpress
+
+        return sincronizza_ufficio_wordpress(self)
+
     def clean(self):
         super().clean()
         self.prefisso_coda = (self.prefisso_coda or "").strip().upper()

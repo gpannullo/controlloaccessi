@@ -184,6 +184,12 @@
                     <span class="monitor-status-dot"></span>
                     <span id="monitor-status-text">Monitor attivo</span>
                 </div>
+
+                {% if monitor_launcher_url %}
+                    <a href="{{ monitor_launcher_url }}" class="btn btn-sm btn-outline-secondary mt-3">
+                        <i class="bi bi-download me-1"></i>Scarica avvio monitor
+                    </a>
+                {% endif %}
             </div>
 
         </div>
@@ -316,7 +322,7 @@
 <script>
 document.addEventListener("DOMContentLoaded", function () {
 
-    const refreshUrl = "{% url 'monitor_stato_live' %}";
+    const refreshUrl = "{{ monitor_live_url }}";
     const refreshInterval = 2500;
 
     let requestInProgress = false;
@@ -857,6 +863,16 @@ document.addEventListener("DOMContentLoaded", function () {
             data.uffici.forEach(
                 updateOffice
             );
+
+            // Il server restituisce l'ordine degli eventi di coda, dal piu recente.
+            // Spostiamo i nodi esistenti senza ricreare schede o notifiche audio.
+            const grid = document.getElementById("office-grid");
+            data.uffici.forEach(function (office, index) {
+                const wrapper = document.getElementById(`office-wrapper-${office.id}`);
+                if (wrapper && grid.children[index] !== wrapper) {
+                    grid.insertBefore(wrapper, grid.children[index] || null);
+                }
+            });
 
         } catch (error) {
 

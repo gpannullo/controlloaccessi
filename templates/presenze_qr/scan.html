@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Timbratura personale{% endblock %}
+{% block content %}
+<div class="container py-4" style="max-width:600px">
+  <h1 class="h3">Presenze — Comune di Aversa</h1>
+  <div id="esito" class="alert alert-info" role="status" aria-live="polite">Lettura del codice…</div>
+  {% if not request.user.is_authenticated %}
+  <p>Accedi con le tue credenziali personali. Se nel frattempo il QR scade, inquadra quello nuovo dopo l'accesso.</p>
+  <a class="btn btn-primary btn-lg w-100" href="{% url 'login' %}?next={% url 'presenze_qr:scan' %}">Accedi</a>
+  {% elif abilitato_qr %}
+  <p>{{ request.user.get_full_name|default:request.user.username }}</p>
+  <form id="timbra" method="post" action="{% url 'presenze_qr:registra' %}">{% csrf_token %}
+    <div class="d-grid gap-3"><button type="button" class="btn btn-success btn-lg py-4" data-verso="I">Entrata</button><button type="button" class="btn btn-danger btn-lg py-4" data-verso="U">Uscita</button></div>
+  </form>
+  {% else %}<p>La timbratura QR è riservata agli utenti attivi senza badge.</p>{% endif %}
+  <a class="btn btn-outline-secondary mt-4" href="{% url 'presenze_qr:personale' %}">Le mie timbrature</a>
+</div>
+{{ automatico|json_script:"verso-automatico" }}
+<script>
+(() => {
+  const key = 'presenze-qr-token';
+  const status = document.getElementById('esito');
+  const incoming = new URLSearchParams(location.hash.slice(1)).get('token');
+  let token = incoming || '';
+  try { if (incoming) sessionStorage.setItem(key, incoming); else token = sessionStorage.getItem(key) || ''; } catch (_) {}
+  if (incoming) history.replaceState(null, '', location.pathname);
+  const form = document.getElementById('timbra');
+  status.textContent = token ? 'QR acquisito. Attendi la conferma della timbratura.' : 'Inquadra il nuovo QR sul monitor della sede.';
+  if (!form) return;
+  const buttons = Array.from(form.querySelectorAll('button'));
+  let busy = false, completed = false;
+  const lock = value => buttons.forEach(b => b.disabled = value);
+  if (!token) { lock(true); return; }
+  async function submit(verso) {
+    if (busy || completed) return;
+    busy = true; lock(true); status.textContent = 'Registrazione in corso…';
+    const data = new FormData(form); data.set('token', token); data.set('verso', verso);
+    try {
+      const response = await fetch(form.action, {method:'POST', body:data, credentials:'same-origin', redirect:'error'});
+      const result = await response.json();
+      if (!result.success) { status.textContent = result.error; lock(false); return; }
+      completed = true;
+      try { sessionStorage.removeItem(key); } catch (_) {}
+      status.className = 'alert alert-success'; status.textContent = result.verso + ' registrata correttamente.';
+      location.replace(result.url);
+    } catch (_) { status.textContent = 'Connessione interrotta: verifica lo storico prima di riprovare. Ripetere lo stesso QR non duplica il timbro.'; lock(false); }
+    finally { busy = false; }
+  }
+  buttons.forEach(b => b.addEventListener('click', () => submit(b.dataset.verso)));
+  const auto = JSON.parse(document.getElementById('verso-automatico').textContent);
+  if (auto) submit('auto'); else status.textContent = 'Seleziona Entrata oppure Uscita.';
+})();
+</script>
+{% endblock %}

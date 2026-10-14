@@ -105,6 +105,20 @@ class DirectoryAdminService(ActiveDirectoryService):
         conn, entry = self._user(username)
         try:
             valore = (badge or "").strip()
+            attributo_badge = getattr(entry, "employeeID", None)
+            valore_corrente = (
+                str(attributo_badge.value or "").strip()
+                if attributo_badge is not None
+                else ""
+            )
+
+            # LDAP risponde con NO_ATTRIBUTE_OR_VAL quando viene tentata la
+            # cancellazione di employeeID che non è mai stato impostato.
+            # Il badge è facoltativo: nessuna scrittura è necessaria se il
+            # valore richiesto coincide già con quello presente in AD.
+            if valore == valore_corrente:
+                return
+
             modifica = (
                 [(MODIFY_REPLACE, [valore])]
                 if valore
@@ -228,7 +242,9 @@ class DirectoryAdminService(ActiveDirectoryService):
             ) or not conn.entries:
                 raise DirectoryAdminException("Gruppo AD non trovato: %s." % nome_gruppo)
             conn.modify(conn.entries[0].entry_dn, {"member": [(MODIFY_ADD, [entry.entry_dn])]})
-            self._ok(conn, "Aggiunta gruppo AD")
+            # LDAP result 20 means that this membership already exists.
+            if conn.result.get("result") != 20:
+                self._ok(conn, "Aggiunta gruppo AD")
         finally:
             conn.unbind()
 

@@ -1,14 +1,18 @@
+import hashlib
+import hmac
 from datetime import datetime
+from hmac import compare_digest
 from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.conf import settings
 from django.db import IntegrityError, transaction
-from django.http import JsonResponse
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.views.decorators.http import require_GET
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET, require_http_methods
 
 from spid_cie.services import AppIOService, SpidCieService
 
@@ -18,6 +22,42 @@ from .services import slot_disponibili, uffici_prenotabili
 
 
 SESSION_KEY = "prenotazione_wizard"
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def whatsapp_webhook(request):
+    """Verifica Meta e ricezione sicura degli eventi WhatsApp.
+
+    Gli eventi in ingresso non vengono ancora trattati: la risposta 200 evita
+    ritentativi inutili. Quando sarà attivata la messaggistica bidirezionale,
+    qui sarà aggiunta la relativa logica applicativa.
+    """
+
+    if request.method == "GET":
+        mode = request.GET.get("hub.mode", "")
+        verify_token = request.GET.get("hub.verify_token", "")
+        challenge = request.GET.get("hub.challenge", "")
+        expected_token = settings.WHATSAPP_WEBHOOK_VERIFY_TOKEN
+        if (
+            mode == "subscribe"
+            and expected_token
+            and compare_digest(verify_token, expected_token)
+        ):
+            return HttpResponse(challenge, content_type="text/plain")
+        return HttpResponseForbidden("Token webhook non valido.")
+
+    # La firma verrà controllata appena sarà inserito l'App Secret Meta.
+    app_secret = settings.WHATSAPP_APP_SECRET
+    if app_secret:
+        signature = request.headers.get("X-Hub-Signature-256", "")
+        expected_signature = "sha256=" + hmac.new(
+            app_secret.encode("utf-8"), request.body, hashlib.sha256
+        ).hexdigest()
+        if not compare_digest(signature, expected_signature):
+            return HttpResponseForbidden("Firma webhook non valida.")
+
+    return HttpResponse(status=200)
 
 
 def _data(request):

@@ -23,6 +23,8 @@ media/
 *.dump
 *.tar.gz
 *.zip
+*.before-*
+/comunicazioni/password_campaign_2026.json
 
 # IDE / OS
 .vscode/

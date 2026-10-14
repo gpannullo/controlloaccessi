@@ -1,6 +1,12 @@
-from django.db.models import Q
-from django.http import JsonResponse
+from hmac import compare_digest
+
+from django.conf import settings
+from django.core.exceptions import PermissionDenied
+from django.db.models import Q, F, OuterRef, Subquery, Exists
+from django.db.models.functions import Coalesce, Greatest
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET
 
@@ -13,6 +19,58 @@ from access_control.services.office_service import (
 from visitors.models import EventoAccesso, AccessoVisitatore
 
 NUMERO_CHIAMATE_STORICO = 4
+
+
+def _token_monitor_valido(token):
+    configurato = settings.PUBLIC_MONITOR_TOKEN
+    return bool(
+        configurato
+        and token
+        and compare_digest(configurato, token)
+    )
+
+
+def _contesto_monitor(stato, live_url, monitor_launcher_url=""):
+    return {
+        "uffici_monitor": stato["uffici"],
+        "aggiornato_il": stato["aggiornato_il"],
+        "monitor_live_url": live_url,
+        "monitor_launcher_url": monitor_launcher_url,
+    }
+
+
+def _ordina_uffici_per_coda(uffici, oggi):
+    """Ordine persistente tra refresh: ultimo evento di coda, non note."""
+    eventi = EventoAccesso.objects.filter(
+        ufficio_id=OuterRef("pk"), timestamp__date=oggi,
+    ).exclude(tipo=EventoAccesso.Tipo.NOTA).order_by("-timestamp", "-pk")
+    accessi = AccessoVisitatore.objects.filter(
+        ufficio_destinazione_id=OuterRef("pk"), ingresso__date=oggi,
+    ).annotate(ultimo_movimento=Greatest(
+        F("ingresso"),
+        Coalesce("spostato_fuori_ufficio_il", "ingresso"),
+        Coalesce("ingresso_ufficio_il", "ingresso"),
+        Coalesce("visita_conclusa_il", "ingresso"),
+        Coalesce("uscita", "ingresso"),
+    )).order_by("-ultimo_movimento", "-pk")
+    return uffici.annotate(
+        ha_coda=Exists(accessi.filter(
+            uscita__isnull=True, visita_conclusa_il__isnull=True,
+            ingresso_ufficio_il__isnull=True,
+        )),
+        ultimo_evento_coda_il=Subquery(eventi.values("timestamp")[:1]),
+        ultimo_evento_coda_id=Subquery(eventi.values("pk")[:1]),
+        ultimo_movimento_coda_il=Subquery(accessi.values("ultimo_movimento")[:1]),
+    ).annotate(
+        aggiornamento_coda_il=Greatest(
+            Coalesce("ultimo_evento_coda_il", "ultimo_movimento_coda_il"),
+            Coalesce("ultimo_movimento_coda_il", "ultimo_evento_coda_il"),
+        ),
+    ).order_by(
+        "-ha_coda",
+        F("aggiornamento_coda_il").desc(nulls_last=True),
+        F("ultimo_evento_coda_id").desc(nulls_last=True), "nome", "pk",
+    )
 
 
 def _stato_monitor():
@@ -51,12 +109,12 @@ def _stato_monitor():
     )
 
     uffici = list(
-        Ufficio.objects
+        _ordina_uffici_per_coda(Ufficio.objects
         .filter(
             pk__in=uffici_ids,
             attivo=True,
         )
-        .order_by("nome")
+        , oggi)
     )
 
     risultato = []
@@ -256,14 +314,13 @@ def monitor_home(request):
     return render(
         request,
         "common/monitor_home.html",
-        {
-            "uffici_monitor": (
-                stato["uffici"]
-            ),
-            "aggiornato_il": (
-                stato["aggiornato_il"]
-            ),
-        },
+        _contesto_monitor(
+            stato,
+            reverse("monitor_stato_live"),
+            reverse("monitor_scarica_avvio")
+            if request.user.is_superuser and settings.PUBLIC_MONITOR_TOKEN
+            else "",
+        ),
     )
 
 
@@ -284,3 +341,74 @@ def monitor_stato_live(request):
             **stato,
         }
     )
+
+
+@module_required(MonitorPortineriaAccessMixin)
+@require_GET
+def monitor_scarica_avvio(request):
+    """Scarica il launcher Windows con il token pubblico già configurato."""
+    if not request.user.is_superuser:
+        raise PermissionDenied
+
+    token = settings.PUBLIC_MONITOR_TOKEN
+    if not token:
+        raise Http404
+
+    contenuto = """@echo off
+setlocal
+
+REM Monitor portineria - Comune di Aversa
+REM Coordinate del monitor secondario: a sinistra del principale per impostazione predefinita.
+set \"SECONDARY_X=-1920\"
+set \"SECONDARY_Y=0\"
+set \"MONITOR_URL=https://controlloaccessi.comune.aversa.ce.it/monitor/pubblico/%s/\"
+set \"PROFILE_DIR=%%LOCALAPPDATA%%\\ControlloAccessiMonitor\"
+
+if exist \"C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe\" (
+    start \"\" \"C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe\" --kiosk --new-window --user-data-dir=\"%%PROFILE_DIR%%\" --window-position=%%SECONDARY_X%%,%%SECONDARY_Y%% \"%%MONITOR_URL%%\"
+    exit /b 0
+)
+
+if exist \"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" (
+    start \"\" \"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --kiosk --new-window --user-data-dir=\"%%PROFILE_DIR%%\" --window-position=%%SECONDARY_X%%,%%SECONDARY_Y%% \"%%MONITOR_URL%%\"
+    exit /b 0
+)
+
+echo Non sono stati trovati Microsoft Edge o Google Chrome.
+pause
+exit /b 1
+""" % token
+    response = HttpResponse(contenuto, content_type="application/octet-stream")
+    response["Content-Disposition"] = 'attachment; filename="apri-monitor-portineria.bat"'
+    response["Cache-Control"] = "no-store, private"
+    return response
+
+
+@require_GET
+def monitor_pubblico(request, token):
+    """Monitor senza login, protetto da un token casuale nell'URL."""
+    if not _token_monitor_valido(token):
+        raise Http404
+
+    stato = _stato_monitor()
+    response = render(
+        request,
+        "common/monitor_home.html",
+        _contesto_monitor(
+            stato,
+            reverse("monitor_pubblico_stato_live", args=[token]),
+        ),
+    )
+    response["Cache-Control"] = "no-store, private"
+    return response
+
+
+@require_GET
+def monitor_pubblico_stato_live(request, token):
+    """Stato live del monitor senza sessione Django."""
+    if not _token_monitor_valido(token):
+        raise Http404
+
+    response = JsonResponse({"success": True, **_stato_monitor()})
+    response["Cache-Control"] = "no-store, private"
+    return response

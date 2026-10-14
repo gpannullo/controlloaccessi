@@ -130,10 +130,10 @@ class CollegamentoUfficioFilter(admin.SimpleListFilter):
 
 @admin.register(UnitaOrganizzativaWordPress)
 class UnitaOrganizzativaWordPressAdmin(admin.ModelAdmin):
-    list_display = ("nome", "origine_id", "ufficio", "stato", "aggiornato_il")
+    list_display = ("nome", "origine_id", "ufficio", "responsabile", "stato", "aggiornato_il")
     list_filter = ("stato", CollegamentoUfficioFilter, "ufficio")
     search_fields = ("nome", "origine_id", "ufficio__nome")
-    autocomplete_fields = ("ufficio",)
+    autocomplete_fields = ("ufficio", "responsabile")
     readonly_fields = ("origine_id", "aggiornato_il")
     actions = ("crea_uffici_locali", "allinea_unita_organizzative_su_wordpress")
 

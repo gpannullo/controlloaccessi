@@ -4,6 +4,8 @@ from django.db import models
 
 class PDNDAuditLog(models.Model):
     class Servizio(models.TextChoices):
+        C020 = "C020", "ANPR — accertamento residenza"
+        C029 = "C029", "ANPR — accertamento dati anagrafici"
         ANPR_SOGGETTO = "ANPR_SOGGETTO", "ANPR — dati del soggetto"
         ANPR_FAMIGLIA = "ANPR_FAMIGLIA", "ANPR — composizione famiglia"
         INPS_ISEE = "INPS_ISEE", "INPS — attestazione ISEE"
@@ -24,6 +26,7 @@ class PDNDAuditLog(models.Model):
     eseguita_il = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        permissions = [("consulta_anpr", "Può consultare i servizi ANPR C020 e C029")]
         ordering = ["-eseguita_il"]
         verbose_name = "Audit interrogazione PDND"
         verbose_name_plural = "Audit interrogazioni PDND"

@@ -20,6 +20,7 @@ from prenotazioni.wordpress_connector import (
     WordPressConnectorError,
     crea_unita_organizzativa_wordpress,
     pubblica_persona_pubblica_wordpress,
+    crea_persona_pubblica_wordpress,
 )
 
 User = get_user_model()
@@ -185,6 +186,8 @@ def directory_user_create_submit(request):
                     "Buongiorno %s %s,\n\n"
                     "è stato creato il suo account.\n"
                     "Username: %s\nPassword provvisoria: %s\n\n"
+                    "Per impostare o modificare una password, utilizzare il seguente portale di accesso:\n"
+                    "https://account.comune.aversa.ce.it/account/\n\n"
                     "Al primo accesso sarà richiesto di cambiare la password."
                 ) % (first_name, last_name, username, password),
             )
@@ -341,12 +344,15 @@ def directory_user(request, pk):
     utente = get_object_or_404(User, pk=pk)
     uffici_associati = AssegnazioneUfficio.objects.filter(
         utente=utente,
-        attiva=True,
     ).select_related("ufficio", "ufficio__gruppo_operativo").order_by("ufficio__nome")
     gruppi_ufficio_disponibili = Ufficio.objects.filter(
         attivo=True,
-        gruppo_operativo__attivo=True,
-    ).exclude(assegnazioni_personale__utente=utente, assegnazioni_personale__attiva=True).select_related("gruppo_operativo").order_by("nome")
+    ).exclude(
+        # Le associazioni esistenti, anche disattivate, si gestiscono nel riepilogo.
+        pk__in=AssegnazioneUfficio.objects.filter(
+            utente=utente,
+        ).values("ufficio_id"),
+    ).select_related("gruppo_operativo").order_by("nome")
     unita_per_ufficio = {
         unita.ufficio_id: unita
         for unita in UnitaOrganizzativaWordPress.objects.filter(
@@ -410,13 +416,15 @@ def directory_user(request, pk):
         "dominio_istituzionale": dominio_istituzionale,
         "gruppi_ad_disponibili": gruppi_ad_disponibili,
         "persone_pubbliche": persone_pubbliche,
+        "persone_collegabili": PersonaleWordPress.objects.filter(utente__isnull=True).order_by("cognome", "nome", "titolo"),
     })
 
 
 @directory_admin_required
 @require_POST
 def directory_action(request, pk):
-    utente = get_object_or_404(User, pk=pk); service = DirectoryAdminService(); azione = request.POST.get("azione")
+    utente = get_object_or_404(User, pk=pk); azione = request.POST.get("azione")
+    service = None if azione in {"visibilita_ufficio", "elimina_ufficio"} else DirectoryAdminService()
     try:
         messaggio_successo = "Operazione completata."
         avviso_email = None
@@ -425,8 +433,16 @@ def directory_action(request, pk):
             last_name = request.POST.get("last_name", "").strip()
             personal_email = request.POST.get("personal_email", "").strip()
             badge = request.POST.get("badge", "").strip()
-            if badge and (not badge.isdigit() or len(badge) != 10):
-                raise DirectoryAdminException("Il badge deve essere composto da 10 cifre.")
+            # 0000000000 è il segnaposto visivo usato dalla form quando il
+            # badge non è assegnato: non va salvato né scritto in LDAP.
+            if badge == "0000000000":
+                badge = ""
+            elif badge:
+                if not badge.isdigit() or len(badge) > 10:
+                    raise DirectoryAdminException(
+                        "Il badge deve contenere al massimo 10 cifre."
+                    )
+                badge = badge.zfill(10)
             if badge and User.objects.exclude(pk=utente.pk).filter(badge=badge).exists():
                 raise DirectoryAdminException("Il badge è già assegnato a un altro utente.")
             service.aggiorna_anagrafica(
@@ -488,6 +504,38 @@ def directory_action(request, pk):
                 if avviso_email
                 else "Password reimpostata e credenziali accodate per l'invio all'e-mail personale."
             )
+        elif azione == "scollega_persona_pubblica":
+            persona = get_object_or_404(PersonaleWordPress, pk=request.POST.get("persona_pubblica"), utente=utente)
+            PersonaleWordPress.objects.filter(pk=persona.pk, utente=utente).update(utente=None)
+            messaggio_successo = "Collegamento alla persona pubblica rimosso."
+        elif azione == "collega_persona_pubblica":
+            if PersonaleWordPress.objects.filter(utente=utente).exists():
+                raise DirectoryAdminException("L'account ha gia una persona pubblica collegata.")
+            persona = get_object_or_404(PersonaleWordPress, pk=request.POST.get("persona_pubblica"), utente__isnull=True)
+            if not PersonaleWordPress.objects.filter(pk=persona.pk, utente__isnull=True).update(utente=utente):
+                raise DirectoryAdminException("Persona pubblica gia collegata a un altro account.")
+            messaggio_successo = "Persona pubblica collegata all'account."
+        elif azione == "crea_persona_pubblica":
+            persona = crea_persona_pubblica_wordpress(utente)
+            messaggio_successo = "Persona pubblica creata su WordPress e collegata all'account."
+        elif azione == "visibilita_ufficio":
+            assegnazione = get_object_or_404(
+                AssegnazioneUfficio.objects.select_related("ufficio"),
+                pk=request.POST.get("assegnazione"),
+                utente=utente,
+            )
+            visibile = request.POST.get("visibile") == "1"
+            if assegnazione.attiva != visibile:
+                assegnazione.attiva = visibile
+                assegnazione.save(update_fields=["attiva", "aggiornata_il"])
+            messaggio_successo = "Utente %s nell'ufficio %s. Gruppi AD invariati." % (
+                "visibile" if visibile else "non visibile", assegnazione.ufficio,
+            )
+        elif azione == "elimina_ufficio":
+            assegnazione = get_object_or_404(AssegnazioneUfficio.objects.select_related("ufficio"), pk=request.POST.get("assegnazione"), utente=utente)
+            nome_ufficio = str(assegnazione.ufficio)
+            assegnazione.delete()
+            messaggio_successo = "Associazione all'ufficio %s eliminata. Gruppi AD invariati." % nome_ufficio
         elif azione == "rimuovi_ufficio":
             assegnazione = get_object_or_404(
                 AssegnazioneUfficio.objects.select_related("ufficio", "ufficio__gruppo_operativo"),
@@ -503,7 +551,6 @@ def directory_action(request, pk):
                 Ufficio.objects.select_related("gruppo_operativo"),
                 pk=request.POST.get("gruppo_organizzativo"),
                 attivo=True,
-                gruppo_operativo__attivo=True,
             )
             from access_control.services.office_assignment_service import OfficeAssignmentService
             _, creata = OfficeAssignmentService().assegna(utente, assegnazione)
@@ -532,6 +579,14 @@ def directory_action(request, pk):
             persona.unita_organizzative.set(unita_attese)
             pubblica_persona_pubblica_wordpress(persona)
             messaggio_successo = "Uffici della persona pubblica %s allineati con gli uffici dell'account e aggiornati su WordPress." % persona
+        elif azione == "rimuovi_gruppo_ad":
+            nome_gruppo = request.POST.get("gruppo_ad", "").strip()
+            if not nome_gruppo:
+                raise DirectoryAdminException("Selezionare un gruppo AD.")
+            service.rimuovi_da_gruppo(utente.username, nome_gruppo)
+            gruppi_locali = Group.objects.filter(Q(name__iexact=nome_gruppo) | Q(gruppo_organizzativo__directory_name__iexact=nome_gruppo)).distinct()
+            utente.groups.remove(*gruppi_locali)
+            messaggio_successo = "Appartenenza al gruppo AD %s rimossa. Gli uffici associati restano invariati." % nome_gruppo
         elif azione == "aggiungi_gruppo_ad":
             nome_gruppo = request.POST.get("gruppo_ad", "").strip()
             if not nome_gruppo:

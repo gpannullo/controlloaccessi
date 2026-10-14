@@ -213,7 +213,7 @@ Controllo Accessi - Seleziona area
             </div>
         {% endif %}
 
-        {% if request.user.is_superuser %}
+        {% if can_manage_directory %}
             <div class="col-md-6 col-xl-4">
                 <a
                     href="{% url 'dashboard:directory_home' %}"

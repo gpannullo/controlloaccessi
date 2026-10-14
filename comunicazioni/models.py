@@ -5,6 +5,27 @@ from django.db import models
 from access_control.models import Ufficio
 
 
+class CampagnaPassword2026(models.Model):
+    utente = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    username = models.CharField(max_length=150)
+    pwd_last_set = models.CharField(max_length=100)
+    ad_guid = models.CharField(max_length=100)
+    completata = models.BooleanField(default=False)
+    ultimo_invio = models.DateField(null=True)
+
+
+class PromemoriaPassword(models.Model):
+    utente = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    giorno = models.DateField()
+    scadenza = models.DateTimeField()
+    destinatario = models.EmailField()
+    creato_il = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['utente', 'giorno'], name='promemoria_password_giornaliero')]
+
+
+
 class ComunicazioneEmail(models.Model):
     class Destinazione(models.TextChoices):
         ISTITUZIONALE = "IST", "E-mail istituzionale"

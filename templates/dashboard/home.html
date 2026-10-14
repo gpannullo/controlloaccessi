@@ -48,12 +48,22 @@
                 </p>
             </div>
 
-            <a
-                    href="{% url 'home' %}"
-                    class="btn btn-outline-primary"
-            >
-                Cambia area
-            </a>
+            <div class="d-flex flex-wrap gap-2">
+                <button
+                        type="button"
+                        class="btn btn-outline-primary"
+                        data-bs-toggle="modal"
+                        data-bs-target="#ufficiOggiModal"
+                >
+                    Orari, code e dipendenti
+                </button>
+                <a
+                        href="{% url 'home' %}"
+                        class="btn btn-outline-primary"
+                >
+                    Cambia area
+                </a>
+            </div>
         </div>
 
         <!-- ================================================= -->
@@ -95,7 +105,7 @@
 
             </div>
 
-            <!-- UFFICI ATTIVI -->
+            <!-- UFFICI CHE RICEVONO OGGI -->
 
             <div class="col-sm-6 col-xl-4">
 
@@ -109,15 +119,15 @@
                     <div class="card-body w-100">
 
                         <div class="text-muted">
-                            Uffici attivi
+                            Uffici che ricevono oggi
                         </div>
 
                         <div class="display-6 fw-semibold">
-                            {{ numero_uffici_attivi }}
+                            {{ numero_uffici_prenotazioni }}
                         </div>
 
                         <div class="small text-primary mt-2">
-                            Disponibili per nuovo ricevimento
+                            In calendario per oggi
                         </div>
 
                     </div>
@@ -125,7 +135,7 @@
 
             </div>
 
-            <!-- UFFICI CHE RICEVONO OGGI -->
+            <!-- UFFICI DISPONIBILI -->
 
             <div class="col-sm-6 col-xl-4">
 
@@ -134,12 +144,12 @@
                         class="card h-100 shadow-sm
                        border-0 text-start w-100"
                         data-bs-toggle="modal"
-                        data-bs-target="#ufficiOggiModal"
+                        data-bs-target="#ufficiVisitaModal"
                 >
                     <div class="card-body w-100">
 
                         <div class="text-muted">
-                            Uffici che ricevono oggi
+                            Uffici disponibili
                         </div>
 
                         <div
@@ -150,7 +160,7 @@
                         </div>
 
                         <div class="small text-primary mt-2">
-                            Orari, code e dipendenti
+                            Possono ricevere una visita ora
                         </div>
 
                     </div>
@@ -172,6 +182,15 @@
                     class="btn btn-primary btn-lg w-100 py-4"
                 >
                     Nuovo ricevimento
+                </a>
+            </div>
+
+            <div class="col-md-3">
+                <a
+                    href="{% url 'portineria:appuntamenti_oggi' %}"
+                    class="btn btn-outline-primary btn-lg w-100 py-4"
+                >
+                    Appuntamenti di oggi
                 </a>
             </div>
 
@@ -657,7 +676,7 @@
                                 class="modal-title fs-5"
                                 id="ufficiOggiModalLabel"
                         >
-                            Uffici che ricevono oggi
+                            Orari, code e dipendenti
                         </h2>
 
                         <div class="small text-muted">
@@ -675,6 +694,15 @@
                 </div>
 
                 <div class="modal-body">
+
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <span class="badge bg-info text-dark">
+                            Uffici in calendario: {{ numero_uffici_prenotazioni }}
+                        </span>
+                        <span class="badge bg-success">
+                            Uffici disponibili per visite: {{ numero_uffici_che_ricevono }}
+                        </span>
+                    </div>
 
                     {% if uffici_oggi %}
 
@@ -697,9 +725,15 @@
                                                 {{ ufficio.nome }}
                                             </strong>
 
-                                            <span class="badge bg-success">
-                                                Personale presente
-                                            </span>
+                                            {% if ufficio.numero_dipendenti_presenti %}
+                                                <span class="badge bg-success">
+                                                    Personale presente
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-primary">
+                                                    In attesa del personale
+                                                </span>
+                                            {% endif %}
                                         </div>
 
                                         <div class="card-body">
@@ -802,11 +836,11 @@
                                             <!-- ELENCO DIPENDENTI -->
 
                                             {% if request.user.is_superuser %}
-                                                <div class="border-top pt-3">
+                                                <details class="border-top pt-3">
 
-                                                    <div class="small text-muted mb-2">
-                                                        Dipendenti assegnati
-                                                    </div>
+                                                    <summary class="small text-muted mb-2" style="cursor: pointer;">
+                                                        Dipendenti assegnati ({{ ufficio.numero_dipendenti_assegnati }})
+                                                    </summary>
 
                                                     {% if ufficio.dipendenti_assegnati %}
 
@@ -863,7 +897,309 @@
 
                                                     {% endif %}
 
+                                                </details>
+                                            {% endif %}
+
+                                        </div>
+
+                                        {% if ufficio.piano or ufficio.stanza %}
+
+                                            <div class="card-footer small text-muted">
+
+                                                {% if ufficio.piano %}
+                                                    Piano:
+                                                    {{ ufficio.piano }}
+                                                {% endif %}
+
+                                                {% if ufficio.stanza %}
+                                                    · Stanza:
+                                                    {{ ufficio.stanza }}
+                                                {% endif %}
+
+                                            </div>
+
+                                        {% endif %}
+
+                                    </div>
+
+                                </div>
+
+                            {% endfor %}
+
+                        </div>
+
+                    {% else %}
+
+                        <div class="alert alert-warning mb-0">
+                            Nessun ufficio risulta configurato per
+                            ricevere pubblico nella giornata odierna.
+                        </div>
+
+                    {% endif %}
+
+                </div>
+
+                <div class="modal-footer">
+
+                    <button
+                            type="button"
+                            class="btn btn-secondary"
+                            data-bs-dismiss="modal"
+                    >
+                        Chiudi
+                    </button>
+
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ===================================================== -->
+    <!-- MODALE CALENDARIO SETTIMANALE UFFICI                  -->
+    <!-- ===================================================== -->
+
+    <div
+            class="modal fade"
+            id="ufficiVisitaModal"
+            tabindex="-1"
+            aria-labelledby="ufficiVisitaModalLabel"
+            aria-hidden="true"
+    >
+        <div
+                class="modal-dialog modal-xl
+               modal-dialog-scrollable"
+        >
+            <div class="modal-content">
+
+                <div class="modal-header">
+
+                    <div>
+                        <h2
+                                class="modal-title fs-5"
+                                id="ufficiVisitaModalLabel"
+                        >
+                            Uffici disponibili per visita
+                        </h2>
+
+                        <div class="small text-muted">
+                            {{ oggi|date:"d/m/Y" }}
+                        </div>
+                    </div>
+
+                    <button
+                            type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Chiudi"
+                    ></button>
+
+                </div>
+
+                <div class="modal-body">
+
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        
+                        <span class="badge bg-success">
+                            Uffici disponibili per visite: {{ numero_uffici_che_ricevono }}
+                        </span>
+                    </div>
+
+                    {% if uffici_visita %}
+
+                        <div class="row g-3">
+
+                            {% for ufficio in uffici_visita %}
+
+                                <div class="col-lg-6 col-xxl-4">
+
+                                    <div class="card h-100">
+
+                                        <div
+                                                class="card-header
+                                               d-flex
+                                               justify-content-between
+                                               align-items-center
+                                               gap-2"
+                                        >
+                                            <strong>
+                                                {{ ufficio.nome }}
+                                            </strong>
+
+                                            {% if ufficio.numero_dipendenti_presenti %}
+                                                <span class="badge bg-success">
+                                                    Personale presente
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-primary">
+                                                    In attesa del personale
+                                                </span>
+                                            {% endif %}
+                                        </div>
+
+                                        <div class="card-body">
+
+                                            <div class="mb-3">
+                                                <div class="small text-muted">
+                                                    Ubicazione
                                                 </div>
+                                                <div class="fw-semibold">
+                                                    Piano: {{ ufficio.piano|default:"—" }}
+                                                    · Stanza: {{ ufficio.stanza|default:"—" }}
+                                                </div>
+
+                                            </div>
+
+                                            <!-- CONTATORI -->
+
+                                            <div class="row text-center g-2 mb-3">
+
+                                                <div class="col-6">
+
+                                                    <div class="border rounded p-2">
+
+                                                        <div
+                                                                class="fs-3 fw-bold"
+                                                                data-office="{{ ufficio.pk }}"
+                                                                data-counter="visitatori-da-servire"
+                                                        >
+                                                            {{ ufficio.visitatori_in_coda }}
+                                                        </div>
+
+                                                        <div class="small text-muted">
+                                                            Visitatori da servire
+                                                        </div>
+
+                                                    </div>
+
+                                                </div>
+
+                                                <div class="col-6">
+
+                                                    <div class="border rounded p-2">
+
+                                                        <div
+                                                                class="fs-3 fw-bold"
+                                                                data-office="{{ ufficio.pk }}"
+                                                                data-counter="registrati-oggi"
+                                                        >
+                                                            {{ ufficio.accessi_registrati_oggi }}
+                                                        </div>
+
+                                                        <div class="small text-muted">
+                                                            Registrati oggi
+                                                        </div>
+
+                                                    </div>
+
+                                                </div>
+
+                                                {% if request.user.is_superuser %}
+                                                <div class="col-6">
+
+                                                    <div class="border rounded p-2">
+
+                                                        <div class="fs-3 fw-bold">
+                                                            {{ ufficio.numero_dipendenti_assegnati }}
+                                                        </div>
+
+                                                        <div class="small text-muted">
+                                                            Dipendenti assegnati
+                                                        </div>
+
+                                                    </div>
+
+                                                </div>
+                                                {% endif %}
+
+                                                <div class="col-6">
+
+                                                    <div class="border rounded p-2">
+
+                                                        <div
+                                                                class="fs-3 fw-bold text-success"
+                                                                data-office="{{ ufficio.pk }}"
+                                                                data-counter="dipendenti-presenti"
+                                                        >
+                                                            {{ ufficio.numero_dipendenti_presenti }}
+                                                        </div>
+
+                                                        <div class="small text-muted">
+                                                            Dipendenti presenti
+                                                        </div>
+
+                                                    </div>
+
+                                                </div>
+
+                                            </div>
+
+                                            <!-- ELENCO DIPENDENTI -->
+
+                                            {% if request.user.is_superuser %}
+                                                <details class="border-top pt-3">
+
+                                                    <summary class="small text-muted mb-2" style="cursor: pointer;">
+                                                        Dipendenti assegnati ({{ ufficio.numero_dipendenti_assegnati }})
+                                                    </summary>
+
+                                                    {% if ufficio.dipendenti_assegnati %}
+
+                                                        <ul class="list-group list-group-flush">
+
+                                                            {% for dipendente in ufficio.dipendenti_assegnati %}
+
+                                                                <li
+                                                                    class="list-group-item px-0 py-2
+                                                                           d-flex justify-content-between
+                                                                           align-items-center gap-2"
+                                                                >
+                                                                    <span>
+                                                                        {% firstof dipendente.get_full_name dipendente.username %}
+                                                                    </span>
+
+                                                                    {% if dipendente in ufficio.dipendenti_presenti %}
+                                                                        <span
+                                                                            class="rounded-circle bg-success d-inline-block flex-shrink-0"
+                                                                            style="width: .75rem; height: .75rem;"
+                                                                            aria-label="Presente"
+                                                                        ></span>
+                                                                    {% elif dipendente.stato_presenza == "ASS" %}
+                                                                        <span
+                                                                            class="rounded-circle bg-danger d-inline-block flex-shrink-0"
+                                                                            style="width: .75rem; height: .75rem;"
+                                                                            aria-label="Assente"
+                                                                        ></span>
+                                                                    {% elif dipendente.stato_presenza == "PRE" and dipendente.tipo_attivita == "AMM" %}
+                                                                        <span
+                                                                            class="rounded-circle bg-primary d-inline-block flex-shrink-0"
+                                                                            style="width: .75rem; height: .75rem;"
+                                                                            aria-label="Presente, non in ricevimento"
+                                                                        ></span>
+                                                                    {% else %}
+                                                                        <span
+                                                                            class="rounded-circle bg-secondary d-inline-block flex-shrink-0"
+                                                                            style="width: .75rem; height: .75rem;"
+                                                                            aria-label="Non disponibile / presenza non verificata"
+                                                                        ></span>
+                                                                    {% endif %}
+
+                                                                </li>
+
+                                                            {% endfor %}
+
+                                                        </ul>
+
+                                                    {% else %}
+
+                                                        <div class="text-muted">
+                                                            Nessun dipendente associato all’ufficio.
+                                                        </div>
+
+                                                    {% endif %}
+
+                                                </details>
                                             {% endif %}
 
                                         </div>
@@ -1036,6 +1372,15 @@
                                                 <tr>
 
                                                     <td>
+                                                        {% if ufficio.personale_disponibile %}
+                                                            <span class="text-success me-2 fs-5" title="Personale disponibile" aria-label="Personale disponibile">
+                                                                <i class="bi bi-person-bounding-box" aria-hidden="true"></i>
+                                                            </span>
+                                                        {% else %}
+                                                            <span class="text-primary me-2 fs-5" title="Personale non disponibile" aria-label="Personale non disponibile">
+                                                                <i class="bi bi-person-bounding-box" aria-hidden="true"></i>
+                                                            </span>
+                                                        {% endif %}
                                                         <strong>
                                                             {{ ufficio.nome }}
                                                         </strong>
@@ -1149,6 +1494,10 @@
 document.addEventListener("DOMContentLoaded", function () {
     const refreshUrl = "{% url 'dashboard:stato_live' %}";
     const refreshInterval = 15000;
+    const visitatoriModal = document.getElementById(
+        "visitatoriPresentiModal"
+    );
+    const visitatoriModalInterval = 5000;
 
     let refreshInProgress = false;
 
@@ -1259,6 +1608,88 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         }
     );
+
+    async function refreshVisitatoriModal() {
+        if (
+            !visitatoriModal ||
+            !visitatoriModal.classList.contains("show") ||
+            document.hidden
+        ) {
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                window.location.href,
+                {
+                    method: "GET",
+                    cache: "no-store",
+                    credentials: "same-origin"
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error(
+                    `Errore HTTP ${response.status}`
+                );
+            }
+
+            const html = await response.text();
+            const pagina = new DOMParser().parseFromString(
+                html,
+                "text/html"
+            );
+            const nuovoModal = pagina.getElementById(
+                "visitatoriPresentiModal"
+            );
+
+            if (!nuovoModal) {
+                return;
+            }
+
+            const intestazione = visitatoriModal.querySelector(
+                ".modal-header"
+            );
+            const nuovaIntestazione = nuovoModal.querySelector(
+                ".modal-header"
+            );
+            const corpo = visitatoriModal.querySelector(
+                ".modal-body"
+            );
+            const nuovoCorpo = nuovoModal.querySelector(
+                ".modal-body"
+            );
+
+            if (intestazione && nuovaIntestazione) {
+                intestazione.replaceWith(
+                    nuovaIntestazione.cloneNode(true)
+                );
+            }
+
+            if (corpo && nuovoCorpo) {
+                corpo.replaceWith(nuovoCorpo.cloneNode(true));
+            }
+        } catch (error) {
+            console.error(
+                "Aggiornamento visitatori presenti non riuscito:",
+                error
+            );
+        }
+    }
+
+    if (visitatoriModal) {
+        visitatoriModal.addEventListener(
+            "shown.bs.modal",
+            function () {
+                refreshVisitatoriModal();
+            }
+        );
+
+        window.setInterval(
+            refreshVisitatoriModal,
+            visitatoriModalInterval
+        );
+    }
 });
 </script>
 {% endblock %}

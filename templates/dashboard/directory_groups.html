@@ -1,1 +1,89 @@
-{% extends "base.html" %}{% block content %}<div class="container py-4"><h1>Gruppi Active Directory</h1><details class="card card-body my-3" open><summary>Filtri gruppi</summary><form method="get"><input name="q" value="{{ query }}" placeholder="Nome o descrizione"><button>Filtra</button><a href="{% url 'dashboard:directory_groups' %}">Reset</a></form></details><p>{{ totale_filtrati }} risultati su {{ totale_gruppi }} gruppi.</p><table class="table"><thead><tr><th>Gruppo</th><th>Descrizione</th><th>Soggetti</th><th>Rinomina</th></tr></thead><tbody>{% for gruppo in gruppi %}<tr><td>{{ gruppo.name }}</td><td>{{ gruppo.description }}</td><td><button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#m-{{ forloop.counter }}">{{ gruppo.members|length }}</button><div class="modal fade" id="m-{{ forloop.counter }}"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h2 class="modal-title fs-5">Utenti di {{ gruppo.name }}</h2><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><ul>{% for membro in gruppo.members %}<li>{{ membro }}</li>{% empty %}<li>Nessun utente associato.</li>{% endfor %}</ul></div></div></div></div></td><td><form method="post" action="{% url 'dashboard:directory_group_rename' %}">{% csrf_token %}<input type="hidden" name="nome" value="{{ gruppo.name }}"><input name="nuovo_nome" value="{{ gruppo.name }}"><button>Rinomina AD</button></form></td></tr>{% endfor %}</tbody></table></div>{% endblock %}
+{% extends "base.html" %}
+
+{% block title %}Gruppi Active Directory{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <div class="text-danger mb-1">Amministrazione Account</div>
+            <h1 class="h3 mb-1">Gruppi Active Directory</h1>
+            <p class="text-muted mb-0">Consulta i gruppi e i soggetti associati.</p>
+        </div>
+        <a href="{% url 'dashboard:directory_home' %}" class="btn btn-outline-danger">
+            <i class="bi bi-arrow-left me-1"></i>Torna alla gestione account
+        </a>
+    </div>
+
+    <form method="get" class="card shadow-sm mb-4">
+        <div class="card-body">
+            <label class="form-label fw-semibold" for="id_q">Ricerca gruppi</label>
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input id="id_q" name="q" value="{{ query }}" class="form-control" placeholder="Cerca per nome o descrizione">
+                <button type="submit" class="btn btn-primary">Cerca</button>
+                {% if query %}
+                    <a href="{% url 'dashboard:directory_groups' %}" class="btn btn-outline-secondary">Azzera</a>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+
+    <div class="text-muted mb-3">
+        Visualizzati <strong>{{ totale_filtrati }}</strong> gruppi su {{ totale_gruppi }}.
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th scope="col">Gruppo</th>
+                        <th scope="col">Descrizione</th>
+                        <th scope="col" class="text-center">Soggetti</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for gruppo in gruppi %}
+                        <tr>
+                            <td class="fw-semibold">{{ gruppo.name }}</td>
+                            <td>{{ gruppo.description|default:"—" }}</td>
+                            <td class="text-center">
+                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#m-{{ forloop.counter }}">
+                                    <i class="bi bi-people me-1"></i>{{ gruppo.members|length }}
+                                </button>
+                                <div class="modal fade" id="m-{{ forloop.counter }}" tabindex="-1" aria-labelledby="m-titolo-{{ forloop.counter }}" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                                        <div class="modal-content">
+                                            <div class="modal-header bg-primary text-white">
+                                                <div>
+                                                    <h2 class="modal-title fs-5" id="m-titolo-{{ forloop.counter }}">{{ gruppo.name }}</h2>
+                                                    <div class="small opacity-75">{{ gruppo.members|length }} soggetti associati</div>
+                                                </div>
+                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+                                            </div>
+                                            <div class="modal-body p-0">
+                                                <ul class="list-group list-group-flush">
+                                                    {% for membro in gruppo.members %}
+                                                        <li class="list-group-item">{{ membro }}</li>
+                                                    {% empty %}
+                                                        <li class="list-group-item text-muted text-center py-4">Nessun utente associato.</li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-5">Nessun gruppo trovato.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

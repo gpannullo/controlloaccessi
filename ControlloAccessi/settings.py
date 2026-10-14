@@ -46,7 +46,28 @@ ALLOWED_HOSTS = [
 
 # Application definition
 
+# Backend sostituibile: le app chiamanti importano solo protocollazione.services.
+PROTOCOLLAZIONE_ENABLED = os.getenv('PROTOCOLLAZIONE_ENABLED', 'false').lower() in {'1', 'true', 'yes', 'on'}
+PROTOCOLLAZIONE_BACKEND = os.getenv('PROTOCOLLAZIONE_BACKEND', 'cityware.backend.CitywareBackend')
+CITYWARE = {
+    'ENDPOINT': os.getenv('CITYWARE_ENDPOINT', ''),
+    'SOAP_ACTION_BASE': os.getenv('CITYWARE_SOAP_ACTION_BASE', ''),
+    'USERNAME': os.getenv('CITYWARE_USERNAME', ''),
+    'PASSWORD': os.getenv('CITYWARE_PASSWORD', ''),
+    'DOMAIN_CODE': os.getenv('CITYWARE_DOMAIN_CODE', ''),
+    'UFFICIO_OPERATORE': os.getenv('CITYWARE_UFFICIO_OPERATORE', ''),
+    'FIRMATARIO': os.getenv('CITYWARE_FIRMATARIO', ''),
+    'UFFICIO_FIRMATARIO': os.getenv('CITYWARE_UFFICIO_FIRMATARIO', ''),
+    'CA_BUNDLE': os.getenv('CITYWARE_CA_BUNDLE', ''),
+    'CONNECT_TIMEOUT': int(os.getenv('CITYWARE_CONNECT_TIMEOUT', '10')),
+    'TIMEOUT': int(os.getenv('CITYWARE_TIMEOUT', '60')),
+    'MAX_DOCUMENT_BYTES': int(os.getenv('CITYWARE_MAX_DOCUMENT_BYTES', '20971520')),
+}
+
 INSTALLED_APPS = [
+    'presenze_qr',
+    'protocollazione.apps.ProtocollazioneConfig',
+    'cityware.apps.CitywareConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -82,6 +103,12 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'ControlloAccessi.urls'
 
+# Enable only after migration and reverse-proxy configuration.
+PRESENZE_QR_ENABLED = os.getenv('PRESENZE_QR_ENABLED', 'false').lower() in {'1', 'true', 'yes', 'on'}
+PRESENZE_QR_SOLO_RETE_COMUNALE = os.getenv('PRESENZE_QR_SOLO_RETE_COMUNALE', 'false').lower() in {'1', 'true', 'yes', 'on'}
+PRESENZE_QR_RETI_CONSENTITE = os.getenv('PRESENZE_QR_RETI_CONSENTITE', '10.0.0.0/22,192.168.15.0/24').split(',')
+PRESENZE_QR_PROXY_ATTENDIBILI = os.getenv('PRESENZE_QR_PROXY_ATTENDIBILI', '127.0.0.1/32,::1/128').split(',')
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -91,6 +118,7 @@ TEMPLATES = [
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.request',
+                'presenze_qr.context.presenze',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
@@ -230,6 +258,14 @@ TICKET_PRINTER = {
     "HOST": os.getenv("TICKET_PRINTER_HOST", "192.168.15.80"),
     "PORT": int(os.getenv("TICKET_PRINTER_PORT", "9100")),
     "TIMEOUT": int(os.getenv("TICKET_PRINTER_TIMEOUT", "5")),
+    "EPOS_URL": os.getenv("TICKET_PRINTER_EPOS_URL", ""),
+    "EPOS_DEVICE_ID": os.getenv(
+        "TICKET_PRINTER_EPOS_DEVICE_ID", "local_printer"
+    ),
+    "EPOS_TIMEOUT": int(os.getenv("TICKET_PRINTER_EPOS_TIMEOUT", "10000")),
+    "EPOS_VERIFY_SSL": os.getenv(
+        "TICKET_PRINTER_EPOS_VERIFY_SSL", "False"
+    ).lower() in {"1", "true", "yes", "on"},
     "PRINT_QR": os.getenv("TICKET_PRINTER_PRINT_QR", "False").lower()
     in {"1", "true", "yes", "on"},
     "PUBLIC_TICKET_BASE_URL": os.getenv(
@@ -252,9 +288,16 @@ INTERNAL_APPLICATION_HOST = os.getenv(
 PUBLIC_TICKET_TOKEN_HOURS = int(
     os.getenv("PUBLIC_TICKET_TOKEN_HOURS", "24")
 )
+# Token casuale dedicato al monitor mostrato al pubblico. Quando è vuoto,
+# l'endpoint pubblico del monitor resta disattivato.
+PUBLIC_MONITOR_TOKEN = os.getenv("PUBLIC_MONITOR_TOKEN", "")
 PUBLIC_BOOKING_HOST = os.getenv(
     "PUBLIC_BOOKING_HOST", "prenotazioni.comune.aversa.ce.it"
 ).lower()
+
+# Webhook Meta WhatsApp: il token di verifica non è l'access token API.
+WHATSAPP_WEBHOOK_VERIFY_TOKEN = os.getenv("WHATSAPP_WEBHOOK_VERIFY_TOKEN", "")
+WHATSAPP_APP_SECRET = os.getenv("WHATSAPP_APP_SECRET", "")
 
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
@@ -351,6 +394,15 @@ APP_IO = {
 # PDND Interoperabilità. Ogni ENDPOINT e PURPOSE_ID viene rilasciato per lo
 # specifico e-service dopo la richiesta di fruizione e la relativa finalità.
 # La chiave privata non deve mai essere inclusa nel repository.
+ANPR = {
+    "SECURITY_HEADERS_PROVIDER": os.getenv("PDND_ANPR_SECURITY_HEADERS_PROVIDER", ""),
+    **{code: {
+        "ENDPOINT": os.getenv(f"PDND_ANPR_{code}_ENDPOINT", ""),
+        "PURPOSE_ID": os.getenv(f"PDND_ANPR_{code}_PURPOSE_ID", ""),
+        "AUDIENCE": os.getenv(f"PDND_ANPR_{code}_AUDIENCE", ""),
+    } for code in ("C020", "C029")},
+}
+
 PDND = {
     "ENABLED": os.getenv("PDND_ENABLED", "False").lower() in {"1", "true", "yes", "on"},
     "TOKEN_URL": os.getenv("PDND_TOKEN_URL", "https://auth.interop.pagopa.it/token.oauth2"),

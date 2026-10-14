@@ -1,0 +1,17 @@
+<section class="mt-4">
+  <h2 class="h5">Ultimi 10 passaggi</h2>
+  {% if abilitato_qr %}<p>Inquadra il QR della sede per timbrare. Puoi correggere solo l’ultimo passaggio entro 60 secondi. È consentito un solo nuovo passaggio per minuto.</p>{% endif %}
+  {% for r in timbrature %}<article class="card mb-2"><div class="card-body">
+    <strong>{{ r.get_verso_display }}</strong> · {{ r.registrata_il|date:'d/m/Y H:i:s' }}
+    <div class="text-muted">{{ r.get_origine_display }}</div>
+    {% if r.modificabile %}<form method="post" action="{% url 'presenze_qr:inverti' r.pk %}">{% csrf_token %}
+      <input type="hidden" name="verso_atteso" value="{{ r.verso }}">
+      <button class="btn btn-outline-primary mt-2" data-created="{{ r.registrata_il|date:'c' }}">Correggi in {% if r.verso == 'I' %}Uscita{% else %}Entrata{% endif %}</button>
+    </form>{% endif %}
+  </div></article>{% empty %}<p>Nessun passaggio disponibile.</p>{% endfor %}
+</section>
+<script>
+setInterval(() => document.querySelectorAll('[data-created]').forEach(b => {
+  if (Date.now() - Date.parse(b.dataset.created) >= 60000) { b.disabled = true; b.textContent = 'Tempo di correzione terminato'; }
+}), 500);
+</script>

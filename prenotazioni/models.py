@@ -76,6 +76,14 @@ class UnitaOrganizzativaWordPress(models.Model):
         blank=True,
         related_name="unita_organizzative_wordpress",
     )
+    responsabile = models.ForeignKey(
+        "PersonaleWordPress",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="unita_organizzative_responsabili",
+        verbose_name="Responsabile WordPress",
+    )
     aggiornato_il = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -205,6 +213,7 @@ class AppuntamentoWordPress(models.Model):
     unita_organizzativa = models.CharField(max_length=255, blank=True)
     luogo_id = models.CharField(max_length=64, blank=True)
     servizio = models.CharField(max_length=255, blank=True)
+    nome_prenotato = models.CharField(max_length=255, blank=True)
     email = models.EmailField(blank=True)
     codice_fiscale = models.CharField(max_length=16, blank=True)
     dettaglio_richiesta = models.TextField(blank=True)
@@ -214,6 +223,14 @@ class AppuntamentoWordPress(models.Model):
         null=True,
         blank=True,
         related_name="appuntamenti_wordpress",
+    )
+    appuntamento = models.OneToOneField(
+        "visitors.Appuntamento",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="origine_wordpress",
+        verbose_name="Appuntamento locale collegato",
     )
     dati_origine = models.JSONField(default=dict, blank=True)
     acquisito_il = models.DateTimeField(auto_now_add=True)

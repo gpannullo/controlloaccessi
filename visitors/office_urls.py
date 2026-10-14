@@ -5,6 +5,7 @@ from visitors.office_views import (
     autorizza_salita_visita,
     concludi_visita,
     fai_entrare_prossimo,
+    salta_non_presente,
     fai_entrare_visitatore,
     gestisci_indisponibilita,
     selezione_ufficio,
@@ -18,6 +19,7 @@ app_name = "uffici"
 
 
 urlpatterns = [
+    path("dettaglio/<int:ufficio_id>/accessi/<int:accesso_id>/salta/", salta_non_presente, name="salta_non_presente"),
     path("", selezione_ufficio, name="selezione"),
 
     path("dettaglio/<int:ufficio_id>/", ufficio_dashboard, name="dashboard"),

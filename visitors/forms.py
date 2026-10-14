@@ -24,6 +24,11 @@ class IndisponibilitaUfficioForm(forms.ModelForm):
 
 
 class RegistrazioneVisitatoreForm(forms.Form):
+    appuntamento_id = forms.IntegerField(
+        required=False,
+        widget=forms.HiddenInput,
+    )
+
     documento_presentato = forms.BooleanField(
         required=False,
         initial=True,
@@ -136,7 +141,7 @@ class RegistrazioneVisitatoreForm(forms.Form):
         else:
             uffici = (
                 OfficeService
-                .get_offices_receiving_with_present_staff()
+                .get_offices_receiving_today()
             )
 
         self.fields["ufficio"].queryset = uffici
@@ -201,7 +206,12 @@ class RegistrazioneVisitatoreForm(forms.Form):
                 or ""
         )
 
-        return numero.strip().upper()
+        return (
+            numero.strip().upper()
+            .replace(" ", "")
+            .replace("-", "")
+            .replace(".", "")
+        )
 
     def clean_motivo(self):
         motivo = (

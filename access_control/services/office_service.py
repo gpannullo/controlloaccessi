@@ -209,16 +209,22 @@ class OfficeService:
 
     @classmethod
     def get_offices_receiving_with_present_staff(cls):
-        """Uffici pubblici attivi con almeno un dipendente presente.
+        """Uffici che ricevono oggi e hanno almeno un dipendente presente.
 
-        Il calendario di apertura non determina la selezionabilita per la
-        registrazione in portineria: l'ufficio e disponibile quando il suo
-        personale assegnato e effettivamente presente.
+        Per il ricevimento si considera il calendario della giornata e le
+        indisponibilità comunicate dal responsabile. Prima dell'apertura il
+        cittadino può essere comunque registrato e resta in hall; dopo la
+        chiusura dell'ultima fascia non compare più nell'elenco.
         """
 
-        return cls.get_offices_with_present_staff().filter(
-            riceve_pubblico=True,
-        )
+        User = get_user_model()
+        return cls.get_offices_receiving_today().filter(
+            assegnazioni_personale__attiva=True,
+            assegnazioni_personale__utente__is_active=True,
+            assegnazioni_personale__utente__stato_presenza=(
+                User.StatoPresenza.PRESENTE
+            ),
+        ).distinct()
 
     @staticmethod
     def get_active_offices_for_day(giorno):

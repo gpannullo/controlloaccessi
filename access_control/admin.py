@@ -1,3 +1,5 @@
+from datetime import time
+
 from django.contrib import admin, messages
 from django.contrib.auth.admin import GroupAdmin
 from django.contrib.auth.models import Group
@@ -226,7 +228,11 @@ class UfficioAdmin(admin.ModelAdmin):
         IndisponibilitaUfficioInline,
     ]
 
-    actions = ("disabilita_uffici", "crea_gruppi_active_directory")
+    actions = (
+        "disabilita_uffici",
+        "crea_gruppi_active_directory",
+        "imposta_orari_ricevimento_predefiniti",
+    )
 
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)
@@ -376,6 +382,34 @@ class UfficioAdmin(admin.ModelAdmin):
     def disabilita_uffici(self, request, queryset):
         aggiornati = queryset.filter(attivo=True).update(attivo=False)
         self.message_user(request, f"Uffici disabilitati: {aggiornati}.", messages.SUCCESS)
+
+    @admin.action(description="Aggiungi orari di ricevimento predefiniti")
+    def imposta_orari_ricevimento_predefiniti(self, request, queryset):
+        """Aggiunge il calendario standard senza sovrascrivere quello esistente."""
+        intervalli = [
+            (giorno, time(8, 30), time(13, 30)) for giorno in range(5)
+        ] + [
+            (CalendarioApertura.Giorno.MARTEDI, time(14, 30), time(17, 30)),
+            (CalendarioApertura.Giorno.GIOVEDI, time(14, 30), time(17, 30)),
+        ]
+        creati = gia_presenti = 0
+        for ufficio in queryset:
+            for giorno, ora_inizio, ora_fine in intervalli:
+                _, creato = CalendarioApertura.objects.get_or_create(
+                    ufficio=ufficio,
+                    giorno=giorno,
+                    ora_inizio=ora_inizio,
+                    ora_fine=ora_fine,
+                    defaults={"su_appuntamento": False},
+                )
+                creati += int(creato)
+                gia_presenti += int(not creato)
+        self.message_user(
+            request,
+            "Orari predefiniti applicati: %s intervalli creati, %s già presenti."
+            % (creati, gia_presenti),
+            messages.SUCCESS,
+        )
 
     @admin.action(
         description="Crea gruppi Active Directory per gli uffici selezionati"

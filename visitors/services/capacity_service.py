@@ -35,28 +35,23 @@ class CapacityService:
         ).distinct().count()
 
     @staticmethod
-    def numero_operatori_attivi(ufficio):
-        """
-        Conta gli utenti attivi assegnati all'ufficio,
-        configurati come sportellisti e, quando previsto,
-        presenti secondo il sistema esterno.
-        """
+    def operatori_per_capacita(ufficio):
+        """Sportellisti e tecnici attivi, associati e presenti.
 
-        controllo_presenze = getattr(
-            settings,
-            "PRESENCE_CHECK_ENABLED",
-            False,
-        )
-
-        utenti = User.objects.filter(
+        La presenza e' sempre richiesta. Il flag dell'associazione usato
+        dalla scheda utente come visibilita' non limita questo conteggio:
+        anche il personale non pubblicato contribuisce alla capacita'.
+        """
+        return User.objects.filter(
             assegnazioni_ufficio__ufficio=ufficio,
-            assegnazioni_ufficio__attiva=True,
             is_active=True,
-            tipo_attivita=User.TipoAttivita.SPORTELLISTA,
+            tipo_attivita__in=[User.TipoAttivita.SPORTELLISTA, User.TipoAttivita.TECNICO],
+            stato_presenza=User.StatoPresenza.PRESENTE,
         ).distinct()
-        if controllo_presenze:
-            utenti = utenti.filter(stato_presenza=User.StatoPresenza.PRESENTE)
-        return utenti.count()
+
+    @classmethod
+    def numero_operatori_attivi(cls, ufficio):
+        return cls.operatori_per_capacita(ufficio).count()
 
     @staticmethod
     def tempo_medio_servizio(ufficio):

@@ -50,6 +50,10 @@ class DirectoryLoginView(LoginView):
     template_name = "registration/login.html"
 
     def get_success_url(self):
+        # Preserve the QR landing page without changing other public redirects.
+        destination = self.get_redirect_url()
+        if destination in {reverse("presenze_qr:scan"), reverse("presenze_qr:personale")}:
+            return destination
         if self.request.get_host().split(":", 1)[0].lower() == settings.PUBLIC_ACCOUNT_HOST:
             return reverse("my_account")
         return self.get_redirect_url() or _default_destination(self.request)
@@ -100,6 +104,7 @@ def initial_password_change(request):
 @login_required
 @require_http_methods(["GET", "POST"])
 def my_account(request):
+    from presenze_qr.services import storico_personale, abilitato
     tab = request.GET.get("tab", "anagrafica")
     if request.method == "POST":
         request.user.email_aggiuntiva = request.POST.get("email_aggiuntiva", "").strip()
@@ -115,9 +120,11 @@ def my_account(request):
     uffici_responsabili = request.user.uffici_responsabili.filter(attivo=True).order_by("nome")
     return render(request, "accounts/my_account.html", {
         "dettaglio": dettaglio,
+        "timbrature": storico_personale(request.user) if tab == 'presenza' else [],
+        "abilitato_qr": settings.PRESENZE_QR_ENABLED and abilitato(request.user),
         "uffici": uffici,
         "uffici_responsabili": uffici_responsabili,
-        "tab": tab if tab in {"anagrafica", "uffici", "abilitazioni"} else "anagrafica",
+        "tab": tab if tab in {"anagrafica", "uffici", "abilitazioni", "presenza"} else "anagrafica",
         "account_update_contact_email": settings.ACCOUNT_UPDATE_CONTACT_EMAIL,
         "is_public_account": request.get_host().split(":", 1)[0].lower() == settings.PUBLIC_ACCOUNT_HOST,
     })

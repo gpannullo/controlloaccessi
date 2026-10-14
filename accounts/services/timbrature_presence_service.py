@@ -1,4 +1,5 @@
 import logging
+import hashlib
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -147,15 +148,39 @@ class TimbraturePresenceService:
             if precedente is None or timbratura.rilevata_il > precedente.rilevata_il:
                 ultima_per_badge[timbratura.badge] = timbratura
 
-        utenti = list(
-            User.objects.select_for_update().filter(is_active=True, badge__isnull=False).exclude(badge="")
+        utenti_badge = list(
+            User.objects.select_for_update().filter(badge__isnull=False).exclude(badge__in=["", "0000000000"]).order_by('pk')
         )
+        # Archive every available movement, including inactive badge owners.
+        # Identity uses source data, not the current owner, so reassignment cannot
+        # duplicate or move an already archived punch to another employee.
+        from presenze_qr.models import Timbratura as StoricoTimbratura
+        proprietari = {u.badge: u for u in utenti_badge}
+        for movimento in timbrature:
+            proprietario = proprietari.get(movimento.badge)
+            if proprietario is None:
+                continue
+            identity = '|'.join((self.fonte, movimento.badge, movimento.rilevata_il.isoformat(), movimento.verso, movimento.causale))
+            StoricoTimbratura.objects.get_or_create(
+                chiave_importazione=hashlib.sha256(identity.encode()).hexdigest(),
+                defaults=dict(utente=proprietario, origine='AUTOMATICO', badge=movimento.badge,
+                    causale=movimento.causale, verso=movimento.verso, verso_originale=movimento.verso,
+                    registrata_il=timezone.make_aware(movimento.rilevata_il, timezone.get_current_timezone())),
+            )
+        utenti = [u for u in utenti_badge if u.is_active]
         badge_conosciuti = {utente.badge for utente in utenti}
         adesso = timezone.now()
         aggiornati = presenti = assenti = 0
         for utente in utenti:
             timbratura = ultima_per_badge.get(utente.badge)
             ultima_timbratura = ultima_storica_per_badge.get(utente.badge)
+            # A badge assigned after a QR punch must not restore an older record.
+            if utente.presenza_fonte == 'QR' and utente.ultima_timbratura_il and (
+                not ultima_timbratura or timezone.make_aware(
+                    ultima_timbratura.rilevata_il, timezone.get_current_timezone()
+                ) <= utente.ultima_timbratura_il
+            ):
+                continue
             stato = User.StatoPresenza.PRESENTE if timbratura and timbratura.verso == "I" else User.StatoPresenza.ASSENTE
             if stato == User.StatoPresenza.PRESENTE:
                 presenti += 1

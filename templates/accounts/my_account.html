@@ -20,6 +20,7 @@
 
   <ul class="nav nav-tabs mb-4">
     <li class="nav-item"><a class="nav-link {% if tab == 'anagrafica' %}active{% endif %}" href="{% url 'my_account' %}?tab=anagrafica">Anagrafica e recapiti</a></li>
+    <li class="nav-item"><a class="nav-link {% if tab == 'presenza' %}active{% endif %}" href="{% url 'my_account' %}?tab=presenza">Presenze</a></li>
     {% if uffici_responsabili %}<li class="nav-item"><a class="nav-link {% if tab == 'uffici' %}active{% endif %}" href="{% url 'my_account' %}?tab=uffici">Uffici</a></li>{% endif %}
     <li class="nav-item"><a class="nav-link {% if tab == 'abilitazioni' %}active{% endif %}" href="{% url 'my_account' %}?tab=abilitazioni">Abilitazioni</a></li>
   </ul>
@@ -41,6 +42,20 @@
         <div class="col-12"><button class="btn btn-danger">Salva recapiti aggiuntivi</button></div>
       </form>
     </div></div>
+  {% elif tab == 'presenza' %}
+    <div class="card"><div class="card-body">
+      <h2 class="h5">Presenza</h2>
+      <p class="text-muted">Dati personali in sola lettura, aggiornati dal sistema di rilevazione delle presenze.</p>
+      {% if dettaglio.badge or request.user.badge %}
+      <dl class="row mb-0">
+        <dt class="col-sm-4">Badge</dt><dd class="col-sm-8">{{ dettaglio.badge|default:request.user.badge }}</dd>
+        <dt class="col-sm-4">Stato attuale</dt><dd class="col-sm-8">{% if request.user.stato_presenza == 'PRE' %}<span class="badge text-bg-success">Presente</span>{% elif request.user.stato_presenza == 'ASS' %}<span class="badge text-bg-danger">Non presente</span>{% else %}<span class="badge text-bg-secondary">Non verificata</span>{% endif %}</dd>
+        <dt class="col-sm-4">Ultimo controllo</dt><dd class="col-sm-8">{{ request.user.presenza_verificata_il|date:"d/m/Y H:i"|default:"—" }}</dd>
+        <dt class="col-sm-4">Ultima timbratura registrata</dt><dd class="col-sm-8">{% if request.user.ultima_timbratura_il %}{{ request.user.ultima_timbratura_il|date:"d/m/Y H:i" }} — {% if request.user.ultima_timbratura_verso == 'I' %}Entrata{% elif request.user.ultima_timbratura_verso == 'U' %}Uscita{% else %}Verso non disponibile{% endif %} (causale {{ request.user.ultima_timbratura_causale|default:"—" }}){% else %}Nessuna timbratura disponibile.{% endif %}</dd>
+      </dl>
+      {% else %}<p class="mb-0">Nessun badge associato al tuo account.</p>{% endif %}
+    </div></div>
+    {% include 'presenze_qr/storico.html' %}
   {% elif tab == 'uffici' %}
     <div class="card mb-3"><div class="card-body"><h2 class="h5">Uffici assegnati</h2><ul class="mb-0">{% for item in uffici %}<li>{{ item.ufficio.nome }}</li>{% empty %}<li>Nessun ufficio associato.</li>{% endfor %}</ul></div></div>
     <div class="card"><div class="card-body">

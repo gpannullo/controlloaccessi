@@ -24,7 +24,7 @@ def stato_dashboard_portineria(request):
     )
 
     uffici_oggi = list(
-        OfficeService.get_offices_receiving_with_present_staff()
+        OfficeService.get_offices_with_present_staff()
     )
 
     dati_uffici = []

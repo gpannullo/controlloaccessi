@@ -167,7 +167,7 @@ class AccessoVisitatore(models.Model):
     )
 
     prefisso_coda = models.CharField(
-        max_length=1,
+        max_length=2,
         blank=True,
         editable=False,
         verbose_name="Prefisso della coda",
@@ -242,6 +242,8 @@ class AccessoVisitatore(models.Model):
         related_name="accessi_successivi",
         verbose_name="Accesso precedente",
     )
+
+    reinserito_hall_il = models.DateTimeField(null=True, blank=True, editable=False)
 
     stato_coda = models.CharField(
         max_length=5,

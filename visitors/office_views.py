@@ -9,13 +9,14 @@ from django.shortcuts import (
     redirect,
     render,
 )
+from django.utils import timezone
 from django.views.decorators.http import require_POST, require_GET
 
 from access_control.models import IndisponibilitaUfficio, Ufficio
 from access_control.services.office_service import OfficeService
 from common.exceptions import BusinessException
 from visitors.forms import IndisponibilitaUfficioForm
-from visitors.models import AccessoVisitatore
+from visitors.models import AccessoVisitatore, Appuntamento
 from visitors.permissions import ufficio_required
 from visitors.services.capacity_service import CapacityService
 from visitors.services.continuity_service import ContinuitaAccessoService
@@ -203,6 +204,18 @@ def ufficio_dashboard(request, ufficio_id):
         )
     )
 
+    prenotati_non_arrivati = list(
+        Appuntamento.objects.filter(
+            ufficio=ufficio,
+            data_ora__date=timezone.localdate(),
+            stato__in=[
+                Appuntamento.Stato.PRENOTATO,
+                Appuntamento.Stato.CONFERMATO,
+            ],
+            accesso__isnull=True,
+        ).order_by("data_ora", "cognome_cittadino", "nome_cittadino")
+    )
+
     uffici_trasferimento = list(
         Ufficio.objects.filter(attivo=True)
         .exclude(pk=ufficio.pk)
@@ -233,6 +246,8 @@ def ufficio_dashboard(request, ufficio_id):
             "numero_in_ufficio": len(
                 visite_in_corso
             ),
+            "numero_prenotati_non_arrivati": len(prenotati_non_arrivati),
+            "prenotati_non_arrivati": prenotati_non_arrivati,
             "uffici_trasferimento": uffici_trasferimento,
             "puo_gestire_indisponibilita": (
                 request.user.is_superuser
@@ -279,6 +294,20 @@ def fai_entrare_prossimo(request, ufficio_id):
         "uffici:dashboard",
         ufficio_id=ufficio.pk,
     )
+
+
+@ufficio_required
+@require_POST
+def salta_non_presente(request, ufficio_id, accesso_id):
+    ufficio = _get_ufficio_autorizzato(request.user, ufficio_id)
+    get_object_or_404(AccessoVisitatore, pk=accesso_id, ufficio_destinazione=ufficio)
+    try:
+        OfficeQueueService.salta_non_presente(accesso_id=accesso_id, ufficio=ufficio,
+            operatore=request.user, ip_address=_get_client_ip(request))
+        messages.success(request, 'Visitatore non presente: rimesso in fondo alla hall della sua categoria. Verifica il prossimo numero chiamato.')
+    except BusinessException as exc:
+        messages.warning(request, str(exc))
+    return redirect('uffici:dashboard', ufficio_id=ufficio.pk)
 
 
 @ufficio_required

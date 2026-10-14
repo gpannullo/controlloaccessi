@@ -170,28 +170,45 @@ class ActiveDirectoryService(DirectoryService):
         deve poter scegliere subito una nuova password.
         """
 
+        conn = None
         try:
+            # Evitiamo ``auto_bind``: ldap3 in base alla versione/protocollo
+            # può restituire l'esito della bind in ``conn.result`` anziché
+            # sollevare LDAPBindError. In entrambi i casi dobbiamo intercettare
+            # l'account con password scaduta o provvisoria.
             conn = Connection(
                 self.server,
                 user=f"{username}@{self.domain}",
                 password=password,
-                auto_bind=True,
+                auto_bind=False,
                 auto_referrals=False,
             )
 
-            stato = "authenticated" if conn.bound else "invalid"
-            conn.unbind()
-            return stato
+            if conn.bind():
+                return "authenticated"
+
+            result = conn.result or {}
+            diagnostic = " ".join(
+                str(result.get(key, ""))
+                for key in ("message", "description", "result")
+            ).lower()
+            if any(marker in diagnostic for marker in (
+                "data 532", "data 773", "password expired", "must change password",
+            )):
+                return "password_change_required"
+            return "invalid"
         except LDAPBindError as exc:
             # Le credenziali sono corrette, ma AD richiede il cambio password:
             # 773 = password provvisoria; 532 = password scaduta.
-            return (
-                "password_change_required"
-                if any(code in str(exc) for code in ("773", "532"))
-                else "invalid"
-            )
+            diagnostic = str(exc).lower()
+            return "password_change_required" if any(marker in diagnostic for marker in (
+                "data 532", "data 773", "password expired", "must change password",
+            )) else "invalid"
         except Exception:
             return "invalid"
+        finally:
+            if conn is not None:
+                conn.unbind()
 
     def get_groups(self):
 

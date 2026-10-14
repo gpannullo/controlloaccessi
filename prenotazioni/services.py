@@ -5,7 +5,56 @@ from django.utils import timezone
 
 from access_control.models import CalendarioApertura, IndisponibilitaUfficio, Ufficio
 
-from .models import Prenotazione
+from .models import AppuntamentoWordPress, Prenotazione
+
+
+def _normalizza_nominativo(valore):
+    return " ".join((valore or "").casefold().split())
+
+
+def appuntamento_wordpress_per_checkin(visitatore, ufficio, data=None):
+    """Restituisce l'appuntamento WordPress verificato per il check-in.
+
+    Il codice fiscale è il criterio prevalente; se non è disponibile viene
+    usato il nominativo completo, limitato allo stesso ufficio e giorno.
+    """
+    data = data or timezone.localdate()
+    candidati = (
+        AppuntamentoWordPress.objects
+        .filter(
+            ufficio=ufficio,
+            data_ora_inizio__date=data,
+            appuntamento__isnull=False,
+            appuntamento__accesso__isnull=True,
+            appuntamento__stato__in=["PR", "CO"],
+        )
+        .select_related("appuntamento")
+    )
+    codice_fiscale = (visitatore.codice_fiscale or "").strip().upper()
+    if codice_fiscale:
+        candidati = candidati.filter(codice_fiscale=codice_fiscale)
+    else:
+        nominativo = _normalizza_nominativo(
+            f"{visitatore.nome} {visitatore.cognome}"
+        )
+        candidati = [
+            appuntamento
+            for appuntamento in candidati
+            if _normalizza_nominativo(appuntamento.nome_prenotato) == nominativo
+            or _normalizza_nominativo(" ".join(reversed(appuntamento.nome_prenotato.split()))) == nominativo
+        ]
+
+    candidati = list(candidati)
+    if not candidati:
+        return None
+    ora = timezone.now()
+    appuntamento_wp = min(
+        candidati,
+        key=lambda candidato: abs(
+            (candidato.data_ora_inizio - ora).total_seconds()
+        ),
+    )
+    return appuntamento_wp.appuntamento
 
 
 def uffici_prenotabili():

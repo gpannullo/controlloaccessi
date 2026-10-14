@@ -88,7 +88,7 @@ def _endpoint(config, name):
 def _mappatura(item):
     unita_id = str(item.get("unita_organizzativa_id") or "")
     luogo_id = str(item.get("luogo_id") or "")
-    if not unita_id and not luogo_id:
+    if not unita_id:
         return None
     mapping, _ = MappaturaUfficioWordPress.objects.get_or_create(
         unita_organizzativa_id=unita_id,
@@ -98,7 +98,43 @@ def _mappatura(item):
     if item.get("unita_organizzativa") and mapping.unita_organizzativa != item["unita_organizzativa"]:
         mapping.unita_organizzativa = item["unita_organizzativa"]
         mapping.save(update_fields=["unita_organizzativa", "aggiornato_il"])
+
+    # L'ufficio di destinazione deriva esclusivamente dall'Unità
+    # organizzativa WordPress. La sede è descrittiva: al momento è unica e
+    # non può cambiare la coda di destinazione di un appuntamento.
+    unita = UnitaOrganizzativaWordPress.objects.filter(
+        origine_id=unita_id,
+        ufficio__isnull=False,
+    ).select_related("ufficio").first()
+    if unita and mapping.ufficio_id != unita.ufficio_id:
+        mapping.ufficio = unita.ufficio
+        mapping.save(update_fields=["ufficio", "aggiornato_il"])
     return mapping
+
+
+def allinea_uffici_appuntamenti_wordpress():
+    """Allinea tutti gli appuntamenti agli uffici definiti nei mapping.
+
+    La fonte autorevole è ``Unità organizzativa WordPress -> Ufficio Django``.
+    La sede WordPress è solo un'informazione descrittiva e non interviene
+    nella destinazione degli appuntamenti.
+    """
+    aggiornati = 0
+    unita_organizzative = UnitaOrganizzativaWordPress.objects.filter(
+        ufficio__isnull=False,
+    ).only("origine_id", "ufficio_id")
+    for unita in unita_organizzative:
+        # Mantiene leggibile anche la vecchia anagrafica delle mappature
+        # importate dai calendari WordPress.
+        MappaturaUfficioWordPress.objects.filter(
+            unita_organizzativa_id=unita.origine_id,
+        ).exclude(ufficio_id=unita.ufficio_id).update(ufficio_id=unita.ufficio_id)
+        aggiornati += AppuntamentoWordPress.objects.filter(
+            unita_organizzativa_id=unita.origine_id,
+        ).exclude(
+            ufficio_id=unita.ufficio_id,
+        ).update(ufficio_id=unita.ufficio_id)
+    return aggiornati
 
 
 def _salva(item):
@@ -113,13 +149,95 @@ def _salva(item):
         "unita_organizzativa": item.get("unita_organizzativa", ""),
         "luogo_id": str(item.get("luogo_id") or ""),
         "servizio": item.get("servizio", ""),
+        "nome_prenotato": item.get("nome_prenotato", ""),
         "email": item.get("email", ""),
         "codice_fiscale": (item.get("codice_fiscale", "") or "").upper(),
         "dettaglio_richiesta": item.get("dettaglio_richiesta", ""),
         "ufficio": mapping.ufficio if mapping else None,
         "dati_origine": item,
     }
-    return AppuntamentoWordPress.objects.update_or_create(origine_id=item["id"], defaults=defaults)
+    appuntamento_wp, creato = AppuntamentoWordPress.objects.update_or_create(
+        origine_id=item["id"],
+        defaults=defaults,
+    )
+    _allinea_appuntamento_locale(appuntamento_wp)
+    return appuntamento_wp, creato
+
+
+def _nominativo_appuntamento(nome_completo):
+    """Il portale WordPress salva il titolo come ``cognome nome``."""
+    parti = " ".join((nome_completo or "").split()).split(" ", 1)
+    cognome = parti[0] if parti else ""
+    nome = parti[1] if len(parti) > 1 else ""
+    return nome, cognome
+
+
+def _allinea_appuntamento_locale(appuntamento_wp):
+    """Crea o aggiorna la prenotazione interna usata dalla portineria.
+
+    Si importano solo appuntamenti dall'inizio della giornata corrente: lo
+    storico WordPress resta consultabile ma non genera prenotazioni inutili.
+    """
+    from visitors.models import Appuntamento
+
+    data_ora = appuntamento_wp.data_ora_inizio
+    if (
+        not appuntamento_wp.ufficio_id
+        or not data_ora
+        or data_ora.date() < timezone.localdate()
+        or not appuntamento_wp.nome_prenotato.strip()
+    ):
+        return False
+
+    appuntamento = appuntamento_wp.appuntamento
+    if appuntamento_wp.origine_stato not in {"draft", "publish", "pending", "future"}:
+        if appuntamento and appuntamento.stato in {
+            Appuntamento.Stato.PRENOTATO,
+            Appuntamento.Stato.CONFERMATO,
+        }:
+            appuntamento.annulla()
+        return False
+
+    nome, cognome = _nominativo_appuntamento(appuntamento_wp.nome_prenotato)
+    if appuntamento is None:
+        appuntamento = Appuntamento.objects.create(
+            nome_cittadino=nome,
+            cognome_cittadino=cognome,
+            ufficio=appuntamento_wp.ufficio,
+            data_ora=data_ora,
+            motivo=appuntamento_wp.servizio or appuntamento_wp.dettaglio_richiesta[:255],
+            stato=Appuntamento.Stato.PRENOTATO,
+        )
+        appuntamento_wp.appuntamento = appuntamento
+        appuntamento_wp.save(update_fields=["appuntamento", "sincronizzato_il"])
+        return True
+
+    campi = []
+    for campo, valore in {
+        "nome_cittadino": nome,
+        "cognome_cittadino": cognome,
+        "ufficio": appuntamento_wp.ufficio,
+        "data_ora": data_ora,
+        "motivo": appuntamento_wp.servizio or appuntamento_wp.dettaglio_richiesta[:255],
+    }.items():
+        if getattr(appuntamento, campo) != valore:
+            setattr(appuntamento, campo, valore)
+            campi.append(campo)
+    if campi:
+        appuntamento.save(update_fields=campi)
+    return bool(campi)
+
+
+def allinea_appuntamenti_locali_wordpress():
+    """Collega anche gli appuntamenti WordPress già importati oggi o futuri."""
+    aggiornati = 0
+    appuntamenti = AppuntamentoWordPress.objects.filter(
+        data_ora_inizio__date__gte=timezone.localdate(),
+        ufficio__isnull=False,
+    ).select_related("appuntamento", "ufficio")
+    for appuntamento_wp in appuntamenti:
+        aggiornati += int(_allinea_appuntamento_locale(appuntamento_wp))
+    return aggiornati
 
 
 def sincronizza_appuntamenti_wordpress():
@@ -137,8 +255,10 @@ def sincronizza_appuntamenti_wordpress():
 
     while True:
         params = {"page": page, "per_page": config["PAGE_SIZE"]}
-        if cursor:
-            params["updated_after"] = cursor.astimezone(datetime_timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        # WordPress appointments may have zero GMT timestamps, including new
+        # bookings and edits to postmeta. A timestamp cursor silently loses
+        # these records. Reconcile every page by unique origine_id instead;
+        # keep the cursor only as diagnostic information, never as a filter.
         separatore = "&" if "?" in config["ENDPOINT"] else "?"
         payload = _request(f'{config["ENDPOINT"]}{separatore}{urlencode(params)}', config["SHARED_SECRET"], config["TIMEOUT"])
         items = payload.get("items")
@@ -161,10 +281,20 @@ def sincronizza_appuntamenti_wordpress():
             break
         page += 1
 
+    uffici_allineati = allinea_uffici_appuntamenti_wordpress()
+    appuntamenti_locali_allineati = allinea_appuntamenti_locali_wordpress()
+
     stato.cursore = cursor_finale
     stato.ultima_esecuzione_il = timezone.now()
     stato.save(update_fields=["cursore", "ultima_esecuzione_il"])
-    return {"totale": totale, "creati": creati, "aggiornati": aggiornati, "cursore": cursor_finale}
+    return {
+        "totale": totale,
+        "creati": creati,
+        "aggiornati": aggiornati,
+        "uffici_allineati": uffici_allineati,
+        "appuntamenti_locali_allineati": appuntamenti_locali_allineati,
+        "cursore": cursor_finale,
+    }
 
 
 def sincronizza_anagrafiche_wordpress():
@@ -211,6 +341,8 @@ def sincronizza_anagrafiche_wordpress():
         mapping.unita_organizzativa_wordpress = unita_wordpress
         mapping.sede = sede
         mapping.calendario_wordpress_id = str(item.get("id") or "")
+        if unita_wordpress and unita_wordpress.ufficio_id:
+            mapping.ufficio = unita_wordpress.ufficio
         mapping.save()
         mappature += 1
 
@@ -244,6 +376,25 @@ def sincronizza_anagrafiche_wordpress():
                     unita_organizzativa=unita[unita_id],
                 )
         personale += 1
+
+    # Il responsabile è una relazione distinta dalle persone della struttura.
+    # Viene importato dopo le persone, così il riferimento locale è disponibile.
+    persone_per_origine = {
+        str(persona.origine_id): persona
+        for persona in PersonaleWordPress.objects.filter(origine_id__in=[
+            str(item.get("responsabile"))
+            for item in payload.get("uffici", [])
+            if item.get("responsabile")
+        ])
+    }
+    for item in payload.get("uffici", []):
+        unita_id = str(item.get("id") or "")
+        if unita_id not in unita:
+            continue
+        responsabile = persone_per_origine.get(str(item.get("responsabile") or ""))
+        if unita[unita_id].responsabile_id != (responsabile.pk if responsabile else None):
+            unita[unita_id].responsabile = responsabile
+            unita[unita_id].save(update_fields=["responsabile", "aggiornato_il"])
     return {"sedi": sedi, "unita_organizzative": len(unita), "mappature": mappature, "personale": personale}
 
 
@@ -433,6 +584,7 @@ def pubblica_unita_organizzativa_wordpress(unita):
         payload={
             "nome": unita.nome,
             "attivo": unita.stato == "publish",
+            "responsabile": unita.responsabile.origine_id if unita.responsabile_id else None,
         },
     )
     if not isinstance(response, dict) or not response.get("aggiornato"):

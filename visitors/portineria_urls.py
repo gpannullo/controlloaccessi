@@ -6,6 +6,7 @@ from visitors.views import (
     libera_badge_rientro,
     nuova_registrazione,
     nuovo_ricevimento,
+    appuntamenti_oggi,
     nuova_visita,
     registrazione_completata,
     rientro_badge,
@@ -19,6 +20,7 @@ app_name = "portineria"
 
 
 urlpatterns = [
+    path("appuntamenti-oggi/", appuntamenti_oggi, name="appuntamenti_oggi"),
     path("nuovo-ricevimento/", nuovo_ricevimento, name="nuovo_ricevimento"),
     path("nuova-visita/", nuova_visita, name="nuova_visita"),
     path("nuova-registrazione/", nuova_registrazione, name="nuova_registrazione"),

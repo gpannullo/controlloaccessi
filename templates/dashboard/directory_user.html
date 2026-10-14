@@ -22,7 +22,7 @@
     {% if dettaglio.badge or utente.badge %}<li class="nav-item" role="presentation"><button class="nav-link" id="presenza-tab" data-bs-toggle="tab" data-bs-target="#presenza" type="button" role="tab">Presenza</button></li>{% endif %}
     <li class="nav-item" role="presentation"><button class="nav-link" id="uffici-tab" data-bs-toggle="tab" data-bs-target="#uffici" type="button" role="tab">Uffici</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" id="gruppi-tab" data-bs-toggle="tab" data-bs-target="#gruppi" type="button" role="tab">Gruppi AD</button></li>
-    {% if persone_pubbliche %}<li class="nav-item" role="presentation"><button class="nav-link" id="persone-pubbliche-tab" data-bs-toggle="tab" data-bs-target="#persone-pubbliche" type="button" role="tab">Persona pubblica</button></li>{% endif %}
+    <li class="nav-item" role="presentation"><button class="nav-link" id="persone-pubbliche-tab" data-bs-toggle="tab" data-bs-target="#persone-pubbliche" type="button" role="tab">Persona pubblica</button></li>
   </ul>
 
   <div class="tab-content">
@@ -36,7 +36,7 @@
             <label class="form-label" for="last_name">Cognome</label><input id="last_name" class="form-control mb-2" name="last_name" value="{{ dettaglio.last_name }}">
             <label class="form-label" for="personal_email">E-mail personale</label><input id="personal_email" type="email" class="form-control mb-2" name="personal_email" value="{{ dettaglio.personal_email }}">
             <label class="form-label" for="mobile">Cellulare</label><input id="mobile" type="tel" class="form-control mb-3" name="mobile" value="{{ dettaglio.mobile }}">
-            <label class="form-label" for="badge">Badge presenze</label><input id="badge" type="text" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" class="form-control mb-1" name="badge" value="{{ dettaglio.badge|default:utente.badge }}"><div class="form-text mb-3">Codice di 10 cifre, salvato anche nell'attributo LDAP employeeID.</div>
+            <label class="form-label" for="badge">Badge presenze <span class="text-muted fw-normal">(facoltativo)</span></label><input id="badge" type="text" inputmode="numeric" pattern="[0-9]{1,10}" maxlength="10" class="form-control mb-1" name="badge" value="{{ dettaglio.badge|default:utente.badge|default:'0000000000' }}"><div class="form-text mb-3">Se non assegnato viene visualizzato <strong>0000000000</strong> ma non viene salvato. Un badge inserito viene completato automaticamente con gli zeri iniziali fino a 10 cifre.</div>
             <hr>
             <div class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" role="switch" id="mail_istituzionale" name="mail_istituzionale" {% if 'MDAEMON' in dettaglio.groups %}checked{% endif %}><label class="form-check-label" for="mail_istituzionale">Mail istituzionale</label></div>
             <div id="mail-istituzionale-campi"><label class="form-label" for="dominio_istituzionale">Dominio e-mail istituzionale</label><select class="form-select mb-1" id="dominio_istituzionale" name="dominio_istituzionale">{% for dominio in domini_istituzionali %}<option value="{{ dominio }}" {% if dominio == dominio_istituzionale %}selected{% endif %}>@{{ dominio }}</option>{% endfor %}</select><div class="form-text mb-3">Indirizzo previsto: <span id="indirizzo-istituzionale">{{ utente.username }}{% if dominio_istituzionale %}@{{ dominio_istituzionale }}{% endif %}</span>. L'attivazione aggiunge il gruppo MDAEMON.</div></div>
@@ -64,36 +64,61 @@
     <section class="tab-pane fade" id="uffici" role="tabpanel" aria-labelledby="uffici-tab">
       <div class="card"><div class="card-body">
         <h2 class="h5">Uffici associati</h2>
+        <p class="text-muted">Sono elencate anche le associazioni non attive. Il flag abilita o disabilita l'utente per l'ufficio: non è solo grafico e non modifica l'account o i gruppi AD. L'ufficio resta sempre in questo elenco.</p>
         <form method="post" action="{% url 'dashboard:directory_action' utente.pk %}" class="row g-2 align-items-end mb-4">
           {% csrf_token %}<input type="hidden" name="azione" value="aggiungi_ufficio">
           <div class="col-md"><label class="form-label" for="gruppo_organizzativo">Aggiungi ufficio</label><select class="form-select" id="gruppo_organizzativo" name="gruppo_organizzativo"><option value="">Seleziona un ufficio</option>{% for ufficio in gruppi_ufficio_disponibili %}<option value="{{ ufficio.pk }}">{{ ufficio.nome }} — {{ ufficio.gruppo_operativo.nome }}</option>{% endfor %}</select></div>
           <div class="col-md-auto"><button class="btn btn-danger">Aggiungi ufficio</button></div>
         </form>
         {% for assegnazione in uffici_associati %}
+          <div class="mt-3 mb-1"><span class="badge {% if assegnazione.attiva %}bg-success{% else %}bg-secondary{% endif %}">{% if assegnazione.attiva %}Visibile nell'ufficio{% else %}Non visibile nell'ufficio{% endif %}</span>{% if not assegnazione.ufficio.attivo %} <span class="badge bg-warning text-dark">Ufficio disattivato</span>{% endif %}</div>
           <div class="border rounded p-2 mb-2 d-flex justify-content-between align-items-center gap-2">
             <div><strong>{{ assegnazione.ufficio.nome }}</strong><br><small class="text-muted">Gruppo operativo: {{ assegnazione.ufficio.gruppo_operativo.directory_name }}</small>{% if assegnazione.unita_organizzativa_wordpress %}<br><small class="text-success">Unità organizzativa WordPress: {{ assegnazione.unita_organizzativa_wordpress.nome }}</small>{% if persone_pubbliche %}{% if assegnazione.persone_pubbliche_mancanti %}<br><small class="text-warning-emphasis">Manca nell’associazione WordPress di: {% for persona in assegnazione.persone_pubbliche_mancanti %}{{ persona }}{% if not forloop.last %}, {% endif %}{% endfor %}.</small>{% else %}<br><small class="text-success">Allineato con la persona pubblica.</small>{% endif %}{% endif %}{% else %}<br><small class="text-warning-emphasis">Nessuna unità organizzativa WordPress collegata.</small>{% endif %}</div>
             <div class="d-flex gap-2 flex-wrap">
+              <form method="post" action="{% url 'dashboard:directory_action' utente.pk %}" onsubmit="return confirm('Eliminare questa associazione all’ufficio? I gruppi AD non saranno modificati.');">{% csrf_token %}<input type="hidden" name="azione" value="elimina_ufficio"><input type="hidden" name="assegnazione" value="{{ assegnazione.pk }}"><button class="btn btn-sm btn-outline-danger" type="submit">Rimuovi ufficio</button></form>
+              <form method="post" action="{% url 'dashboard:directory_action' utente.pk %}#uffici" class="d-flex align-items-center gap-2">
+                {% csrf_token %}<input type="hidden" name="azione" value="visibilita_ufficio"><input type="hidden" name="assegnazione" value="{{ assegnazione.pk }}">
+                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="visibile-{{ assegnazione.pk }}" name="visibile" value="1" {% if assegnazione.attiva %}checked{% endif %}><label class="form-check-label" for="visibile-{{ assegnazione.pk }}">Visibile nell'ufficio</label></div>
+                <button class="btn btn-sm btn-outline-primary">Salva visibilità</button>
+              </form>
+              {% if assegnazione.attiva %}
               {% if not assegnazione.unita_organizzativa_wordpress %}<form method="post" action="{% url 'dashboard:directory_action' utente.pk %}" onsubmit="return confirm('Creare su WordPress l’unità organizzativa {{ assegnazione.ufficio.nome }}?');">{% csrf_token %}<input type="hidden" name="azione" value="crea_unita_organizzativa"><input type="hidden" name="ufficio" value="{{ assegnazione.ufficio_id }}"><button class="btn btn-sm btn-outline-success">Crea unità organizzativa</button></form>{% endif %}
               {% for persona in assegnazione.persone_pubbliche_mancanti %}<form method="post" action="{% url 'dashboard:directory_action' utente.pk %}" onsubmit="return confirm('Allineare tutti gli uffici di {{ persona }} con quelli dell’account?');">{% csrf_token %}<input type="hidden" name="azione" value="allinea_uffici_persona_pubblica"><input type="hidden" name="persona_pubblica" value="{{ persona.pk }}"><button class="btn btn-sm btn-outline-warning">Allinea {{ persona }}</button></form>{% endfor %}
-              <form method="post" action="{% url 'dashboard:directory_action' utente.pk %}" onsubmit="return confirm('Vuoi rimuovere l’ufficio {{ assegnazione.ufficio.nome }} dall’account?');">{% csrf_token %}<input type="hidden" name="azione" value="rimuovi_ufficio"><input type="hidden" name="gruppo_organizzativo" value="{{ assegnazione.pk }}"><button class="btn btn-sm btn-outline-danger">Rimuovi</button></form>
+              {% endif %}
             </div>
           </div>
         {% empty %}<p class="text-muted mb-0">Nessun ufficio associato.</p>{% endfor %}
       </div></div>
     </section>
 
-    <section class="tab-pane fade" id="gruppi" role="tabpanel" aria-labelledby="gruppi-tab"><div class="card"><div class="card-body"><h2 class="h5">Gruppi AD aggiuntivi</h2><p class="text-muted">Qui puoi aggiungere gruppi AD non gestiti automaticamente da uffici o dalla mail istituzionale.</p><form method="post" action="{% url 'dashboard:directory_action' utente.pk %}" class="row g-2 align-items-end mb-4">{% csrf_token %}<input type="hidden" name="azione" value="aggiungi_gruppo_ad"><div class="col-md"><label class="form-label" for="gruppo_ad">Gruppo AD</label><select class="form-select" id="gruppo_ad" name="gruppo_ad"><option value="">Seleziona un gruppo</option>{% for gruppo in gruppi_ad_disponibili %}<option value="{{ gruppo }}">{{ gruppo }}</option>{% endfor %}</select></div><div class="col-md-auto"><button class="btn btn-danger">Aggiungi gruppo</button></div></form><h3 class="h6">Appartenenze attuali</h3><div class="row row-cols-1 row-cols-md-3 g-2">{% for gruppo in dettaglio.groups %}<div class="col"><div class="border rounded px-2 py-1">{{ gruppo }}</div></div>{% empty %}<p class="text-muted mb-0">Nessun gruppo AD associato.</p>{% endfor %}</div></div></div></section>
+    <section class="tab-pane fade" id="gruppi" role="tabpanel" aria-labelledby="gruppi-tab"><div class="card"><div class="card-body"><h2 class="h5">Gruppi AD aggiuntivi</h2><p class="text-muted">Qui puoi aggiungere gruppi AD non gestiti automaticamente da uffici o dalla mail istituzionale.</p><form method="post" action="{% url 'dashboard:directory_action' utente.pk %}" class="row g-2 align-items-end mb-4">{% csrf_token %}<input type="hidden" name="azione" value="aggiungi_gruppo_ad"><div class="col-md"><label class="form-label" for="gruppo_ad">Gruppo AD</label><select class="form-select" id="gruppo_ad" name="gruppo_ad"><option value="">Seleziona un gruppo</option>{% for gruppo in gruppi_ad_disponibili %}<option value="{{ gruppo }}">{{ gruppo }}</option>{% endfor %}</select></div><div class="col-md-auto"><button class="btn btn-danger">Aggiungi gruppo</button></div></form><h3 class="h6">Appartenenze attuali</h3><div class="row row-cols-1 row-cols-md-3 g-2">{% for gruppo in dettaglio.groups %}<div class="col"><div class="border rounded p-2"><span>{{ gruppo }}</span><form method="post" action="{% url 'dashboard:directory_action' utente.pk %}" onsubmit="return confirm('Rimuovere questa appartenenza AD? Gli uffici restano associati. Un gruppo automatico potrebbe essere riaggiunto dalla relativa gestione.');">{% csrf_token %}<input type="hidden" name="azione" value="rimuovi_gruppo_ad"><input type="hidden" name="gruppo_ad" value="{{ gruppo }}"><button class="btn btn-sm btn-outline-danger" type="submit">Rimuovi</button></form></div></div>{% empty %}<p class="text-muted mb-0">Nessun gruppo AD associato.</p>{% endfor %}</div></div></div></section>
 
-    {% if persone_pubbliche %}
     <section class="tab-pane fade" id="persone-pubbliche" role="tabpanel" aria-labelledby="persone-pubbliche-tab">
       <div class="card"><div class="card-body">
         <h2 class="h5">Persona pubblica</h2>
+        <p class="text-muted">Gestisci la persona pubblica associata a questo account.</p>
+        {% if not persone_pubbliche %}
+        <div class="alert alert-light border">Nessuna persona pubblica collegata.</div>
+        <form method="post" action="{% url 'dashboard:directory_action' utente.pk %}" class="mb-3">
+          {% csrf_token %}<input type="hidden" name="azione" value="collega_persona_pubblica">
+          <label for="persona-collegabile" class="form-label">Collega una persona pubblica esistente</label>
+          <div class="d-flex gap-2"><select id="persona-collegabile" name="persona_pubblica" class="form-select" required><option value="">Seleziona una persona</option>{% for persona in persone_collegabili %}<option value="{{ persona.pk }}">{{ persona }} — ID WordPress {{ persona.origine_id }}</option>{% endfor %}</select><button class="btn btn-outline-danger">Collega</button></div>
+        </form>
+        <form method="post" action="{% url 'dashboard:directory_action' utente.pk %}" onsubmit="return confirm('Creare una nuova persona pubblica su WordPress e collegarla a questo account?');">
+          {% csrf_token %}<input type="hidden" name="azione" value="crea_persona_pubblica"><button class="btn btn-danger">Crea e collega persona pubblica</button>
+        </form>
+        {% endif %}
+
         {% for persona in persone_pubbliche %}
           <div class="border rounded p-3 {% if not forloop.last %}mb-2{% endif %}">
             <div class="d-flex justify-content-between align-items-start gap-2">
               <div><strong>{{ persona }}</strong>{% if persona.titolo %}<div class="text-muted">{{ persona.titolo }}</div>{% endif %}</div>
               {% if persona.attivo %}<span class="badge text-bg-success">Attiva</span>{% else %}<span class="badge text-bg-secondary">Non attiva</span>{% endif %}
             </div>
+            <div class="small text-muted mt-2">ID WordPress: {{ persona.origine_id }} · Account collegato: {{ utente.username }}</div>
+            <form method="post" action="{% url 'dashboard:directory_action' utente.pk %}" class="mt-3" onsubmit="return confirm('Rimuovere il collegamento? La persona pubblica rimane sul sito WordPress.');">
+              {% csrf_token %}<input type="hidden" name="azione" value="scollega_persona_pubblica"><input type="hidden" name="persona_pubblica" value="{{ persona.pk }}"><button class="btn btn-sm btn-outline-danger">Rimuovi collegamento</button>
+            </form>
             {% if persona.uffici_disallineati %}
               <div class="alert alert-warning py-2 mt-3 mb-0">
                 <strong>Uffici non allineati con l’account.</strong>
@@ -116,7 +141,6 @@
         {% endfor %}
       </div></div>
     </section>
-    {% endif %}
   </div>
   {% endif %}
 </div>
@@ -126,8 +150,19 @@
     const campi = document.getElementById('mail-istituzionale-campi');
     const dominio = document.getElementById('dominio_istituzionale');
     const indirizzo = document.getElementById('indirizzo-istituzionale');
+    const badge = document.getElementById('badge');
     const aggiornaMail = () => { if (!attiva) return; campi.classList.toggle('d-none', !attiva.checked); indirizzo.textContent = '{{ utente.username }}@' + dominio.value; };
+    const normalizzaBadge = () => {
+      if (!badge) return;
+      const valore = badge.value.trim();
+      if (!valore || valore === '0000000000') {
+        badge.value = '0000000000';
+        return;
+      }
+      if (/^\d{1,10}$/.test(valore)) badge.value = valore.padStart(10, '0');
+    };
     attiva?.addEventListener('change', aggiornaMail); dominio?.addEventListener('change', aggiornaMail); aggiornaMail();
+    badge?.addEventListener('blur', normalizzaBadge);
     window.setTimeout(() => document.querySelectorAll('[data-auto-dismiss="true"]').forEach((element) => bootstrap.Alert.getOrCreateInstance(element).close()), 5000);
   })();
 </script>
