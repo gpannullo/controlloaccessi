@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 
 from .sync_result import SyncResult
+from .directory_identity import find_directory_user
 
 User = get_user_model()
 
@@ -16,9 +17,8 @@ class MembershipSyncService:
 
         for u in users:
 
-            try:
-                user = User.objects.get(username=u["username"])
-            except User.DoesNotExist:
+            user = find_directory_user(u['username'])
+            if user is None:
                 continue
 
             user.groups.clear()

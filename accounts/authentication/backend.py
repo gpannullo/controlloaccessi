@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from accounts.services.factory import DirectoryFactory
+from accounts.services.directory_identity import get_or_create_directory_user
 from audit.services.audit_service import AuditService
 
 User = get_user_model()
@@ -24,7 +25,9 @@ class ActiveDirectoryBackend(BaseBackend):
         if not username or not password:
             return None
 
-        username = username.strip()
+        username = username.strip().lower()
+        if not username:
+            return None
         directory = DirectoryFactory.get_service()
 
         if not directory.authenticate(username, password):
@@ -54,9 +57,7 @@ class ActiveDirectoryBackend(BaseBackend):
         is_superuser = bool(ad_groups & superuser_groups)
         is_staff = is_superuser or bool(ad_groups & staff_groups)
 
-        user, _ = User.objects.get_or_create(
-            username=username,
-        )
+        user, _ = get_or_create_directory_user(username)
 
         fields_to_update = []
 
