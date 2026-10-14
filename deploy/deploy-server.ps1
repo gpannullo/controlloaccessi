@@ -1,5 +1,5 @@
 param(
-    [string]$IdentityFile = '',
+    [string]$IdentityFile = (Join-Path $env:USERPROFILE '.ssh\gpannullo'),
     [switch]$CheckOnly
 )
 $ErrorActionPreference = 'Stop'
@@ -13,7 +13,7 @@ function Git-Checked([string[]]$Arguments) {
 }
 try {
     Get-Command git, ssh -ErrorAction Stop | Out-Null
-    if ($IdentityFile -and !(Test-Path -LiteralPath $IdentityFile -PathType Leaf)) { throw 'Chiave SSH non trovata.' }
+    if ($IdentityFile -and !(Test-Path -LiteralPath $IdentityFile -PathType Leaf)) { throw "Chiave SSH non trovata: $IdentityFile. Esportare la chiave PPK in formato OpenSSH oppure specificare -IdentityFile." }
     if (Git-Checked @('status','--porcelain','--untracked-files=all')) { throw 'Copia locale non pulita: completare commit e push prima del deploy.' }
     if ((Git-Checked @('branch','--show-current')) -ne $branch) { throw "Selezionare il branch $branch nella copia locale." }
     Git-Checked @('fetch','origin',$branch)

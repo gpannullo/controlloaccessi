@@ -8,7 +8,10 @@ Account SSH: `controlloaccessi`. Non crea commit, tag o push.
 Prerequisiti: Git e OpenSSH Windows nel PATH, accesso SSH ai due server e
 chiavi host verificate presenti in known_hosts. Usa la configurazione SSH
 dell'utente Windows. Non contiene password o chiavi private.
-Per una chiave specifica:
+Il percorso predefinito della chiave privata e `%USERPROFILE%\.ssh\gpannullo`,
+configurato nel parametro IdentityFile di deploy-server.ps1. Deve essere una
+chiave OpenSSH (non il file .ppk); la passphrase non viene salvata nello script.
+Per una chiave diversa:
 
 ```bat
 deploy\deploy-server.bat -IdentityFile "C:\percorso\chiave_privata"
