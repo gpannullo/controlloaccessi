@@ -25,8 +25,6 @@ def protetta(monitor=False):
                 raise Http404
             try:
                 request.presenze_ip = controlla_rete(request, monitor)
-                if monitor and (not request.user.is_authenticated or not request.user.is_active or not request.user.has_perm('presenze_qr.gestisci_monitor')):
-                    raise PermissionDenied
                 response = view(request, *args, **kwargs)
             except PermissionDenied:
                 log(request.user, 'ACCESSO_NEGATO', client_ip(request))
@@ -81,7 +79,12 @@ def inverti(request, pk):
 
 @protetta(monitor=True)
 @require_GET
-def monitor(request, pk):
+def monitor(request, pk=None):
+    if pk is None:
+        station = Postazione.objects.filter(attiva=True).order_by('pk').first()
+        if station is None:
+            raise Http404
+        pk = station.pk
     station = get_object_or_404(Postazione, pk=pk, attiva=True)
     log(request.user, 'APERTURA_MONITOR', request.presenze_ip, station)
     return render(request, 'presenze_qr/monitor.html', {'postazione': station})
@@ -90,20 +93,13 @@ def monitor(request, pk):
 @protetta(monitor=True)
 @require_POST
 def codice(request, pk):
-    from reportlab.graphics.barcode.qr import QrCodeWidget
-    from reportlab.graphics.shapes import Drawing
-    from reportlab.graphics import renderSVG
+    from io import BytesIO
+    import qrcode
     get_object_or_404(Postazione, pk=pk, attiva=True)
     station, token = emetti(pk, request.user, request.presenze_ip)
     # Fragment is never sent to HTTP access logs or as a Referer.
     url = 'https://' + settings.PUBLIC_ACCOUNT_HOST + reverse('presenze_qr:scan') + '#token=' + token
-    widget = QrCodeWidget(url)
-    drawing = Drawing(360, 360)
-    x0, y0, x1, y1 = widget.getBounds()
-    drawing.scale(360 / (x1-x0), 360 / (y1-y0))
-    drawing.add(widget)
-    svg = renderSVG.drawToString(drawing)
-    if isinstance(svg, str):
-        svg = svg.encode('utf-8')
-    return JsonResponse({'qr': 'data:image/svg+xml;base64,' + base64.b64encode(svg).decode(),
+    output = BytesIO()
+    qrcode.make(url).save(output, format='PNG')
+    return JsonResponse({'qr': 'data:image/png;base64,' + base64.b64encode(output.getvalue()).decode(),
         'generazione': str(station.generazione), 'remaining_ms': max(0, int((station.scade_il-timezone.now()).total_seconds()*1000))})

@@ -26,20 +26,24 @@ riservate alla rete vengono negate. Non viene usato X-Forwarded-For.
 
 Il vhost account deve inoltrare `/account/presenze/` a Django, senza un
 allow/deny interno applicato a questo percorso se si desidera usare la rete mobile.
-Il monitor `/monitor-presenze/` deve essere esposto solo sul vhost interno,
+Il monitor `/qr/` (alias `/monitor-presenze/<id>/`) deve essere esposto solo sul vhost interno,
 con le stesse restrizioni Nginx/firewall di ControlloAccessi.
-Il controllo applicativo verifica sempre host, rete, utente attivo e permesso
-`presenze_qr.gestisci_monitor`, anche sul POST che genera/legge il QR.
+Il controllo applicativo verifica sempre host e rete, anche sul POST che
+genera/legge il QR. Il monitor non richiede login; il telefono deve invece
+autenticare il dipendente per timbrare. Il POST del monitor mantiene il CSRF.
 
 3. Riavviare il servizio. In admin creare una **Postazione presenze QR**.
-4. Assegnare il permesso di monitor all'operatore del PC, oppure utilizzare
-   un superuser per il collaudo. Preferire un operatore dedicato con il solo
-   permesso necessario, non lasciare una sessione amministratore sul PC pubblico.
+4. Utilizzare il PC del monitor senza sessioni amministrative aperte.
 5. Aprire il link **Apri monitor** della postazione in admin oppure
-   `https://controlloaccessi.comune.aversa.ce.it/monitor-presenze/<id>/`.
+   `https://controlloaccessi.comune.aversa.ce.it/qr/` (prima postazione attiva).
+   Per una postazione specifica resta valido `/monitor-presenze/<id>/`.
 6. Sul cellulare utilizzare il QR o la voce **Presenze QR** del portale Account.
 
-Non servono nuove dipendenze: il QR SVG è generato con reportlab già presente.
+Il QR PNG usa qrcode/Pillow gia presenti tra le dipendenze della stampa.
+La pagina monitor e autonoma, senza jQuery, Bootstrap o CDN; usa XMLHttpRequest
+e JavaScript classico. Richiede JSON.parse e supporto PNG data URI (IE8 o superiore).
+Su Windows XP la compatibilita TLS/certificati dipende dal browser: non ridurre
+la sicurezza HTTPS del server. La compatibilita sul dispositivo va collaudata.
 Il modulo è DISABILITATO per default: distribuirlo non abilita le timbrature.
 
 ## Regole

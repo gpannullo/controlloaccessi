@@ -1,36 +1,58 @@
-{% extends "base.html" %}
-{% block title %}Monitor presenze{% endblock %}
-{% block content %}
-<main class="container py-4 text-center">
-  <h1>Comune di Aversa</h1><h2>Presenze del personale</h2><p class="fs-4">{{ postazione.nome }}</p>
-  <p class="fs-4">Inquadra il codice per registrare Entrata o Uscita</p>
-  <div style="min-height:360px"><img id="qr" hidden alt="QR monouso per timbrare" width="360" height="360" style="max-width:90vw;height:auto;background:white"></div>
-  <p id="stato" role="status">Generazione del codice…</p>
-  <p>Codice valido 30 secondi e per una sola timbratura.</p>
-  <button id="full" class="btn btn-outline-primary">Schermo intero</button>
-  <form id="csrf" hidden>{% csrf_token %}</form>
-</main>
-<script>
-(() => {
-  const img = document.getElementById('qr'), status = document.getElementById('stato');
-  let deadline = 0, generation = '', busy = false;
-  async function refresh() {
-    if (busy) return;
-    busy = true; const started = performance.now();
-    const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 4000);
+<!DOCTYPE html>
+<html lang="it"><head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>Comune di Aversa - Presenze</title>
+<style type="text/css">
+body {margin:0;background:#eef3f7;color:#183249;font:20px Arial,sans-serif;text-align:center;}
+#panel {margin:24px auto;padding:20px;width:580px;background:white;border:1px solid #ccd5de;}
+h1 {font-size:30px;} h2 {font-size:24px;} #box {height:360px;}
+#qr {display:none;width:360px;height:360px;border:0;} #stato {font-weight:bold;} .small {font-size:16px;}
+</style></head><body><div id="panel">
+<h1>Comune di Aversa</h1><h2>Presenze del personale</h2><p>{{ postazione.nome }}</p>
+<p>Inquadra il codice per registrare Entrata o Uscita</p>
+<div id="box"><img id="qr" alt="QR per timbrare" width="360" height="360"></div>
+<p id="stato">Generazione del codice...</p>
+<p class="small">Codice valido 30 secondi e per una sola timbratura.</p>
+<p class="small">Premi F11 per lo schermo intero.</p>
+<form id="csrf" style="display:none">{% csrf_token %}</form>
+</div><script type="text/javascript">
+(function () {
+  var img=document.getElementById('qr'), status=document.getElementById('stato');
+  var deadline=0, generation='', busy=false;
+  function now() { return new Date().getTime(); }
+  function message(value) { status.innerHTML=''; status.appendChild(document.createTextNode(value)); }
+  function fail() { deadline=0; img.style.display='none'; message('Codice non disponibile. Verificare la connessione.'); }
+  function refresh() {
+    if (busy) { return; }
+    if (!window.XMLHttpRequest || !window.JSON || !window.JSON.parse) { fail(); message('Browser non compatibile: aggiornare il browser del monitor.'); return; }
+    busy=true;
+    var started=now(), request=new XMLHttpRequest(), finished=false;
+    var timer=setTimeout(function () { if (!finished) { finished=true; request.abort(); busy=false; fail(); } },4000);
+    request.onreadystatechange=function () {
+      if (request.readyState!==4 || finished) { return; }
+      finished=true; clearTimeout(timer); busy=false;
+      try {
+        if (request.status!==200) { throw new Error('HTTP'); }
+        var data=JSON.parse(request.responseText);
+        deadline=now()+Math.max(0,data.remaining_ms-(now()-started));
+        if (generation!==data.generazione) { img.src=data.qr; generation=data.generazione; }
+        img.style.display=deadline>now() ? 'inline' : 'none';
+      } catch (error) { fail(); }
+    };
     try {
-      const response = await fetch('{% url "monitor_presenze_codice" postazione.pk %}', {method:'POST', body:new FormData(document.getElementById('csrf')), cache:'no-store', redirect:'error', signal:controller.signal});
-      if (!response.ok) throw new Error();
-      const data = await response.json();
-      deadline = performance.now() + Math.max(0, data.remaining_ms - (performance.now()-started));
-      if (generation !== data.generazione) {img.src = data.qr; generation = data.generazione;}
-      img.hidden = deadline <= performance.now();
-    } catch (_) { deadline = 0; img.hidden = true; status.textContent = 'Codice non disponibile. Controllare connessione e accesso.'; }
-    finally { clearTimeout(timer); busy = false; }
+      request.open('POST','{% url "monitor_presenze_codice" postazione.pk %}',true);
+      request.setRequestHeader('Content-Type','application/x-www-form-urlencoded');
+      request.send('csrfmiddlewaretoken='+encodeURIComponent(document.getElementById('csrf').getElementsByTagName('input')[0].value));
+    } catch (error) { finished=true; clearTimeout(timer); busy=false; fail(); }
   }
-  setInterval(() => {if (deadline) {const left = Math.ceil((deadline-performance.now())/1000); img.hidden = left <= 0; status.textContent = left > 0 ? 'Nuovo codice entro ' + left + ' secondi' : 'Aggiornamento codice…';}}, 100);
-  setInterval(refresh, 1000); refresh();
-  document.getElementById('full').onclick = () => document.documentElement.requestFullscreen();
+  setInterval(function () {
+    if (deadline) {
+      var left=Math.ceil((deadline-now())/1000);
+      img.style.display=left>0 ? 'inline' : 'none';
+      message(left>0 ? 'Nuovo codice entro '+left+' secondi' : 'Aggiornamento codice...');
+    }
+  },200);
+  setInterval(refresh,1000); refresh();
 })();
-</script>
-{% endblock %}
+</script></body></html>

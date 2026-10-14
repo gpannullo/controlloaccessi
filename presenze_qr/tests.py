@@ -126,16 +126,31 @@ class PresenzeTests(TestCase):
             with self.assertRaises(TimbraturaError): correggi(self.user,first.pk,'I',None)
             correggi(self.user,last.pk,'U',None)
 
-    def test_monitor_requires_network_host_and_permission(self):
-        self.client.force_login(self.user)
-        self.assertEqual(self.client.post(reverse('monitor_presenze_codice',args=[self.station.pk]), HTTP_HOST='controlloaccessi.comune.aversa.ce.it', REMOTE_ADDR='10.0.3.6').status_code,403)
+    def test_anonymous_monitor_requires_network_and_host(self):
+        self.assertEqual(self.client.get('/qr/', HTTP_HOST='controlloaccessi.comune.aversa.ce.it', REMOTE_ADDR='10.0.3.6').status_code,200)
+        self.assertEqual(self.client.get('/qr/', HTTP_HOST='controlloaccessi.comune.aversa.ce.it', REMOTE_ADDR='8.8.8.8').status_code,403)
+        self.assertNotEqual(self.client.get('/qr/', HTTP_HOST='account.comune.aversa.ce.it', REMOTE_ADDR='10.0.3.6').status_code,200)
+        self.assertEqual(self.client.post(reverse('monitor_presenze_codice',args=[self.station.pk]), HTTP_HOST='controlloaccessi.comune.aversa.ce.it', REMOTE_ADDR='10.0.3.6').status_code,200)
+        self.assertEqual(self.client.post(reverse('monitor_presenze_codice',args=[self.station.pk]), HTTP_HOST='controlloaccessi.comune.aversa.ce.it', REMOTE_ADDR='8.8.8.8').status_code,403)
+
+    def test_anonymous_monitor_csrf_and_standalone_page(self):
+        client = Client(enforce_csrf_checks=True)
+        args = dict(HTTP_HOST='controlloaccessi.comune.aversa.ce.it', REMOTE_ADDR='10.0.3.6')
+        response = client.get('/qr/', **args)
+        html = response.content.decode()
+        for unwanted in ('jquery', 'bootstrap', 'fetch(', '=>', 'cdn.'):
+            self.assertNotIn(unwanted, html.lower())
+        url = reverse('monitor_presenze_codice', args=[self.station.pk])
+        self.assertEqual(client.post(url, **args).status_code, 403)
+        token = client.cookies['csrftoken'].value
+        self.assertEqual(client.post(url, {'csrfmiddlewaretoken': token}, **args).status_code, 200)
 
     def test_monitor_generates_svg_without_consuming(self):
         self.user.is_superuser=True; self.user.save(update_fields=['is_superuser'])
         self.client.force_login(self.user)
         response=self.client.post(reverse('monitor_presenze_codice',args=[self.station.pk]),HTTP_HOST='controlloaccessi.comune.aversa.ce.it',REMOTE_ADDR='10.0.3.6')
         self.assertEqual(response.status_code,200)
-        self.assertTrue(response.json()['qr'].startswith('data:image/svg+xml;base64,'))
+        self.assertTrue(response.json()['qr'].startswith('data:image/png;base64,'))
         self.assertFalse(Timbratura.objects.exists())
 
     def test_public_account_login_keeps_scan_destination(self):
