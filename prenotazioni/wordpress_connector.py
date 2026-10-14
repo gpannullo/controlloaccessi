@@ -297,6 +297,17 @@ def sincronizza_appuntamenti_wordpress():
     }
 
 
+def leggi_anagrafiche_wordpress():
+    """Read-only remote snapshot: never overwrite Iris while verifying a push."""
+    config = settings.WORDPRESS_APPOINTMENTS
+    if not config['ENABLED'] or not config['SHARED_SECRET']:
+        raise WordPressConnectorError('Connettore WordPress non abilitato o chiave non configurata.')
+    payload = _request(_endpoint(config, 'ANAGRAFICHE_ENDPOINT'), config['SHARED_SECRET'], config['TIMEOUT'])
+    if not isinstance(payload, dict) or not isinstance(payload.get('uffici'), list):
+        raise WordPressConnectorError('Risposta anagrafiche WordPress non valida.')
+    return payload
+
+
 def sincronizza_anagrafiche_wordpress():
     """Importa le anagrafiche WordPress, senza creare oggetti applicativi locali."""
     config = settings.WORDPRESS_APPOINTMENTS

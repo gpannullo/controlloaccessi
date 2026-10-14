@@ -229,10 +229,28 @@ class UfficioAdmin(admin.ModelAdmin):
     ]
 
     actions = (
+        "allinea_wordpress_verificato",
         "disabilita_uffici",
         "crea_gruppi_active_directory",
         "imposta_orari_ricevimento_predefiniti",
     )
+
+    @admin.action(description="Allinea responsabile e personale su WordPress e verifica", permissions=['change'])
+    def allinea_wordpress_verificato(self, request, queryset):
+        from .services.wordpress_sync_service import allinea_e_verifica_ufficio_wordpress
+        successi = errori = 0
+        for ufficio in queryset:
+            try:
+                result = allinea_e_verifica_ufficio_wordpress(ufficio)
+                if result['differenze']:
+                    errori += 1
+                    self.message_user(request, '%s: invio effettuato, ma restano differenze: %s' % (ufficio.nome, '; '.join(result['differenze'])), messages.WARNING)
+                else:
+                    successi += 1
+            except Exception as exc:
+                errori += 1
+                self.message_user(request, '%s: allineamento non completato: %s. Verificare prima di riprovare; eventuali invii già effettuati non vengono annullati.' % (ufficio.nome, exc), messages.ERROR)
+        self.message_user(request, 'Uffici allineati e verificati: %s. Uffici da verificare: %s.' % (successi, errori), messages.SUCCESS if not errori else messages.WARNING)
 
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)

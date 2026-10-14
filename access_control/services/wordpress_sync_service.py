@@ -7,6 +7,48 @@ WordPress sono esclusivamente la sua proiezione sul sito pubblico.
 from django.db.models import Q
 
 
+def allinea_e_verifica_ufficio_wordpress(ufficio):
+    from prenotazioni.models import PersonaleWordPress
+    from prenotazioni.wordpress_connector import leggi_anagrafiche_wordpress, WordPressConnectorError
+
+    unita = list(ufficio.unita_organizzative_wordpress.all())
+    if not unita:
+        raise WordPressConnectorError('Nessuna Unità organizzativa WordPress collegata.')
+    ids = set(ufficio.assegnazioni_personale.filter(attiva=True).values_list('utente_id', flat=True))
+    if ufficio.responsabile_id:
+        ids.add(ufficio.responsabile_id)
+    linked = set(PersonaleWordPress.objects.filter(utente_id__in=ids, attivo=True).exclude(origine_id='').values_list('utente_id', flat=True))
+    if ids - linked:
+        raise WordPressConnectorError('Persone pubbliche attive mancanti per gli utenti ID: %s. Nessun invio eseguito.' % ', '.join(map(str, sorted(ids-linked))))
+
+    def snapshot():
+        remote = {str(item.get('id')): item for item in leggi_anagrafiche_wordpress()['uffici']}
+        for unit in unita:
+            item = remote.get(str(unit.origine_id))
+            if not item or not {'persone', 'responsabile', 'nome', 'stato'} <= item.keys() or not isinstance(item['persone'], list):
+                raise WordPressConnectorError('Unità WP %s non verificabile: dati incompleti o connettore da aggiornare.' % unit.origine_id)
+        return remote
+
+    snapshot()  # Fail before writing if verification is not supported.
+    result = sincronizza_ufficio_wordpress(ufficio)
+    remote = snapshot()
+    differences = []
+    for unit in unita:
+        unit.refresh_from_db()
+        item = remote[str(unit.origine_id)]
+        expected = {str(value) for value in unit.personale_wordpress.values_list('origine_id', flat=True)}
+        actual = {str(value) for value in item['persone']}
+        if expected != actual:
+            differences.append('WP %s: personale mancante [%s], in più [%s]' % (unit.origine_id, ', '.join(sorted(expected-actual)), ', '.join(sorted(actual-expected))))
+        responsible = str(unit.responsabile.origine_id) if unit.responsabile_id else ''
+        if str(item['responsabile'] or '') != responsible:
+            differences.append('WP %s: responsabile non allineato' % unit.origine_id)
+        if item['nome'] != unit.nome or item['stato'] != unit.stato:
+            differences.append('WP %s: nome o stato editoriale non allineato' % unit.origine_id)
+    result['differenze'] = differences
+    return result
+
+
 def sincronizza_ufficio_wordpress(ufficio):
     """Allinea personale, responsabile e dati dell'ufficio sulle unità mappate.
 
