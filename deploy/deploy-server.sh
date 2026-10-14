@@ -29,7 +29,8 @@ set -a
 . /etc/controlloaccessi.env
 set +a
 py=/var/www/controlloaccessi/venv/bin/python
-"$py" -m pip install -r requirements.txt
+echo 'Verifica e installazione dipendenze...'
+"$py" -m pip --disable-pip-version-check install --quiet --progress-bar off -r requirements.txt
 "$py" manage.py check
 "$py" manage.py migrate --plan
 "$py" manage.py migrate --noinput
