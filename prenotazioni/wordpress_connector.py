@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone as datetime_timezone
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.db import transaction
@@ -22,7 +23,7 @@ class WordPressConnectorError(RuntimeError):
     pass
 
 
-def _parse_datetime(value, required=False):
+def _parse_datetime(value, required=False, *, naive_tz=datetime_timezone.utc):
     if not value:
         if required:
             raise WordPressConnectorError("L'appuntamento WordPress non ha una data di aggiornamento valida.")
@@ -37,7 +38,7 @@ def _parse_datetime(value, required=False):
             raise WordPressConnectorError(f"Data WordPress non valida: {value!r}") from exc
         return None
     if timezone.is_naive(parsed):
-        parsed = timezone.make_aware(parsed, datetime_timezone.utc)
+        parsed = timezone.make_aware(parsed, naive_tz)
     return parsed
 
 
@@ -143,8 +144,10 @@ def _salva(item):
         "origine_stato": item.get("stato", ""),
         "origine_aggiornato_il": _parse_datetime(item["aggiornato_il"], required=True),
         "prenotato_il": _parse_datetime(item.get("prenotato_il")),
-        "data_ora_inizio": _parse_datetime(item.get("data_ora_inizio")),
-        "data_ora_fine": _parse_datetime(item.get("data_ora_fine")),
+        # Gli slot WP senza offset sono orari civili italiani, non date GMT.
+        # I timestamp tecnici e gli offset espliciti restano invariati.
+        "data_ora_inizio": _parse_datetime(item.get("data_ora_inizio"), naive_tz=ZoneInfo("Europe/Rome")),
+        "data_ora_fine": _parse_datetime(item.get("data_ora_fine"), naive_tz=ZoneInfo("Europe/Rome")),
         "unita_organizzativa_id": str(item.get("unita_organizzativa_id") or ""),
         "unita_organizzativa": item.get("unita_organizzativa", ""),
         "luogo_id": str(item.get("luogo_id") or ""),
