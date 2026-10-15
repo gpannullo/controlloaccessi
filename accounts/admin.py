@@ -5,7 +5,7 @@ from accounts.services.directory_admin_service import (
     DirectoryAdminException,
     DirectoryAdminService,
 )
-from access_control.models import GruppoOrganizzativo
+from access_control.models import GruppoOrganizzativo, Ufficio
 
 from .models import CustomUser
 from prenotazioni.models import PersonaleWordPress
@@ -30,6 +30,26 @@ class UtenteUfficioFilter(admin.SimpleListFilter):
         return queryset
 
 
+class UfficioUtenteFilter(admin.SimpleListFilter):
+    title = "Ufficio"
+    parameter_name = "ufficio"
+
+    def lookups(self, request, model_admin):
+        return Ufficio.objects.order_by("nome", "pk").values_list("pk", "nome")
+
+    def queryset(self, request, queryset):
+        if not self.value():
+            return queryset
+        try:
+            ufficio_id = int(self.value())
+        except (TypeError, ValueError):
+            return queryset.none()
+        return queryset.filter(
+            assegnazioni_ufficio__ufficio_id=ufficio_id,
+            assegnazioni_ufficio__attiva=True,
+        ).distinct()
+
+
 @admin.register(CustomUser)
 class CustomUserAdmin(UserAdmin):
     list_display = (
@@ -50,6 +70,7 @@ class CustomUserAdmin(UserAdmin):
         "is_active",
         "is_staff",
         UtenteUfficioFilter,
+        UfficioUtenteFilter,
     )
 
     search_fields = UserAdmin.search_fields + ("badge",)
