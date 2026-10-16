@@ -1,6 +1,24 @@
 {% extends "base.html" %}
 {% block title %}Timbratura personale{% endblock %}
 {% block content %}
+<style>
+  .qr-result { position:fixed; inset:0; z-index:2000; background:#f8fafc; color:#172b3a; display:flex; align-items:center; justify-content:center; padding:24px; overflow:auto; }
+  .qr-result[hidden] { display:none; }
+  .qr-result-card { width:100%; max-width:520px; text-align:center; margin:auto; }
+  .qr-result-symbol { font-size:64px; font-weight:bold; line-height:1.2; color:#146c43; }
+  .qr-result.error .qr-result-symbol { color:#b02a37; }
+  .qr-result h2 { font-size:clamp(28px,7vw,42px); margin:20px 0; }
+  .qr-result p { font-size:20px; }
+</style>
+<section id="qr-result" class="qr-result" role="alertdialog" aria-modal="true" aria-labelledby="qr-result-title" aria-describedby="qr-result-message" hidden>
+  <div class="qr-result-card">
+    <div id="qr-result-symbol" class="qr-result-symbol" aria-hidden="true">✓</div>
+    <h2 id="qr-result-title" tabindex="-1"></h2>
+    <p id="qr-result-message"></p>
+    <p id="qr-result-help"></p>
+    <a class="btn btn-primary btn-lg w-100" href="{% url 'presenze_qr:personale' %}">Vai alle mie timbrature</a>
+  </div>
+</section>
 <div class="container py-4" style="max-width:600px">
   <h1 class="h3">Presenze — Comune di Aversa</h1>
   <div id="esito" class="alert alert-info" role="status" aria-live="polite">Lettura del codice…</div>
@@ -20,6 +38,22 @@
 (() => {
   const key = 'presenze-qr-token';
   const status = document.getElementById('esito');
+  function showResult(title, message, success) {
+    const panel = document.getElementById('qr-result');
+    panel.className = 'qr-result' + (success ? '' : ' error');
+    document.getElementById('qr-result-symbol').textContent = success ? '✓' : '!';
+    document.getElementById('qr-result-title').textContent = title;
+    document.getElementById('qr-result-message').textContent = message;
+    document.getElementById('qr-result-help').textContent = success
+      ? 'Puoi invertire entrata e uscita nelle tue timbrature entro 60 secondi dalla registrazione.'
+      : 'Controlla le tue timbrature prima di riprovare. Se il codice non è più valido, inquadra il nuovo QR sul monitor.';
+    panel.hidden = false;
+    document.getElementById('qr-result-title').focus();
+    // Keep keyboard focus inside the full-page notice as well.
+    panel.addEventListener('keydown', event => {
+      if (event.key === 'Tab') { event.preventDefault(); panel.querySelector('a').focus(); }
+    }, {once:false});
+  }
   const incoming = new URLSearchParams(location.hash.slice(1)).get('token');
   let token = incoming || '';
   try { if (incoming) sessionStorage.setItem(key, incoming); else token = sessionStorage.getItem(key) || ''; } catch (_) {}
@@ -38,12 +72,21 @@
     try {
       const response = await fetch(form.action, {method:'POST', body:data, credentials:'same-origin', redirect:'error'});
       const result = await response.json();
-      if (!result.success) { status.textContent = result.error; lock(false); return; }
+      if (!result.success) {
+        status.textContent = result.error;
+        const qrError = /^QR /i.test(result.error || '');
+        showResult(qrError ? 'QR scaduto, già utilizzato o non valido' : 'Timbratura non registrata', result.error || 'Operazione non riuscita.', false);
+        return;
+      }
       completed = true;
       try { sessionStorage.removeItem(key); } catch (_) {}
       status.className = 'alert alert-success'; status.textContent = result.verso + ' registrata correttamente.';
-      location.replace(result.url);
-    } catch (_) { status.textContent = 'Connessione interrotta: verifica lo storico prima di riprovare. Ripetere lo stesso QR non duplica il timbro.'; lock(false); }
+      showResult(result.created ? (result.verso === 'Entrata' ? 'Ingresso registrato' : 'Uscita registrata') : 'Timbratura già registrata',
+        result.created ? result.verso + ' registrata correttamente.' : result.verso + ' già presente: non è stata creata una seconda timbratura.', true);
+    } catch (_) {
+      status.textContent = 'Connessione interrotta: verifica lo storico prima di riprovare. Ripetere lo stesso QR non duplica il timbro.';
+      showResult('Esito da verificare', status.textContent, false);
+    }
     finally { busy = false; }
   }
   buttons.forEach(b => b.addEventListener('click', () => submit(b.dataset.verso)));

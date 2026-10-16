@@ -23,6 +23,21 @@ class PresenzeTests(TestCase):
     def token(self):
         return emetti(self.station.pk, self.user, '10.0.3.6')[1]
 
+    def test_scan_has_full_page_result_without_immediate_redirect(self):
+        from django.template.loader import render_to_string
+        request = RequestFactory().get('/presenze/scan/')
+        request.user = self.user
+        html = render_to_string('presenze_qr/scan.html', {
+            'abilitato_qr': True, 'automatico': 'I',
+        }, request=request)
+        self.assertIn('role="alertdialog"', html)
+        self.assertIn('Ingresso registrato', html)
+        self.assertIn('Uscita registrata', html)
+        self.assertIn('QR scaduto, già utilizzato o non valido', html)
+        self.assertIn('Timbratura già registrata', html)
+        self.assertIn('entro 60 secondi', html)
+        self.assertNotIn('location.replace(result.url)', html)
+
     def test_one_use_and_idempotent_retry(self):
         token = self.token()
         a, created = timbra(self.user, token, 'auto', '1.2.3.4')
