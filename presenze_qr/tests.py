@@ -23,7 +23,7 @@ class PresenzeTests(TestCase):
     def token(self):
         return emetti(self.station.pk, self.user, '10.0.3.6')[1]
 
-    def test_scan_has_full_page_result_without_immediate_redirect(self):
+    def test_scan_has_colored_modal_and_delayed_redirect(self):
         from django.template.loader import render_to_string
         request = RequestFactory().get('/presenze/scan/')
         request.user = self.user
@@ -37,6 +37,9 @@ class PresenzeTests(TestCase):
         self.assertIn('Timbratura già registrata', html)
         self.assertIn('entro 60 secondi', html)
         self.assertNotIn('location.replace(result.url)', html)
+        self.assertIn("success ? 'bg-success' : 'bg-danger'", html)
+        self.assertIn('}, 5000)', html)
+        self.assertIn("location.replace(panel.querySelector('a').href)", html)
 
     def test_one_use_and_idempotent_retry(self):
         token = self.token()

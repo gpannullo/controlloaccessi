@@ -2,11 +2,11 @@
 {% block title %}Timbratura personale{% endblock %}
 {% block content %}
 <style>
-  .qr-result { position:fixed; inset:0; z-index:2000; background:#f8fafc; color:#172b3a; display:flex; align-items:center; justify-content:center; padding:24px; overflow:auto; }
+  .qr-result { position:fixed; inset:0; z-index:2000; color:#212529; display:flex; align-items:center; justify-content:center; padding:20px; overflow:auto; }
   .qr-result[hidden] { display:none; }
-  .qr-result-card { width:100%; max-width:520px; text-align:center; margin:auto; }
+  .qr-result-card { width:100%; max-width:480px; text-align:center; margin:auto; background:white; padding:32px 24px; border-radius:20px; box-shadow:0 16px 48px rgba(0,0,0,.25); }
   .qr-result-symbol { font-size:64px; font-weight:bold; line-height:1.2; color:#146c43; }
-  .qr-result.error .qr-result-symbol { color:#b02a37; }
+  .qr-result.bg-danger .qr-result-symbol { color:var(--bs-danger, #dc3545); }
   .qr-result h2 { font-size:clamp(28px,7vw,42px); margin:20px 0; }
   .qr-result p { font-size:20px; }
 </style>
@@ -16,6 +16,7 @@
     <h2 id="qr-result-title" tabindex="-1"></h2>
     <p id="qr-result-message"></p>
     <p id="qr-result-help"></p>
+    <p class="small text-muted">Tra 5 secondi si aprirà la pagina delle tue timbrature.</p>
     <a class="btn btn-primary btn-lg w-100" href="{% url 'presenze_qr:personale' %}">Vai alle mie timbrature</a>
   </div>
 </section>
@@ -40,7 +41,7 @@
   const status = document.getElementById('esito');
   function showResult(title, message, success) {
     const panel = document.getElementById('qr-result');
-    panel.className = 'qr-result' + (success ? '' : ' error');
+    panel.className = 'qr-result ' + (success ? 'bg-success' : 'bg-danger');
     document.getElementById('qr-result-symbol').textContent = success ? '✓' : '!';
     document.getElementById('qr-result-title').textContent = title;
     document.getElementById('qr-result-message').textContent = message;
@@ -49,6 +50,10 @@
       : 'Controlla le tue timbrature prima di riprovare. Se il codice non è più valido, inquadra il nuovo QR sul monitor.';
     panel.hidden = false;
     document.getElementById('qr-result-title').focus();
+    window.setTimeout(() => {
+      panel.hidden = true;
+      location.replace(panel.querySelector('a').href);
+    }, 5000);
     // Keep keyboard focus inside the full-page notice as well.
     panel.addEventListener('keydown', event => {
       if (event.key === 'Tab') { event.preventDefault(); panel.querySelector('a').focus(); }
