@@ -17,6 +17,7 @@ from presenze_qr import views as presenze_qr_views
 
 
 urlpatterns = [
+    path("audit-ad/", include("audit_ad.urls")),
     path("qr/", presenze_qr_views.monitor, name="monitor_presenze_home"),
     path("account/presenze/", include("presenze_qr.urls")),
     path("monitor-presenze/<int:pk>/", presenze_qr_views.monitor, name="monitor_presenze"),

@@ -65,6 +65,7 @@ CITYWARE = {
 }
 
 INSTALLED_APPS = [
+    'audit_ad.apps.AuditAdConfig',
     'presenze_qr',
     'protocollazione.apps.ProtocollazioneConfig',
     'cityware.apps.CitywareConfig',
@@ -102,6 +103,14 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'ControlloAccessi.urls'
+
+AUDIT_AD_ENABLED = os.getenv('AUDIT_AD_ENABLED', 'false').lower() in {'1', 'true', 'yes', 'on'}
+AUDIT_AD_SOURCES = {
+    '192.168.15.100': os.getenv('AUDIT_AD_SECRET_DC100', ''),
+    '192.168.15.101': os.getenv('AUDIT_AD_SECRET_DC101', ''),
+}
+AUDIT_AD_TRUSTED_PROXIES = ['127.0.0.1', '::1']
+AUDIT_AD_FAILURE_THRESHOLD = int(os.getenv('AUDIT_AD_FAILURE_THRESHOLD', '10'))
 
 # Enable only after migration and reverse-proxy configuration.
 PRESENZE_QR_ENABLED = os.getenv('PRESENZE_QR_ENABLED', 'false').lower() in {'1', 'true', 'yes', 'on'}
