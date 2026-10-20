@@ -228,6 +228,24 @@ class DirectoryAdminService(ActiveDirectoryService):
         finally:
             conn.unbind()
 
+    def _ensure_group_member(self, conn, group_dn, user_dn):
+        """Check direct membership on AD, not the potentially stale Django mirror."""
+        conn.compare(group_dn, 'member', user_dn)
+        if conn.result.get('result') == 6:  # compareTrue
+            return
+        if conn.result.get('result') != 5:  # compareFalse
+            raise DirectoryAdminException('Verifica appartenenza AD non riuscita: %s' % (
+                conn.result.get('message') or conn.result.get('description')))
+        conn.modify(group_dn, {'member': [(MODIFY_ADD, [user_dn])]})
+        if conn.result.get('result') in (20, 68):
+            # A concurrent writer may have added it after the compare.
+            # Accept a duplicate response only after verifying membership.
+            conn.compare(group_dn, 'member', user_dn)
+            if conn.result.get('result') == 6:
+                return
+            raise DirectoryAdminException('Impossibile confermare l’appartenenza al gruppo AD dopo l’aggiunta.')
+        self._ok(conn, 'Aggiunta gruppo AD')
+
     def aggiungi_utente_al_gruppo(self, username, nome_gruppo):
         """Aggiunge l'utente a un singolo gruppo AD, senza toccare le altre appartenenze."""
         self._require_writes()
@@ -241,10 +259,7 @@ class DirectoryAdminService(ActiveDirectoryService):
                 size_limit=1,
             ) or not conn.entries:
                 raise DirectoryAdminException("Gruppo AD non trovato: %s." % nome_gruppo)
-            conn.modify(conn.entries[0].entry_dn, {"member": [(MODIFY_ADD, [entry.entry_dn])]})
-            # LDAP result 20 means that this membership already exists.
-            if conn.result.get("result") != 20:
-                self._ok(conn, "Aggiunta gruppo AD")
+            self._ensure_group_member(conn, conn.entries[0].entry_dn, entry.entry_dn)
         finally:
             conn.unbind()
 
@@ -383,8 +398,7 @@ class DirectoryAdminService(ActiveDirectoryService):
                 size_limit=1,
             ) or not conn.entries:
                 raise DirectoryAdminException("Gruppo AD non trovato: %s." % nome_gruppo)
-            conn.modify(conn.entries[0].entry_dn, {"member": [(MODIFY_ADD, [user_dn])]})
-            self._ok(conn, "Assegnazione gruppo operativo")
+            self._ensure_group_member(conn, conn.entries[0].entry_dn, user_dn)
         finally:
             conn.unbind()
 
