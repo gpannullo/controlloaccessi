@@ -44,7 +44,8 @@ class PasswordReminderTests(SimpleTestCase):
                 send.assert_called_once()
                 self.assertEqual(send.call_args.kwargs['priority'], 'medium')
                 self.assertEqual(send.call_args.kwargs['expires_at'], user.scadenza_password)
-                self.assertIn('&lt;Test&gt;', send.call_args.kwargs['html_message'])
+                self.assertEqual(send.call_args.kwargs['template'], 'password_in_scadenza')
+                self.assertEqual(send.call_args.kwargs['context']['nome'], '<Test>')
                 log.objects.create.assert_called_once()
             return stats
 

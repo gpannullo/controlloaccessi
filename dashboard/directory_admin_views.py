@@ -181,15 +181,9 @@ def directory_user_create_submit(request):
             mail.send(
                 recipients=[email],
                 sender=settings.DEFAULT_FROM_EMAIL,
-                subject="Credenziali di accesso",
-                message=(
-                    "Buongiorno %s %s,\n\n"
-                    "è stato creato il suo account.\n"
-                    "Username: %s\nPassword provvisoria: %s\n\n"
-                    "Per impostare o modificare una password, utilizzare il seguente portale di accesso:\n"
-                    "https://account.comune.aversa.ce.it/account/\n\n"
-                    "Al primo accesso sarà richiesto di cambiare la password."
-                ) % (first_name, last_name, username, password),
+                template="account_creato",
+                context={"nome": (first_name + " " + last_name).strip(), "username": username,
+                         "password_provvisoria": password, "url": "https://account.comune.aversa.ce.it/account/"},
             )
         except Exception as exc:
             messages.warning(request, "Account creato, ma l'e-mail non è stata accodata: %s" % exc)
@@ -487,15 +481,9 @@ def directory_action(request, pk):
                 mail.send(
                     recipients=[destinatario],
                     sender=settings.DEFAULT_FROM_EMAIL,
-                    subject="Nuova password di accesso",
-                    message=(
-                        "Buongiorno %s %s,\n\n"
-                        "la password del suo account è stata reimpostata.\n"
-                        "Username: %s\nPassword provvisoria: %s\n\n"
-                        "Per impostare o modificare una password, è disponibile il seguente portale di accesso:\n"
-                        "https://account.comune.aversa.ce.it/account/\n\n"
-                        "Al primo accesso sarà richiesto di cambiare la password."
-                    ) % (utente.first_name, utente.last_name, utente.username, password),
+                    template="password_reimpostata",
+                    context={"nome": utente.get_full_name() or utente.username, "username": utente.username,
+                             "password_provvisoria": password, "url": "https://account.comune.aversa.ce.it/account/"},
                 )
             except Exception as exc:
                 avviso_email = "Password reimpostata, ma l'e-mail non è stata accodata: %s" % exc

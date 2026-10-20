@@ -9,7 +9,6 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
-from django.utils.html import format_html
 from ldap3.utils.conv import escape_filter_chars
 from post_office import mail
 from accounts.services.active_directory_service import ActiveDirectoryService
@@ -104,13 +103,10 @@ class Command(BaseCommand):
                 stats['candidati'] += 1
                 if options['dry_run']:
                     continue
-                text = ('Gentile %s,\n\nè richiesto il cambio della password del tuo account %s entro il 10 ottobre 2026 alle ore 12:00.\n\n'
-                        'Accedi al portale per cambiare la password:\n%s\n\n'
-                        'Riceverai un promemoria ogni giorno fino al cambio password e comunque non oltre il termine indicato.\n'
-                        'Non comunicare la password via email. Non rispondere a questo messaggio automatico.\n\nComune di Aversa - Centro Elaborazione Dati') % (user.get_full_name() or user.username, user.username, URL)
                 mail.send(recipients=[email], sender=settings.DEFAULT_FROM_EMAIL,
-                          subject='Comune di Aversa - Cambio password entro il 10 ottobre',
-                          message=text, html_message=format_html('<div style="font-family:Arial;max-width:600px;padding:24px;border-top:5px solid #0066a4"><h2>Comune di Aversa</h2><div style="white-space:pre-line">{}</div><p><a href="{}">Cambia password</a></p></div>', text, URL),
+                          template='campagna_cambio_password',
+                          context={'nome': user.get_full_name() or user.username, 'username': user.username,
+                                   'url': URL, 'scadenza': END.strftime('%d/%m/%Y alle %H:%M')},
                           priority='medium', expires_at=min(END, datetime.combine(today, datetime.max.time(), tzinfo=END.tzinfo)))
                 row.ultimo_invio = today
                 row.save(update_fields=['ultimo_invio'])

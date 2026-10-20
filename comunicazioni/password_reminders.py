@@ -6,7 +6,6 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import transaction
-from django.template.loader import render_to_string
 from django.utils import timezone
 from post_office import mail
 
@@ -54,9 +53,7 @@ def queue_reminders(dry_run=False):
                        'url': 'https://account.comune.aversa.ce.it/account/change-password/'}
             mail.send(
                 recipients=[address], sender=settings.DEFAULT_FROM_EMAIL,
-                subject='Promemoria scadenza password - Comune di Aversa',
-                message=render_to_string('comunicazioni/password_reminder.txt', context),
-                html_message=render_to_string('comunicazioni/password_reminder.html', context),
+                template='password_in_scadenza', context=context,
                 priority='medium', expires_at=user.scadenza_password,
             )
             PromemoriaPassword.objects.create(utente=user, giorno=day, scadenza=user.scadenza_password, destinatario=address)

@@ -48,8 +48,9 @@ def accoda_comunicazione(comunicazione, autore=None):
         mail.send(
             recipients=[indirizzo],
             sender=settings.DEFAULT_FROM_EMAIL,
-            subject=comunicazione.oggetto,
-            message=comunicazione.messaggio,
+            template='comunicazione_generica',
+            context={'oggetto': comunicazione.oggetto, 'messaggio': comunicazione.messaggio,
+                     'nome': utente.get_full_name() or utente.username, 'username': utente.username},
         )
         DestinatarioComunicazioneEmail.objects.get_or_create(
             comunicazione=comunicazione,
