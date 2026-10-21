@@ -1,0 +1,14 @@
+<nav class="d-flex flex-wrap gap-2 mb-4" aria-label="Tipo di report">
+  <a class="btn {% if report_kind == 'visitatori' %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{% url 'dashboard:report_visitatori' %}">Report visitatori</a>
+  <a class="btn {% if report_kind == 'qr' %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{% url 'dashboard:report_qr' %}">Report passaggi QR</a>
+</nav>
+<div class="alert alert-info">
+  <strong>Generazione manuale del documento</strong><br>
+  Seleziona il periodo e scarica il PDF. Di default è selezionato il giorno precedente.
+  Date e orari sono riferiti a Roma; gli orari includono i secondi (HH:mm:ss).
+</div>
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+  <span class="text-muted">Selezione rapida:</span>
+  <a class="btn btn-outline-secondary btn-sm" href="?dal={{ report_yesterday|date:'Y-m-d' }}&amp;al={{ report_yesterday|date:'Y-m-d' }}">Ieri · {{ report_yesterday|date:'d/m/Y' }}</a>
+  <a class="btn btn-outline-secondary btn-sm" href="?dal={{ report_today|date:'Y-m-d' }}&amp;al={{ report_today|date:'Y-m-d' }}">Oggi · {{ report_today|date:'d/m/Y' }}</a>
+</div>

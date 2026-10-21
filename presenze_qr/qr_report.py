@@ -13,7 +13,7 @@ from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET
 from dashboard.permissions import dirigenza_required
-from visitors.report_views import VisitorReportForm
+from visitors.report_views import VisitorReportForm, report_period_context
 from .models import Timbratura, Attivita
 
 ROME = ZoneInfo('Europe/Rome')
@@ -91,8 +91,9 @@ def build_qr_report(rows, start, end, generated, author):
 @never_cache
 @require_GET
 def report_qr(request):
-    today = timezone.localdate(timezone=ROME)
-    form = VisitorReportForm(request.GET if request.GET else None, initial={'dal': today, 'al': today})
+    period = report_period_context()
+    yesterday = period['report_yesterday']
+    form = VisitorReportForm(request.GET if request.GET else None, initial={'dal': yesterday, 'al': yesterday})
     if request.GET.get('formato') == 'pdf' and form.is_valid():
         start, end = form.cleaned_data['dal'], form.cleaned_data['al']
         generated = timezone.now()
@@ -105,4 +106,4 @@ def report_qr(request):
             response['Content-Disposition'] = f'attachment; filename="report-qr-{start:%Y%m%d}-{end:%Y%m%d}.pdf"'
             response['X-Content-Type-Options'] = 'nosniff'
             return response
-    return render(request, 'presenze_qr/report.html', {'form': form})
+    return render(request, 'presenze_qr/report.html', {'form': form, **period})

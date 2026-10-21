@@ -27,12 +27,18 @@ class VisitorReportForm(forms.Form):
         return data
 
 
+def report_period_context():
+    today = timezone.localdate(timezone=ZoneInfo('Europe/Rome'))
+    return {'report_today': today, 'report_yesterday': today - timedelta(days=1)}
+
+
 @dirigenza_required
 @never_cache
 @require_GET
 def report_visitatori(request):
-    today = timezone.localdate()
-    form = VisitorReportForm(request.GET if request.GET else None, initial={'dal':today, 'al':today})
+    period = report_period_context()
+    yesterday = period['report_yesterday']
+    form = VisitorReportForm(request.GET if request.GET else None, initial={'dal':yesterday, 'al':yesterday})
     if request.GET.get('formato') == 'pdf' and form.is_valid():
         from visitors.services.visitor_report_service import build_visitor_report
         start, end = form.cleaned_data['dal'], form.cleaned_data['al']
@@ -55,4 +61,4 @@ def report_visitatori(request):
             response['Content-Disposition'] = f'attachment; filename="report-visitatori-{start:%Y%m%d}-{end:%Y%m%d}.pdf"'
             response['X-Content-Type-Options'] = 'nosniff'
             return response
-    return render(request,'visitors/report_visitatori.html',{'form':form})
+    return render(request,'visitors/report_visitatori.html',{'form':form, **period})

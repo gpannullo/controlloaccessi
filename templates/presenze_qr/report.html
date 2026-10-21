@@ -6,7 +6,9 @@
     <div><h1 class="h3">Report entrate e uscite QR</h1><p class="text-muted">Registro del personale su carta intestata del Comune di Aversa.</p></div>
     <a class="btn btn-outline-primary align-self-start" href="{% url 'dashboard:ricerca_visitatori' %}">Torna ai visitatori</a>
   </div>
+  {% include "dashboard/report_period_controls.html" with report_kind="qr" %}
   <form method="get" class="card shadow-sm"><div class="card-body">
+    <h2 class="h5 mb-3">Periodo delle timbrature QR</h2>
     {{ form.non_field_errors }}
     <div class="row g-3 mb-3">{% for field in form %}<div class="col-md-6"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}</div>
     <p>Include tutti i passaggi QR del periodo: dipendente, data e ora di Roma, entrata/uscita, postazione, IP e correzioni registrate. Non include le timbrature dei lettori badge.</p>
