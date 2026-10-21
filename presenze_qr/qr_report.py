@@ -41,7 +41,7 @@ def build_qr_report(rows, start, end, generated, author):
     def p(value, style='CellQR'):
         return Paragraph(escape(str(value)).replace('\n', '<br/>'), styles[style])
     def local(value):
-        return value.astimezone(ROME).strftime('%d/%m/%Y %H:%M')
+        return value.astimezone(ROME).strftime('%d/%m/%Y %H:%M:%S')
     logo = Path(settings.BASE_DIR) / 'visitors/static/visitors/images/stemma-comune-aversa.jpg'
     if not logo.is_file():
         raise FileNotFoundError('Stemma del Comune non disponibile')
