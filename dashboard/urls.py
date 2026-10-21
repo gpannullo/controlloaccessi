@@ -1,6 +1,7 @@
 from django.urls import path
 from dashboard.staff_report import staff_monthly_report
 from visitors.report_views import report_visitatori
+from presenze_qr.qr_report import report_qr
 
 from dashboard.dirigenza_views import (
     area_dirigenza,
@@ -44,6 +45,7 @@ urlpatterns = [
 
     path("dirigenza/visitatori/", ricerca_visitatori, name="ricerca_visitatori"),
     path("dirigenza/visitatori/report/", report_visitatori, name="report_visitatori"),
+    path("dirigenza/visitatori/report-qr/", report_qr, name="report_qr"),
 
     path("dirigenza/visitatori/<int:pk>/", dettaglio_visitatore, name="dettaglio_visitatore"),
 

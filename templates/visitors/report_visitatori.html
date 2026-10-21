@@ -9,7 +9,7 @@
   <form method="get" class="card shadow-sm"><div class="card-body">
     {{ form.non_field_errors }}
     <div class="row g-3 mb-3">{% for field in form %}<div class="col-md-6"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}</div>
-    <p>Il PDF include gli accessi <strong>iniziati nel periodo selezionato</strong>, con badge, entrata e uscita, seguiti da una scheda per persona con tempi di attesa, trasferimenti ed eventi registrati.</p>
+    <p>Il PDF include gli accessi <strong>presenti o con passaggi nel periodo selezionato</strong>, anche se iniziati prima, con badge, entrata e uscita. Le schede individuali riportano la cronologia completa disponibile, anche fuori periodo, aggiornata al momento della generazione.</p>
     <p class="text-muted">Le date sono inclusive. I dati mancanti sono segnalati. Il documento contiene dati personali: conservarlo e condividerlo solo per finalità autorizzate. La protocollazione non viene ancora eseguita automaticamente.</p>
     <button type="submit" name="formato" value="pdf" class="btn btn-primary"><i class="bi bi-file-earmark-pdf me-2"></i>Genera e scarica PDF</button>
   </div></form>

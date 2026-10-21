@@ -86,7 +86,7 @@ def build_visitor_report(accesses, start_date, end_date, generated, author):
     persons = OrderedDict()
     for access in accesses:
         persons.setdefault(access.visitatore_id, []).append(access)
-    story = [p('Report dei visitatori', 'TitleReport'), p(f'Accessi iniziati dal {start_date:%d/%m/%Y} al {end_date:%d/%m/%Y} (date inclusive, ora locale).'), p(f'Generato il {date_text(generated)} - Operatore: {author}'), p(f'Visitatori distinti: {len(persons)} - Accessi / segmenti: {len(accesses)}'), Spacer(1,4*mm), p('Riepilogo', 'Heading2')]
+    story = [p('Report dei visitatori', 'TitleReport'), p(f'Accessi presenti o con passaggi dal {start_date:%d/%m/%Y} al {end_date:%d/%m/%Y} (date inclusive, ora di Roma).'), p('Le schede riportano la cronologia completa disponibile degli accessi selezionati, anche fuori periodo, aggiornata al momento della generazione.'), p(f'Generato il {date_text(generated)} - Operatore: {author}'), p(f'Visitatori distinti: {len(persons)} - Accessi / segmenti: {len(accesses)}'), Spacer(1,4*mm), p('Riepilogo', 'Heading2')]
     story.append(p('Ogni riga identifica un accesso a un ufficio. Un trasferimento genera un nuovo segmento: la chiusura del precedente non indica necessariamente l’uscita fisica dalla sede.'))
     if accesses:
         story.append(table([

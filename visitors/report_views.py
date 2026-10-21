@@ -1,7 +1,8 @@
 from datetime import datetime, time, timedelta
 
 from django import forms
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
+from zoneinfo import ZoneInfo
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.utils import timezone
@@ -35,11 +36,15 @@ def report_visitatori(request):
     if request.GET.get('formato') == 'pdf' and form.is_valid():
         from visitors.services.visitor_report_service import build_visitor_report
         start, end = form.cleaned_data['dal'], form.cleaned_data['al']
-        tz = timezone.get_current_timezone()
+        tz = ZoneInfo('Europe/Rome')
         begin = timezone.make_aware(datetime.combine(start,time.min),tz)
         finish = timezone.make_aware(datetime.combine(end+timedelta(days=1),time.min),tz)
         generated = timezone.now()
-        records = AccessoVisitatore.objects.filter(ingresso__gte=begin, ingresso__lt=finish, ingresso__lte=generated).select_related('visitatore','badge','ufficio_destinazione').prefetch_related(Prefetch('eventi',queryset=EventoAccesso.objects.filter(timestamp__lte=generated).select_related('operatore')), Prefetch('accessi_successivi',queryset=AccessoVisitatore.objects.select_related('ufficio_destinazione'))).order_by('visitatore__cognome','visitatore__nome','visitatore_id','ingresso','pk')
+        activity = Q(ingresso__lt=finish) & (Q(uscita__gte=begin) | Q(uscita__isnull=True))
+        activity |= Q(eventi__timestamp__gte=begin, eventi__timestamp__lt=finish)
+        for field in ('ingresso', 'uscita', 'spostato_fuori_ufficio_il', 'ingresso_ufficio_il', 'visita_conclusa_il'):
+            activity |= Q(**{field+'__gte': begin, field+'__lt': finish})
+        records = AccessoVisitatore.objects.filter(activity, ingresso__lte=generated).distinct().select_related('visitatore','badge','ufficio_destinazione').prefetch_related(Prefetch('eventi',queryset=EventoAccesso.objects.filter(timestamp__lte=generated).select_related('operatore')), Prefetch('accessi_successivi',queryset=AccessoVisitatore.objects.select_related('ufficio_destinazione'))).order_by('visitatore__cognome','visitatore__nome','visitatore_id','ingresso','pk')
         # Bound the synchronous export to avoid exhausting web workers.
         accesses = list(records[:2001])
         if len(accesses) > 2000:

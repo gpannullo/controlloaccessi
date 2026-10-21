@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Report passaggi QR{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex flex-wrap justify-content-between gap-3 mb-4">
+    <div><h1 class="h3">Report entrate e uscite QR</h1><p class="text-muted">Registro del personale su carta intestata del Comune di Aversa.</p></div>
+    <a class="btn btn-outline-primary align-self-start" href="{% url 'dashboard:ricerca_visitatori' %}">Torna ai visitatori</a>
+  </div>
+  <form method="get" class="card shadow-sm"><div class="card-body">
+    {{ form.non_field_errors }}
+    <div class="row g-3 mb-3">{% for field in form %}<div class="col-md-6"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}</div>
+    <p>Include tutti i passaggi QR del periodo: dipendente, data e ora di Roma, entrata/uscita, postazione, IP e correzioni registrate. Non include le timbrature dei lettori badge.</p>
+    <p class="text-muted">Documento riservato. La protocollazione automatica non è ancora attiva.</p>
+    <button class="btn btn-primary" name="formato" value="pdf">Genera e scarica PDF QR</button>
+  </div></form>
+</div>
+{% endblock %}
