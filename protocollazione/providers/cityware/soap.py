@@ -5,6 +5,7 @@ Nessun retry, redirect, logging del payload o disabilitazione TLS.
 from contextlib import contextmanager
 from urllib.parse import urlsplit
 from xml.etree import ElementTree as ET
+import logging
 
 import requests
 from defusedxml.ElementTree import fromstring
@@ -14,6 +15,7 @@ from protocollazione.contracts import ConfigurazioneProtocolloError, ErroreProto
 SOAP='http://schemas.xmlsoap.org/soap/envelope/'
 XSI='http://www.w3.org/2001/XMLSchema-instance'
 NS='urn:proWsProtocollo'
+logger = logging.getLogger(__name__)
 ET.register_namespace('soapenv',SOAP)
 ET.register_namespace('xsi',XSI)
 
@@ -87,7 +89,14 @@ class CitywareSoapClient:
                         if size>2*1024*1024:raise ValueError('Risposta eccessiva')
                         parts.append(part)
             return parse_response(b''.join(parts),method)
-        except Exception:
+        except Exception as exc:
+            logger.warning(
+                'Cityware SOAP non riuscito: metodo=%s endpoint_host=%s errore=%s dettaglio=%s',
+                method,
+                urlsplit(self.endpoint).hostname or '<assente>',
+                type(exc).__name__,
+                str(exc)[:300],
+            )
             if writing:
                 raise EsitoIncertoError('Esito remoto non verificabile: controllare Cityware prima di ripetere.') from None
             raise ErroreProtocollo('Comunicazione Cityware non riuscita prima della registrazione.') from None
