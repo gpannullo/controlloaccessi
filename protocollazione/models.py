@@ -35,6 +35,8 @@ class RegistrazioneProtocollo(models.Model):
     stato = models.CharField(max_length=20, choices=Stato.choices, default=Stato.IN_CORSO)
     esito = models.JSONField(default=dict, blank=True)
     errore = models.CharField(max_length=255, blank=True)
+    reinvio_autorizzato = models.BooleanField(default=False, editable=False)
+    reinvio_autorizzato_il = models.DateTimeField(null=True, blank=True, editable=False)
     operatore = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
     creato_il = models.DateTimeField(auto_now_add=True)
     aggiornato_il = models.DateTimeField(auto_now=True)

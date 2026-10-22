@@ -101,8 +101,12 @@ def protocolla(richiesta, *, chiave, operatore):
             return EsitoProtocollo(**row.esito)
         raise InvioBloccatoError('Richiesta già presente. Verificare l’esito prima di qualsiasi nuovo invio.')
     existing = RegistrazioneProtocollo.objects.filter(chiave=chiave).first()
+    autorizzata = False
     if existing:
-        return existing_result(existing)
+        if existing.reinvio_autorizzato and existing.stato != existing.Stato.COMPLETATO:
+            autorizzata = True
+        else:
+            return existing_result(existing)
     if not settings.PROTOCOLLAZIONE_ENABLED:
         raise ConfigurazioneProtocolloError('Protocollazione non abilitata.')
     backend = get_backend()
@@ -112,8 +116,14 @@ def protocolla(richiesta, *, chiave, operatore):
         'impronta_documento':content_hash,'nome_documento':richiesta.documento.nome,
         'oggetto':richiesta.oggetto,'operatore':operatore,
     })
-    if not created:
+    if not created and not autorizzata:
         return existing_result(row)
+    if autorizzata:
+        row.reinvio_autorizzato = False
+        row.reinvio_autorizzato_il = None
+        row.stato = row.Stato.IN_CORSO
+        row.errore = ''
+        row.save(update_fields=['reinvio_autorizzato', 'reinvio_autorizzato_il', 'stato', 'errore', 'aggiornato_il'])
     try:
         result = backend.protocolla(richiesta)
         if not isinstance(result, EsitoProtocollo) or not all((result.anno,result.numero,result.segnatura)):

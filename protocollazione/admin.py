@@ -1,10 +1,11 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from .models import RegistrazioneProtocollo, ReportGiornaliero
 from django.http import HttpResponse
 from django.urls import path, reverse
 from django.utils.html import format_html
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
 
 @admin.register(ReportGiornaliero)
@@ -46,6 +47,17 @@ class RegistrazioneProtocolloAdmin(admin.ModelAdmin):
     list_filter = ['stato','backend','creato_il']
     search_fields = ['chiave','oggetto']
     readonly_fields = [f.name for f in RegistrazioneProtocollo._meta.fields]
+    actions = ('autorizza_reinvio',)
+
+    @admin.action(description='Autorizza un nuovo invio dopo verifica Cityware')
+    def autorizza_reinvio(self, request, queryset):
+        selezionati = queryset.filter(stato__in=[RegistrazioneProtocollo.Stato.IN_CORSO, RegistrazioneProtocollo.Stato.INCERTO])
+        count = selezionati.update(reinvio_autorizzato=True, reinvio_autorizzato_il=timezone.now())
+        esclusi = queryset.exclude(stato__in=[RegistrazioneProtocollo.Stato.IN_CORSO, RegistrazioneProtocollo.Stato.INCERTO]).count()
+        if count:
+            self.message_user(request, f'{count} registrazione/i autorizzata/e al reinvio. Verificare prima Cityware.', messages.WARNING)
+        if esclusi:
+            self.message_user(request, f'{esclusi} registrazione/i già completata/e non modificata/e.', messages.INFO)
 
     @admin.display(description='Protocollo')
     def numero_protocollo(self,obj):
