@@ -1,0 +1,10 @@
+[Unit]
+Description=Report del giorno precedente alle 01:00 Europe/Rome
+
+[Timer]
+OnCalendar=*-*-* 01:00:00 Europe/Rome
+Persistent=true
+Unit=controlloaccessi-report-protocollo.service
+
+[Install]
+WantedBy=timers.target

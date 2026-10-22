@@ -2,6 +2,23 @@ from django.conf import settings
 from django.db import models
 
 
+class ReportGiornaliero(models.Model):
+    chiave = models.CharField(max_length=200, unique=True)
+    giorno = models.DateField()
+    tipo = models.CharField(max_length=20, choices=[('visitatori', 'Visitatori'), ('qr', 'Passaggi QR')])
+    documento = models.BinaryField(editable=False)
+    parametri = models.JSONField(default=dict)
+    generato_il = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Report giornaliero da protocollare'
+        verbose_name_plural = 'Report giornalieri da protocollare'
+        ordering = ['-giorno', 'tipo']
+
+    def __str__(self):
+        return self.chiave
+
+
 class RegistrazioneProtocollo(models.Model):
     class Stato(models.TextChoices):
         IN_CORSO = 'in_corso', 'In corso / da verificare se interrotto'
