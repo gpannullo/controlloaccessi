@@ -49,9 +49,13 @@ class RegistrazioneProtocolloAdmin(admin.ModelAdmin):
     readonly_fields = [f.name for f in RegistrazioneProtocollo._meta.fields]
     actions = ('autorizza_reinvio',)
 
-    @admin.action(description='Autorizza un nuovo invio dopo verifica Cityware')
+    @admin.action(description='Autorizza nuovo invio dopo verifica Cityware')
     def autorizza_reinvio(self, request, queryset):
-        selezionati = queryset.filter(stato__in=[RegistrazioneProtocollo.Stato.IN_CORSO, RegistrazioneProtocollo.Stato.INCERTO])
+        selezionati = queryset.filter(stato__in=[
+            RegistrazioneProtocollo.Stato.IN_CORSO,
+            RegistrazioneProtocollo.Stato.INCERTO,
+            RegistrazioneProtocollo.Stato.ERRORE,
+        ])
         count = selezionati.update(reinvio_autorizzato=True, reinvio_autorizzato_il=timezone.now())
         esclusi = queryset.exclude(stato__in=[RegistrazioneProtocollo.Stato.IN_CORSO, RegistrazioneProtocollo.Stato.INCERTO]).count()
         if count:

@@ -103,7 +103,9 @@ def protocolla(richiesta, *, chiave, operatore):
     existing = RegistrazioneProtocollo.objects.filter(chiave=chiave).first()
     autorizzata = False
     if existing:
-        if existing.reinvio_autorizzato and existing.stato != existing.Stato.COMPLETATO:
+        if existing.reinvio_autorizzato and existing.stato in (
+            existing.Stato.IN_CORSO, existing.Stato.INCERTO, existing.Stato.ERRORE
+        ):
             autorizzata = True
         else:
             return existing_result(existing)
