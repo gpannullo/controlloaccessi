@@ -4,7 +4,7 @@ Le credenziali sono lette esclusivamente dall'ambiente del processo.
 """
 import os
 
-ENDPOINT = 'https://boaversa.nuvolapalitalsoft.it/ws/Protocollo/proWsProtocollo.php?wsdl'
+ENDPOINT = 'https://boaversa.nuvolapalitalsoft.it/ws/Protocollo/proWsProtocollo.php'
 SOAP_ACTION_BASE = ENDPOINT
 DOMAIN_CODE = 'A512'
 UFFICIO_OPERATORE = '0010'
