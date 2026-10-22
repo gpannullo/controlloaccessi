@@ -27,16 +27,15 @@ def _pdf(kind, day, generated, author):
         Prefetch('accessi_successivi', queryset=AccessoVisitatore.objects.select_related('ufficio_destinazione'))).order_by('visitatore__cognome','visitatore__nome','visitatore_id','ingresso','pk')
     return build_visitor_report(list(records), day, day, generated, author)
 
-def protocolla_report_giornaliero(kind, day, operator, *, send=False):
+def protocolla_report_giornaliero(kind, day, operator, config, *, send=False):
     key = f'report-giornaliero:{kind}:{day.isoformat()}'
     snapshot = ReportGiornaliero.objects.filter(chiave=key).first()
-    config = settings.REPORT_PROTOCOLLO
     if snapshot:
         pdf, params = bytes(snapshot.documento), snapshot.parametri
     else:
-        classification = config.get('CLASSIFICAZIONE_'+kind.upper(), '')
+        classification = config.get('classificazione', '')
         if not classification: raise ConfigurazioneProtocolloError(f'Classificazione mancante per {kind}.')
-        params = {'oggetto': f"Report giornaliero {'visitatori' if kind == 'visitatori' else 'entrate e uscite QR'} del {day:%d/%m/%Y}", 'nome': f'report-{kind}-{day:%Y%m%d}.pdf', 'classificazione': classification, 'ufficio': config.get('UFFICIO',''), 'firmatari': [{'codice': config.get('FIRMATARIO',''), 'ufficio': config.get('UFFICIO_FIRMATARIO','')}]}
+        params = {'oggetto': f"Report giornaliero {'visitatori' if kind == 'visitatori' else 'entrate e uscite QR'} del {day:%d/%m/%Y}", 'nome': f'report-{kind}-{day:%Y%m%d}.pdf', 'classificazione': classification, 'ufficio': config.get('ufficio_destinatario',''), 'firmatari': [{'codice': config.get('firmatario',''), 'ufficio': config.get('ufficio_firmatario','')}]}
         pdf = _pdf(kind, day, timezone.now(), operator.get_full_name() or operator.username)
         if send:
             snapshot, _ = ReportGiornaliero.objects.get_or_create(chiave=key, defaults={'giorno': day, 'tipo': kind, 'documento': pdf, 'parametri': params})

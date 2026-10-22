@@ -6,6 +6,7 @@ from django.core.management import call_command, CommandError
 from django.test import TransactionTestCase, override_settings
 from protocollazione.contracts import EsitoProtocollo, EsitoIncertoError, InvioBloccatoError
 from visitors.services.report_protocol_service import protocolla_report_giornaliero as process_report
+from visitors.management.commands.protocolla_report_giornalieri import REPORT_CONFIG
 from protocollazione.models import ReportGiornaliero, RegistrazioneProtocollo
 
 CONFIG = {'OPERATORE': 'protocol-test', 'CLASSIFICAZIONE_VISITATORI': '1', 'CLASSIFICAZIONE_QR': '2',
@@ -25,15 +26,15 @@ class DailyProtocolTests(TransactionTestCase):
         self.addCleanup(patch.stopall)
 
     def test_validation_does_not_write_or_send(self):
-        process_report('qr', self.day, self.user)
+        process_report('qr', self.day, self.user, REPORT_CONFIG)
         self.assertFalse(ReportGiornaliero.objects.exists())
         self.assertFalse(RegistrazioneProtocollo.objects.exists())
         self.sender.protocolla.assert_not_called()
 
     def test_retry_preserves_snapshot_and_sends_once(self):
-        first = process_report('qr', self.day, self.user, send=True)
+        first = process_report('qr', self.day, self.user, REPORT_CONFIG, send=True)
         with override_settings(REPORT_PROTOCOLLO={}):
-            second = process_report('qr', self.day, self.user, send=True)
+            second = process_report('qr', self.day, self.user, REPORT_CONFIG, send=True)
         self.assertEqual(first, second)
         self.builder.assert_called_once()
         self.sender.protocolla.assert_called_once()
@@ -42,9 +43,9 @@ class DailyProtocolTests(TransactionTestCase):
     def test_uncertain_never_resends(self):
         self.sender.protocolla.side_effect = EsitoIncertoError('timeout')
         with self.assertRaises(EsitoIncertoError):
-            process_report('visitatori', self.day, self.user, send=True)
+            process_report('visitatori', self.day, self.user, REPORT_CONFIG, send=True)
         with self.assertRaises(InvioBloccatoError):
-            process_report('visitatori', self.day, self.user, send=True)
+            process_report('visitatori', self.day, self.user, REPORT_CONFIG, send=True)
         self.sender.protocolla.assert_called_once()
 
     def test_command_continues_other_report_and_fails(self):
@@ -72,7 +73,7 @@ class DailyProtocolTests(TransactionTestCase):
         from django.contrib.admin.sites import AdminSite
         from django.core.exceptions import PermissionDenied
         from protocollazione.admin import ReportGiornalieroAdmin
-        process_report('qr', self.day, self.user, send=True)
+        process_report('qr', self.day, self.user, REPORT_CONFIG, send=True)
         row = ReportGiornaliero.objects.get()
         admin = ReportGiornalieroAdmin(ReportGiornaliero, AdminSite())
         request = RequestFactory().get('/')
