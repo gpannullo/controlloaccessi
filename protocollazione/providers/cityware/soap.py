@@ -81,8 +81,13 @@ class CitywareSoapClient:
             with requests.Session() as session:
                 session.mount('https://',requests.adapters.HTTPAdapter(max_retries=0))
                 with session.post(self.endpoint,data=payload,headers={'Content-Type':'text/xml; charset=utf-8','SOAPAction':f'"{self.action_base.rstrip("/")}/{method}"'},timeout=(self.config.get('CONNECT_TIMEOUT',10),self.config.get('TIMEOUT',60)),verify=self.config.get('CA_BUNDLE') or True,allow_redirects=False,stream=True) as response:
-                    response.raise_for_status()
-                    if response.status_code!=200:raise ValueError('HTTP inatteso')
+                    if response.status_code != 200:
+                        preview = response.content[:500].decode('utf-8', errors='replace')
+                        logger.warning(
+                            'Cityware HTTP inatteso: metodo=%s status=%s risposta=%s',
+                            method, response.status_code, preview,
+                        )
+                        response.raise_for_status()
                     parts=[]; size=0
                     for part in response.iter_content(65536):
                         size+=len(part)
