@@ -1,0 +1,20 @@
+"""Configurazione non segreta del provider Cityware.
+
+Le credenziali sono lette esclusivamente dall'ambiente del processo.
+"""
+import os
+
+ENDPOINT = 'https://cityware.example.invalid/proWsProtocollo'
+SOAP_ACTION_BASE = ENDPOINT
+DOMAIN_CODE = 'CODICE_ENTE_DA_CONFIGURARE'
+UFFICIO_OPERATORE = 'CODICE_UFFICIO_DA_CONFIGURARE'
+FIRMATARIO = 'CODICE_FIRMATARIO_DA_CONFIGURARE'
+UFFICIO_FIRMATARIO = 'CODICE_UFFICIO_FIRMATARIO_DA_CONFIGURARE'
+CA_BUNDLE = ''
+CONNECT_TIMEOUT = 10
+TIMEOUT = 60
+MAX_DOCUMENT_BYTES = 20 * 1024 * 1024
+
+USERNAME = os.getenv('CITYWARE_USERNAME', '')
+PASSWORD = os.getenv('CITYWARE_PASSWORD', '')
+

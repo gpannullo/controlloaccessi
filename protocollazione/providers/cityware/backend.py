@@ -6,13 +6,31 @@ from django.conf import settings
 from protocollazione.contracts import (ProtocolloBackend,TipoProtocollo,EsitoProtocollo,
     ValidazioneProtocolloError,ConfigurazioneProtocolloError,EsitoIncertoError,Firmatario)
 from .soap import CitywareSoapClient
+from . import settings as cityware_settings
 
 
 class CitywareBackend(ProtocolloBackend):
     TYPES={TipoProtocollo.ARRIVO:'A',TipoProtocollo.PARTENZA:'P',TipoProtocollo.INTERNO:'C'}
 
     def __init__(self):
-        self.config=dict(settings.CITYWARE)
+        self.config = {
+            'ENDPOINT': cityware_settings.ENDPOINT,
+            'SOAP_ACTION_BASE': cityware_settings.SOAP_ACTION_BASE,
+            'USERNAME': cityware_settings.USERNAME,
+            'PASSWORD': cityware_settings.PASSWORD,
+            'DOMAIN_CODE': cityware_settings.DOMAIN_CODE,
+            'UFFICIO_OPERATORE': cityware_settings.UFFICIO_OPERATORE,
+            'FIRMATARIO': cityware_settings.FIRMATARIO,
+            'UFFICIO_FIRMATARIO': cityware_settings.UFFICIO_FIRMATARIO,
+            'CA_BUNDLE': cityware_settings.CA_BUNDLE,
+            'CONNECT_TIMEOUT': cityware_settings.CONNECT_TIMEOUT,
+            'TIMEOUT': cityware_settings.TIMEOUT,
+            'MAX_DOCUMENT_BYTES': cityware_settings.MAX_DOCUMENT_BYTES,
+        }
+        # Backward-compatible test/embedding override; production uses settings.py.
+        override = getattr(settings, 'CITYWARE', None)
+        if override:
+            self.config.update(dict(override))
 
     def firmatari(self,r):
         if r.firmatari:return r.firmatari

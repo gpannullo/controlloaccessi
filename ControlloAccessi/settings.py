@@ -57,20 +57,6 @@ REPORT_PROTOCOLLO = {
     'FIRMATARIO': os.getenv('REPORT_PROTOCOLLO_FIRMATARIO', ''),
     'UFFICIO_FIRMATARIO': os.getenv('REPORT_PROTOCOLLO_UFFICIO_FIRMATARIO', ''),
 }
-CITYWARE = {
-    'ENDPOINT': os.getenv('CITYWARE_ENDPOINT', ''),
-    'SOAP_ACTION_BASE': os.getenv('CITYWARE_SOAP_ACTION_BASE', ''),
-    'USERNAME': os.getenv('CITYWARE_USERNAME', ''),
-    'PASSWORD': os.getenv('CITYWARE_PASSWORD', ''),
-    'DOMAIN_CODE': os.getenv('CITYWARE_DOMAIN_CODE', ''),
-    'UFFICIO_OPERATORE': os.getenv('CITYWARE_UFFICIO_OPERATORE', ''),
-    'FIRMATARIO': os.getenv('CITYWARE_FIRMATARIO', ''),
-    'UFFICIO_FIRMATARIO': os.getenv('CITYWARE_UFFICIO_FIRMATARIO', ''),
-    'CA_BUNDLE': os.getenv('CITYWARE_CA_BUNDLE', ''),
-    'CONNECT_TIMEOUT': int(os.getenv('CITYWARE_CONNECT_TIMEOUT', '10')),
-    'TIMEOUT': int(os.getenv('CITYWARE_TIMEOUT', '60')),
-    'MAX_DOCUMENT_BYTES': int(os.getenv('CITYWARE_MAX_DOCUMENT_BYTES', '20971520')),
-}
 
 INSTALLED_APPS = [
     'audit_ad.apps.AuditAdConfig',
