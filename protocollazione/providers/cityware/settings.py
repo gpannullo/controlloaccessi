@@ -6,7 +6,7 @@ import os
 
 ENDPOINT = 'https://boaversa.nuvolapalitalsoft.it/ws/Protocollo/proWsProtocollo.php'
 SOAP_ACTION_BASE = ENDPOINT
-DOMAIN_CODE = 'A512'
+DOMAIN_CODE = '01'
 UFFICIO_OPERATORE = '0010'
 FIRMATARIO = '0081'
 UFFICIO_FIRMATARIO = '0010'
