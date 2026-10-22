@@ -1,4 +1,4 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.utils import timezone
 from .models import (
     Visitatore,
@@ -114,6 +114,26 @@ class BadgeAdmin(admin.ModelAdmin):
     ordering = (
         "codice",
     )
+
+    actions = ("abilita_badge", "disabilita_badge")
+
+    @admin.action(description="Abilita i badge selezionati")
+    def abilita_badge(self, request, queryset):
+        aggiornati = queryset.update(attivo=True)
+        self.message_user(
+            request,
+            f"{aggiornati} badge abilitati.",
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="Disabilita i badge selezionati")
+    def disabilita_badge(self, request, queryset):
+        aggiornati = queryset.update(attivo=False)
+        self.message_user(
+            request,
+            f"{aggiornati} badge disabilitati.",
+            level=messages.SUCCESS,
+        )
 
     @admin.display(
         description="Disponibilità",
