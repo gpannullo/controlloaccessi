@@ -32,5 +32,11 @@ class Command(BaseCommand):
                 result=protocolla_report_giornaliero(kind, day, operator, REPORT_CONFIG, send=options['invia'])
                 self.stdout.write(f'{day} {kind}: '+(f'protocollo {result.numero}/{result.anno}' if result else 'VALIDATO, nessun invio'))
             except Exception as exc:
-                errors.append(kind); self.stderr.write(f'{kind}: {type(exc).__name__}; verificare configurazione.')
+                errors.append(kind)
+                self.stderr.write(self.style.ERROR(
+                    f'ERRORE PROTOCOLLAZIONE [{kind}]\n'
+                    f'  Tipo: {type(exc).__name__}\n'
+                    f'  Dettaglio: {exc}\n'
+                    '  Nessun nuovo invio automatico eseguito.'
+                ))
         if errors: raise CommandError('Report non completati: '+', '.join(errors))

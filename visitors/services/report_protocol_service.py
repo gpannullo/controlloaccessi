@@ -29,6 +29,13 @@ def _pdf(kind, day, generated, author):
 
 def protocolla_report_giornaliero(kind, day, operator, config, *, send=False):
     key = f'report-giornaliero:{kind}:{day.isoformat()}'
+    missing = [name for name in ('classificazione', 'ufficio_destinatario', 'firmatario', 'ufficio_firmatario')
+               if not config.get(name) or str(config.get(name)).upper().startswith('DA_CONFIGURARE')]
+    if missing:
+        raise ConfigurazioneProtocolloError(
+            'Configurazione report incompleta: ' + ', '.join(missing) +
+            '. Modificare REPORT_CONFIG nel management command.'
+        )
     snapshot = ReportGiornaliero.objects.filter(chiave=key).first()
     if snapshot:
         pdf, params = bytes(snapshot.documento), snapshot.parametri
