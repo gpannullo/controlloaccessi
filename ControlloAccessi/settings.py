@@ -48,7 +48,7 @@ ALLOWED_HOSTS = [
 
 # Backend sostituibile: le app chiamanti importano solo protocollazione.services.
 PROTOCOLLAZIONE_ENABLED = os.getenv('PROTOCOLLAZIONE_ENABLED', 'false').lower() in {'1', 'true', 'yes', 'on'}
-PROTOCOLLAZIONE_BACKEND = os.getenv('PROTOCOLLAZIONE_BACKEND', 'cityware.backend.CitywareBackend')
+PROTOCOLLAZIONE_BACKEND = os.getenv('PROTOCOLLAZIONE_BACKEND', 'protocollazione.providers.cityware.backend.CitywareBackend')
 REPORT_PROTOCOLLO = {
     'OPERATORE': os.getenv('REPORT_PROTOCOLLO_OPERATORE', ''),
     'CLASSIFICAZIONE_VISITATORI': os.getenv('REPORT_PROTOCOLLO_CLASSIFICAZIONE_VISITATORI', ''),

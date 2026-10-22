@@ -2,7 +2,9 @@
 
 L'app chiamante non dipende da Cityware: usa
 `protocollazione.services.protocolla_documenti`. Il backend è selezionato da
-`PROTOCOLLAZIONE_BACKEND`. Nessuna pianificazione è necessaria per questo metodo.
+`PROTOCOLLAZIONE_BACKEND`. Il provider predefinito è
+`protocollazione.providers.cityware.backend.CitywareBackend`; nessuna pianificazione
+è necessaria per questo metodo.
 
 ```python
 from protocollazione.contracts import Documento, Firmatario, Soggetto, TipoProtocollo
