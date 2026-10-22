@@ -23,6 +23,7 @@ def envelope(method, data):
     body=ET.SubElement(root,f'{{{SOAP}}}Body')
     call=ET.SubElement(body,method,{f'{{{SOAP}}}encodingStyle':'http://schemas.xmlsoap.org/soap/encoding/'})
     types={'datiProtocollo':'datiProtocollo','firmatari':'firmatari','firmatario':'firmatario','mittenti':'mittenti','destinatari':'destinatari','mittenteDestinatario':'mittenteDestinatario','trasmissioniInterne':'trasmissioniInterne','trasmissione':'trasmissione','allegato':'allegato'}
+    types.update({'allegatiPrecaricati': 'allegatiPrecaricati', 'allegatoPrecaricato': 'allegatoPrecaricato'})
     def add(parent,key,value):
         if isinstance(value,list):
             for item in value: add(parent,key,item)

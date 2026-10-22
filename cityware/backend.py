@@ -40,11 +40,15 @@ class CitywareBackend(ProtocolloBackend):
             raise ValidazioneProtocolloError('Firmatario e relativo ufficio obbligatori.')
         if any(not t.ufficio.strip() for t in r.trasmissioni):
             raise ValidazioneProtocolloError('Ufficio della trasmissione obbligatorio.')
-        doc=r.documento
-        if not doc.nome or len(doc.nome)>255 or '/' in doc.nome or '\\' in doc.nome or any(ord(c)<32 for c in doc.nome):
-            raise ValidazioneProtocolloError('Nome documento non valido.')
-        if not isinstance(doc.contenuto,bytes) or not doc.contenuto or len(doc.contenuto)>self.config.get('MAX_DOCUMENT_BYTES',20*1024*1024):
-            raise ValidazioneProtocolloError('Documento vuoto o oltre il limite configurato.')
+        names = set()
+        for doc in (r.documento, *r.allegati):
+            if not doc.nome or len(doc.nome)>255 or '/' in doc.nome or '\\' in doc.nome or any(ord(c)<32 for c in doc.nome):
+                raise ValidazioneProtocolloError('Nome documento non valido.')
+            if doc.nome.casefold() in names:
+                raise ValidazioneProtocolloError('I documenti devono avere nomi distinti.')
+            names.add(doc.nome.casefold())
+            if not isinstance(doc.contenuto,bytes) or not doc.contenuto or len(doc.contenuto)>self.config.get('MAX_DOCUMENT_BYTES',20*1024*1024):
+                raise ValidazioneProtocolloError('Documento vuoto o oltre il limite configurato.')
 
     def payload(self,r):
         def party(p):
@@ -65,6 +69,27 @@ class CitywareBackend(ProtocolloBackend):
         payload=self.payload(richiesta)
         client=CitywareSoapClient(self.config)
         with client.session() as token:
+            if richiesta.allegati:
+                # Manuale 8.4.4: preload all PDFs, then register once, not N protocols.
+                payload.pop('allegato')
+                uploaded = []
+                for index, doc in enumerate((richiesta.documento, *richiesta.allegati)):
+                    response = client.call('InsertDocumento', {
+                        'token': token, 'nomeFile': doc.nome,
+                        'stream': base64.b64encode(doc.contenuto).decode('ascii')}, writing=True)
+                    info = response.get('allegatoPrecaricato') or {}
+                    status = (response.get('messageResult') or {}).get('tipoRisultato', '')
+                    digest = hashlib.sha256(doc.contenuto).hexdigest()
+                    if (str(status).lower() not in ('info', 'warning') or not isinstance(info, dict)
+                            or not isinstance(info.get('idunivoco'), str) or not info['idunivoco'].strip()
+                            or str(info.get('hashfile', '')).lower() != digest):
+                        raise EsitoIncertoError('Precaricamento non confermato: verificare Cityware prima di ripetere.')
+                    uploaded.append({
+                        'idunivoco': info['idunivoco'], 'hashfile': digest, 'nomeFile': doc.nome,
+                        'tipoFile': 'PRINCIPALE' if index == 0 else 'ALLEGATO',
+                        'estensione': PurePosixPath(doc.nome).suffix.lstrip('.'), 'note': '',
+                        'marcaDocumento': '1' if doc.marca_segnatura else '0', 'mettiAllaFirma': '0'})
+                payload['allegatiPrecaricati'] = {'allegatoPrecaricato': uploaded}
             result=client.call('PutProtocollo',{'token':token,'datiProtocollo':payload},writing=True)
             return self.esito(result,richiesta.tipo)
 

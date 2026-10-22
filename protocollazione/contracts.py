@@ -57,6 +57,7 @@ class RichiestaProtocollo:
     destinatari: tuple[Soggetto, ...] = ()
     trasmissioni: tuple[Trasmissione, ...] = ()
     riservato: bool = True
+    allegati: tuple[Documento, ...] = ()
 
 
 @dataclass(frozen=True)
