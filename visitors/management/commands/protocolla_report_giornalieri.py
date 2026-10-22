@@ -8,10 +8,10 @@ from visitors.services.report_protocol_service import ROME, protocolla_report_gi
 # Configurazione specifica dei report. Non contiene credenziali.
 REPORT_CONFIG = {
     'operatore': 'g.pannullo',
-    'classificazione': 'DA_CONFIGURARE',
-    'ufficio_destinatario': 'DA_CONFIGURARE',
-    'firmatario': 'DA_CONFIGURARE',
-    'ufficio_firmatario': 'DA_CONFIGURARE',
+    'classificazione': '0001.0007',
+    'ufficio_destinatario': '0010',
+    'firmatario': '0081',
+    'ufficio_firmatario': '0010',
 }
 
 class Command(BaseCommand):

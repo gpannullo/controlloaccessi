@@ -4,12 +4,12 @@ Le credenziali sono lette esclusivamente dall'ambiente del processo.
 """
 import os
 
-ENDPOINT = 'https://cityware.example.invalid/proWsProtocollo'
+ENDPOINT = 'https://boaversa.nuvolapalitalsoft.it/ws/Protocollo/proWsProtocollo.php?wsdl'
 SOAP_ACTION_BASE = ENDPOINT
-DOMAIN_CODE = 'CODICE_ENTE_DA_CONFIGURARE'
-UFFICIO_OPERATORE = 'CODICE_UFFICIO_DA_CONFIGURARE'
-FIRMATARIO = 'CODICE_FIRMATARIO_DA_CONFIGURARE'
-UFFICIO_FIRMATARIO = 'CODICE_UFFICIO_FIRMATARIO_DA_CONFIGURARE'
+DOMAIN_CODE = 'A512'
+UFFICIO_OPERATORE = '0010'
+FIRMATARIO = '0081'
+UFFICIO_FIRMATARIO = '0010'
 CA_BUNDLE = ''
 CONNECT_TIMEOUT = 10
 TIMEOUT = 60
