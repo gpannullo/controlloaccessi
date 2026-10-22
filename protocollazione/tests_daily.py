@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.core.management import call_command, CommandError
 from django.test import TransactionTestCase, override_settings
 from protocollazione.contracts import EsitoProtocollo, EsitoIncertoError, InvioBloccatoError
-from protocollazione.daily import process_report
+from visitors.services.report_protocol_service import protocolla_report_giornaliero as process_report
 from protocollazione.models import ReportGiornaliero, RegistrazioneProtocollo
 
 CONFIG = {'OPERATORE': 'protocol-test', 'CLASSIFICAZIONE_VISITATORI': '1', 'CLASSIFICAZIONE_QR': '2',
@@ -18,8 +18,8 @@ class DailyProtocolTests(TransactionTestCase):
         self.user = get_user_model().objects.create(username='protocol-test', is_active=True, is_superuser=True)
         self.day = date(2026, 1, 2)
         self.result = EsitoProtocollo('1', '2026', '123', 'C', '2026-01-03', 'segnatura')
-        self.builder = patch('protocollazione.daily.build_document', return_value=b'%PDF-test').start()
-        self.backend = patch('protocollazione.daily.get_backend').start().return_value
+        self.builder = patch('visitors.services.report_protocol_service._pdf', return_value=b'%PDF-test').start()
+        self.backend = patch('visitors.services.report_protocol_service.get_backend').start().return_value
         self.sender = patch('protocollazione.services.get_backend').start().return_value
         self.sender.protocolla.return_value = self.result
         self.addCleanup(patch.stopall)
@@ -48,7 +48,7 @@ class DailyProtocolTests(TransactionTestCase):
         self.sender.protocolla.assert_called_once()
 
     def test_command_continues_other_report_and_fails(self):
-        with patch('protocollazione.management.commands.protocolla_report_giornalieri.process_report',
+        with patch('visitors.management.commands.protocolla_report_giornalieri.protocolla_report_giornaliero',
                    side_effect=[ValueError('private'), self.result]) as process:
             err = StringIO()
             with self.assertRaises(CommandError):
@@ -58,7 +58,7 @@ class DailyProtocolTests(TransactionTestCase):
 
     def test_current_day_rejected(self):
         from django.utils import timezone
-        from protocollazione.daily import ROME
+        from visitors.services.report_protocol_service import ROME
         with self.assertRaises(CommandError):
             call_command('protocolla_report_giornalieri', data=timezone.localdate(timezone=ROME))
 
