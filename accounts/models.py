@@ -48,6 +48,12 @@ class CustomUser(AbstractUser):
         validators=[RegexValidator(r"^\d{10}$", "Il badge deve essere composto da 10 cifre.")],
     )
 
+    codice_protocollo = models.CharField(
+        max_length=50, unique=True, null=True, blank=True,
+        verbose_name="Codice protocollo",
+        help_text="Codice della persona nel gestionale di protocollo.",
+    )
+
     livello_sicurezza = models.PositiveSmallIntegerField(
         default=1,
         verbose_name="Livello di sicurezza"

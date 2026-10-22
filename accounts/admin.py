@@ -54,6 +54,7 @@ class UfficioUtenteFilter(admin.SimpleListFilter):
 class CustomUserAdmin(UserAdmin):
     list_display = (
         "username",
+        "codice_protocollo",
         "first_name",
         "last_name",
         "uffici_assegnati",

@@ -193,6 +193,7 @@ class UfficioAdmin(admin.ModelAdmin):
     readonly_fields = ("stato_personale", "membri_gruppo_operativo",)
     list_display = (
         "nome",
+        "codice_protocollo",
         "prefisso_coda",
         "responsabile",
         "riceve_pubblico",

@@ -17,6 +17,12 @@ class Ufficio(models.Model):
         verbose_name="Codice"
     )
 
+    codice_protocollo = models.CharField(
+        max_length=50, unique=True, null=True, blank=True,
+        verbose_name="Codice protocollo",
+        help_text="Codice dell'ufficio nell'organigramma del gestionale di protocollo.",
+    )
+
     prefisso_coda = models.CharField(
         max_length=2,
         blank=True,
