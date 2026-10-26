@@ -143,21 +143,24 @@ def costruisci_statino(mese, nome_gruppo='Servizio Civile', autore='Sistema'):
             coppie = [(x[2], x[3], x[4]) for x in dettagli]
             durata = sum((x[2] for x in coppie), timedelta())
             totale += durata
-            entrate = ' / '.join(f"{x[0]:%H:%M}{'*' if x[0].strftime('%H:%M') != dettagli[i][0].strftime('%H:%M') else ''}" for i, x in enumerate(coppie)) or '-'
-            uscite = ' / '.join(f"{x[1]:%H:%M}{'*' if x[1].strftime('%H:%M') != dettagli[i][1].strftime('%H:%M') else ''}" for i, x in enumerate(coppie)) or '-'
+            passaggi = ' | '.join(
+                f"E{x[0]:%H:%M}{'*' if x[0].strftime('%H:%M') != dettagli[i][0].strftime('%H:%M') else ''} - "
+                f"U{x[1]:%H:%M}{'*' if x[1].strftime('%H:%M') != dettagli[i][1].strftime('%H:%M') else ''}"
+                for i, x in enumerate(coppie)
+            ) or '-'
             differenza = durata - ORE_GIORNALIERE
             if _non_lavorativo(giorno_date) and not coppie:
                 differenza, esito = timedelta(0), 'Non lavorativo'
             else:
                 esito = 'Credito' if differenza > timedelta(0) else ('Deficit' if differenza < timedelta(0) else 'Regolare')
             scarto = '-' if _non_lavorativo(giorno_date) and not coppie else _ore(differenza, segno=True)
-            rows.append([giorno_date.strftime('%d/%m/%Y'), GIORNI[giorno_date.weekday()], entrate, uscite, _ore(durata), scarto])
+            rows.append([giorno_date.strftime('%d/%m/%Y'), GIORNI[giorno_date.weekday()], passaggi, _ore(durata), scarto])
         giorni_lavorativi = sum(not _non_lavorativo(primo.replace(day=g)) for g in range(1, ultimo.day + 1))
         atteso = ORE_GIORNALIERE * giorni_lavorativi
         scarto_totale = totale - atteso
-        rows.append(['', 'TOTALE', '', '', _ore(totale), _ore(scarto_totale, segno=True)])
-        table_data = [[p(x, 'StatinoHeader') for x in ['Data','Giorno','Entrate','Uscite','Ore lavorate','Scarto']]] + [[p(x) for x in row] for row in rows]
-        table = Table(table_data, colWidths=[27*mm, 27*mm, 31*mm, 31*mm, 29*mm, 29*mm], repeatRows=1)
+        rows.append(['', 'TOTALE', '', _ore(totale), _ore(scarto_totale, segno=True)])
+        table_data = [[p(x, 'StatinoHeader') for x in ['Data','Giorno','Passaggi','Ore lavorate','Scarto']]] + [[p(x) for x in row] for row in rows]
+        table = Table(table_data, colWidths=[27*mm, 27*mm, 67*mm, 32*mm, 27*mm], repeatRows=1)
         table.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor('#173b59')),('TEXTCOLOR',(0,0),(-1,0),colors.white),('GRID',(0,0),(-1,-1),.25,colors.HexColor('#ccd5dc')),('VALIGN',(0,0),(-1,-1),'MIDDLE'),('FONTSIZE',(0,0),(-1,-1),7),('BACKGROUND',(0,-1),(-1,-1),colors.HexColor('#e9f1f7'))]))
         story.append(table)
         story.append(Spacer(1, 2*mm))
