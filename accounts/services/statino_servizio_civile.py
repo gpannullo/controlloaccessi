@@ -78,6 +78,23 @@ def _coppie(timbrature):
     return risultato
 
 
+def _coppie_con_orari(timbrature):
+    """Coppie con orario reale e orario usato per il conteggio."""
+    aperta = None
+    risultato = []
+    for t in sorted(timbrature, key=lambda x: x.registrata_il):
+        if t.verso == 'I' and aperta is None:
+            aperta = t
+        elif t.verso == 'U' and aperta is not None:
+            ingresso_reale = aperta.registrata_il
+            uscita_reale = t.registrata_il
+            ingresso = ingresso_reale.replace(hour=_normalizza(ingresso_reale.time(), 'I').hour, minute=_normalizza(ingresso_reale.time(), 'I').minute, second=0, microsecond=0)
+            uscita = uscita_reale.replace(hour=_normalizza(uscita_reale.time(), 'U').hour, minute=_normalizza(uscita_reale.time(), 'U').minute, second=0, microsecond=0)
+            risultato.append((ingresso_reale, uscita_reale, ingresso, uscita, max(timedelta(0), uscita - ingresso)))
+            aperta = None
+    return risultato
+
+
 def utenti_gruppo(nome='Servizio Civile'):
     return User.objects.filter(is_active=True, groups__name__iexact=nome).distinct().order_by('last_name', 'first_name', 'username')
 
@@ -122,11 +139,12 @@ def costruisci_statino(mese, nome_gruppo='Servizio Civile', autore='Sistema'):
         for giorno in range(1, ultimo.day + 1):
             giorno_date = primo.replace(day=giorno)
             giornalieri = [t for t in per_utente[utente.pk] if timezone.localtime(t.registrata_il).date() == giorno_date]
-            coppie = _coppie(giornalieri)
+            dettagli = _coppie_con_orari(giornalieri)
+            coppie = [(x[2], x[3], x[4]) for x in dettagli]
             durata = sum((x[2] for x in coppie), timedelta())
             totale += durata
-            entrate = ' / '.join(x[0].strftime('%H:%M') for x in coppie) or '-'
-            uscite = ' / '.join(x[1].strftime('%H:%M') for x in coppie) or '-'
+            entrate = ' / '.join(f"{x[0]:%H:%M}{'*' if x[0].strftime('%H:%M') != dettagli[i][0].strftime('%H:%M') else ''}" for i, x in enumerate(coppie)) or '-'
+            uscite = ' / '.join(f"{x[1]:%H:%M}{'*' if x[1].strftime('%H:%M') != dettagli[i][1].strftime('%H:%M') else ''}" for i, x in enumerate(coppie)) or '-'
             differenza = durata - ORE_GIORNALIERE
             if _non_lavorativo(giorno_date) and not coppie:
                 differenza, esito = timedelta(0), 'Non lavorativo'
@@ -142,6 +160,8 @@ def costruisci_statino(mese, nome_gruppo='Servizio Civile', autore='Sistema'):
         table = Table(table_data, colWidths=[27*mm, 27*mm, 31*mm, 31*mm, 29*mm, 29*mm], repeatRows=1)
         table.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor('#173b59')),('TEXTCOLOR',(0,0),(-1,0),colors.white),('GRID',(0,0),(-1,-1),.25,colors.HexColor('#ccd5dc')),('VALIGN',(0,0),(-1,-1),'MIDDLE'),('FONTSIZE',(0,0),(-1,-1),7),('BACKGROUND',(0,-1),(-1,-1),colors.HexColor('#e9f1f7'))]))
         story.append(table)
+        story.append(Spacer(1, 2*mm))
+        story.append(p('* Gli orari visualizzati con asterisco sono stati arrotondati ai fini del conteggio: entrata alle 08:30 e uscita alle 13:30 quando la timbratura rientra nella tolleranza di 3 minuti. L’orario effettivo resta quello registrato dal sistema.'))
     if not utenti: story.append(p('Nessun utente attivo appartiene al gruppo indicato.'))
     doc.build(story, onFirstPage=header, onLaterPages=header)
     return output.getvalue()
