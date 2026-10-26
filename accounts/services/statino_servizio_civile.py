@@ -72,14 +72,15 @@ def _coppie(timbrature):
     aperta = None
     risultato = []
     for t in sorted(timbrature, key=lambda x: x.registrata_il):
+        t_time = timezone.localtime(t.registrata_il)
         if t.verso == 'I':
             if aperta is None:
                 aperta = t
         elif t.verso == 'U' and aperta is not None:
-            ingresso = _normalizza(aperta.registrata_il.time(), 'I')
-            uscita = _normalizza(t.registrata_il.time(), 'U')
-            start = datetime.combine(aperta.registrata_il.date(), ingresso)
-            end = datetime.combine(t.registrata_il.date(), uscita)
+            ingresso = _normalizza(timezone.localtime(aperta.registrata_il).time(), 'I')
+            uscita = _normalizza(t_time.time(), 'U')
+            start = datetime.combine(timezone.localtime(aperta.registrata_il).date(), ingresso)
+            end = datetime.combine(t_time.date(), uscita)
             risultato.append((start, end, max(timedelta(0), end - start)))
             aperta = None
     return risultato
@@ -90,11 +91,12 @@ def _coppie_con_orari(timbrature):
     aperta = None
     risultato = []
     for t in sorted(timbrature, key=lambda x: x.registrata_il):
+        t_time = timezone.localtime(t.registrata_il)
         if t.verso == 'I' and aperta is None:
             aperta = t
         elif t.verso == 'U' and aperta is not None:
-            ingresso_reale = aperta.registrata_il
-            uscita_reale = t.registrata_il
+            ingresso_reale = timezone.localtime(aperta.registrata_il)
+            uscita_reale = t_time
             ingresso = ingresso_reale.replace(hour=_normalizza(ingresso_reale.time(), 'I').hour, minute=_normalizza(ingresso_reale.time(), 'I').minute, second=0, microsecond=0)
             uscita = uscita_reale.replace(hour=_normalizza(uscita_reale.time(), 'U').hour, minute=_normalizza(uscita_reale.time(), 'U').minute, second=0, microsecond=0)
             risultato.append((ingresso_reale, uscita_reale, ingresso, uscita, max(timedelta(0), uscita - ingresso)))
@@ -165,13 +167,13 @@ def costruisci_statino(mese, nome_gruppo='Servizio Civile', autore='Sistema'):
             ore_testo = '' if senza_passaggi else _ore(durata)
             scarto = '' if senza_passaggi else _ore(differenza, segno=True)
             nota = 'Giornata non lavorativa' if non_lavorativo else ('Nessun passaggio' if senza_passaggi else '')
-            rows.append([giorno_date.strftime('%d/%m/%Y'), GIORNI[giorno_date.weekday()], passaggi, ore_testo, scarto, nota])
+            rows.append([giorno_date.strftime('%d/%m/%Y'), GIORNI[giorno_date.weekday()], passaggi, ore_testo, scarto, ''])
         giorni_lavorativi = sum(not _non_lavorativo(primo.replace(day=g)) for g in range(1, ultimo.day + 1))
         atteso = ORE_GIORNALIERE * giorni_lavorativi
         scarto_totale = totale - atteso
-        rows.append(['', 'TOTALE', '', _ore(totale), _ore(scarto_totale, segno=True), 'Totale mese'])
+        rows.append(['', 'TOTALE', '', _ore(totale), _ore(scarto_totale, segno=True), ''])
         table_data = [[p(x, 'StatinoHeader') for x in ['Data','Giorno','Passaggi','Ore lavorate','Scarto','Note']]] + [[p(x) for x in row] for row in rows]
-        table = Table(table_data, colWidths=[24*mm, 24*mm, 54*mm, 28*mm, 24*mm, 30*mm], repeatRows=1)
+        table = Table(table_data, colWidths=[24*mm, 24*mm, 58*mm, 20*mm, 18*mm, 40*mm], repeatRows=1)
         commands = [('BACKGROUND',(0,0),(-1,0),colors.HexColor('#173b59')),('TEXTCOLOR',(0,0),(-1,0),colors.white),('GRID',(0,0),(-1,-1),.25,colors.HexColor('#ccd5dc')),('VALIGN',(0,0),(-1,-1),'MIDDLE'),('FONTSIZE',(0,0),(-1,-1),7),('BACKGROUND',(0,-1),(-1,-1),colors.HexColor('#e9f1f7'))]
         for row_index in range(1, len(rows) + 1):
             giorno_val = rows[row_index - 1][0]
