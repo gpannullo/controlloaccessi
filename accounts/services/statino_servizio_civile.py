@@ -148,7 +148,8 @@ def costruisci_statino(mese, nome_gruppo='Servizio Civile', autore='Sistema'):
             giornalieri = [t for t in per_utente[utente.pk] if timezone.localtime(t.registrata_il).date() == giorno_date]
             dettagli = _coppie_con_orari(giornalieri)
             coppie = [(x[2], x[3], x[4]) for x in dettagli]
-            durata = sum((x[2] for x in coppie), timedelta())
+            non_lavorativo = _non_lavorativo(giorno_date)
+            durata = timedelta() if non_lavorativo else sum((x[2] for x in coppie), timedelta())
             totale += durata
             passaggi = ' | '.join(
                 f"{_orario_report(dettagli[i][0], x[0], 'E')} - "
@@ -156,11 +157,11 @@ def costruisci_statino(mese, nome_gruppo='Servizio Civile', autore='Sistema'):
                 for i, x in enumerate(coppie)
             ) or '-'
             differenza = durata - ORE_GIORNALIERE
-            if _non_lavorativo(giorno_date) and not coppie:
+            if non_lavorativo:
                 differenza, esito = timedelta(0), 'Non lavorativo'
             else:
                 esito = 'Credito' if differenza > timedelta(0) else ('Deficit' if differenza < timedelta(0) else 'Regolare')
-            scarto = '-' if _non_lavorativo(giorno_date) and not coppie else _ore(differenza, segno=True)
+            scarto = '-' if non_lavorativo else _ore(differenza, segno=True)
             rows.append([giorno_date.strftime('%d/%m/%Y'), GIORNI[giorno_date.weekday()], passaggi, _ore(durata), scarto])
         giorni_lavorativi = sum(not _non_lavorativo(primo.replace(day=g)) for g in range(1, ultimo.day + 1))
         atteso = ORE_GIORNALIERE * giorni_lavorativi
@@ -168,7 +169,12 @@ def costruisci_statino(mese, nome_gruppo='Servizio Civile', autore='Sistema'):
         rows.append(['', 'TOTALE', '', _ore(totale), _ore(scarto_totale, segno=True)])
         table_data = [[p(x, 'StatinoHeader') for x in ['Data','Giorno','Passaggi','Ore lavorate','Scarto']]] + [[p(x) for x in row] for row in rows]
         table = Table(table_data, colWidths=[27*mm, 27*mm, 67*mm, 32*mm, 27*mm], repeatRows=1)
-        table.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor('#173b59')),('TEXTCOLOR',(0,0),(-1,0),colors.white),('GRID',(0,0),(-1,-1),.25,colors.HexColor('#ccd5dc')),('VALIGN',(0,0),(-1,-1),'MIDDLE'),('FONTSIZE',(0,0),(-1,-1),7),('BACKGROUND',(0,-1),(-1,-1),colors.HexColor('#e9f1f7'))]))
+        commands = [('BACKGROUND',(0,0),(-1,0),colors.HexColor('#173b59')),('TEXTCOLOR',(0,0),(-1,0),colors.white),('GRID',(0,0),(-1,-1),.25,colors.HexColor('#ccd5dc')),('VALIGN',(0,0),(-1,-1),'MIDDLE'),('FONTSIZE',(0,0),(-1,-1),7),('BACKGROUND',(0,-1),(-1,-1),colors.HexColor('#e9f1f7'))]
+        for row_index in range(1, len(rows) + 1):
+            giorno_val = rows[row_index - 1][0]
+            if giorno_val and _non_lavorativo(date.fromisoformat(f'{primo.year}-{primo.month:02d}-{giorno_val[:2]}')):
+                commands.append(('BACKGROUND', (0, row_index), (-1, row_index), colors.HexColor('#f0f0f0')))
+        table.setStyle(TableStyle(commands))
         story.append(table)
         story.append(Spacer(1, 2*mm))
         story.append(p('* Gli orari visualizzati con asterisco sono stati arrotondati ai fini del conteggio: entrata alle 08:30 e uscita alle 13:30 quando la timbratura rientra nella tolleranza di 3 minuti. L’orario effettivo resta quello registrato dal sistema.'))
