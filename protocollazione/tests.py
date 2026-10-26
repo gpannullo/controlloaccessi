@@ -7,8 +7,8 @@ from django.test import SimpleTestCase, TransactionTestCase, override_settings
 from protocollazione.contracts import *
 from protocollazione.services import protocolla, get_backend
 from protocollazione.models import RegistrazioneProtocollo
-from cityware.backend import CitywareBackend
-from cityware.soap import CitywareSoapClient, envelope, parse_response
+from protocollazione.providers.cityware.backend import CitywareBackend
+from protocollazione.providers.cityware.soap import CitywareSoapClient, envelope, parse_response
 
 
 def request_data():
@@ -17,12 +17,20 @@ def request_data():
 
 RESULT=EsitoProtocollo('42','2026','000012','interno','20260917','12/2026/ENTE')
 
+TEST_CITYWARE = {
+    'ENDPOINT': 'https://example.invalid/soap', 'USERNAME': 'test',
+    'PASSWORD': 'not-a-real-password', 'DOMAIN_CODE': 'test',
+    'UFFICIO_OPERATORE': '0001', 'FIRMATARIO': '0002',
+    'UFFICIO_FIRMATARIO': '0001',
+}
+
 
 class AlternateBackend(ProtocolloBackend):
     def valida(self,richiesta):pass
     def protocolla(self,richiesta):return RESULT
 
 
+@override_settings(CITYWARE=TEST_CITYWARE, PROTOCOLLAZIONE_ENABLED=True)
 class ContractTests(SimpleTestCase):
     def test_abstract(self):
         with self.assertRaises(TypeError):ProtocolloBackend()
@@ -80,7 +88,7 @@ class ContractTests(SimpleTestCase):
             with client.session() as token:self.assertEqual(token,'token')
 
     def test_transport_no_retry_and_no_redirect(self):
-        with patch('cityware.soap.requests.Session') as session:
+        with patch('protocollazione.providers.cityware.soap.requests.Session') as session:
             session.return_value.__enter__.return_value.post.side_effect=TimeoutError()
             with self.assertRaises(EsitoIncertoError):
                 CitywareSoapClient({'ENDPOINT':'https://example.invalid'}).call('PutProtocollo',{},writing=True)
@@ -94,7 +102,7 @@ class ContractTests(SimpleTestCase):
             return f'<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><{method}Response>{inner}</{method}Response></s:Body></s:Envelope>'.encode()
         fields={'rowidProtocollo':'42','annoProtocollo':'2026','numeroProtocollo':'000012','tipoProtocollo':'C','dataProtocollo':'20260917','segnatura':'12/2026/ENTE'}
         responses=[soap('GetItaEngineContextToken','<return>fake-token</return>'),soap('PutProtocollo','<retProtocollo>'+''.join(f'<{k}>{v}</{k}>' for k,v in fields.items())+'</retProtocollo><messageResult><tipoRisultato>Info</tipoRisultato></messageResult>'),soap('DestroyItaEngineContextToken','<return>Success</return>')]
-        with patch('cityware.soap.requests.Session') as session:
+        with patch('protocollazione.providers.cityware.soap.requests.Session') as session:
             post=session.return_value.__enter__.return_value.post
             def response(*args,**kwargs):
                 result=MagicMock(); result.__enter__.return_value=result
@@ -105,6 +113,7 @@ class ContractTests(SimpleTestCase):
             self.assertEqual(post.call_count,3)
 
 
+@override_settings(CITYWARE=TEST_CITYWARE, PROTOCOLLAZIONE_ENABLED=True)
 class LedgerTests(TransactionTestCase):
     def setUp(self):
         self.user=get_user_model().objects.create(username='tester',is_active=True,is_staff=True,is_superuser=True)

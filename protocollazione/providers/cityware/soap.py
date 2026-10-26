@@ -18,12 +18,13 @@ NS='urn:proWsProtocollo'
 logger = logging.getLogger(__name__)
 ET.register_namespace('soapenv',SOAP)
 ET.register_namespace('xsi',XSI)
+ET.register_namespace('tns',NS)
 
 
 def envelope(method, data):
-    root=ET.Element(f'{{{SOAP}}}Envelope',{'xmlns:xsd':'http://www.w3.org/2001/XMLSchema','xmlns:tns':NS})
+    root=ET.Element(f'{{{SOAP}}}Envelope',{'xmlns:xsd':'http://www.w3.org/2001/XMLSchema'})
     body=ET.SubElement(root,f'{{{SOAP}}}Body')
-    call=ET.SubElement(body,method,{f'{{{SOAP}}}encodingStyle':'http://schemas.xmlsoap.org/soap/encoding/'})
+    call=ET.SubElement(body, f'{{{NS}}}{method}', {f'{{{SOAP}}}encodingStyle':'http://schemas.xmlsoap.org/soap/encoding/'})
     types={'datiProtocollo':'datiProtocollo','firmatari':'firmatari','firmatario':'firmatario','mittenti':'mittenti','destinatari':'destinatari','mittenteDestinatario':'mittenteDestinatario','trasmissioniInterne':'trasmissioniInterne','trasmissione':'trasmissione','allegato':'allegato'}
     types.update({'allegatiPrecaricati': 'allegatiPrecaricati', 'allegatoPrecaricato': 'allegatoPrecaricato'})
     def add(parent,key,value):
