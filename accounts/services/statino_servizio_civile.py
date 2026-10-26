@@ -89,6 +89,7 @@ def costruisci_statino(mese, nome_gruppo='Servizio Civile', autore='Sistema'):
     output = BytesIO()
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(name='StatinoSmall', parent=styles['Normal'], fontSize=7, leading=9))
+    styles.add(ParagraphStyle(name='StatinoHeader', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=7, leading=8, textColor=colors.white))
     styles.add(ParagraphStyle(name='StatinoTitle', parent=styles['Title'], fontSize=16, textColor=colors.HexColor('#173b59')))
     p = lambda value, style='StatinoSmall': Paragraph(str(value), styles[style])
     logo = Path(settings.BASE_DIR) / 'visitors/static/visitors/images/stemma-comune-aversa.jpg'
@@ -126,7 +127,8 @@ def costruisci_statino(mese, nome_gruppo='Servizio Civile', autore='Sistema'):
         atteso = ORE_GIORNALIERE * giorni_lavorativi
         scarto_totale = totale - atteso
         rows.append(['', 'TOTALE', '', '', str(totale)[:7], str(abs(scarto_totale))[:7], 'Credito' if scarto_totale > timedelta(0) else ('Deficit' if scarto_totale < timedelta(0) else 'Regolare')])
-        table = Table([[p(x) for x in row] for row in [['Data','Giorno','Entrate','Uscite','Ore lavorate','Scarto','Esito']] + rows], colWidths=[23*mm, 23*mm, 28*mm, 28*mm, 25*mm, 23*mm, 25*mm], repeatRows=1)
+        table_data = [[p(x, 'StatinoHeader') for x in ['Data','Giorno','Entrate','Uscite','Ore lavorate','Scarto','Esito']]] + [[p(x) for x in row] for row in rows]
+        table = Table(table_data, colWidths=[23*mm, 23*mm, 28*mm, 28*mm, 25*mm, 23*mm, 25*mm], repeatRows=1)
         table.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor('#173b59')),('TEXTCOLOR',(0,0),(-1,0),colors.white),('GRID',(0,0),(-1,-1),.25,colors.HexColor('#ccd5dc')),('VALIGN',(0,0),(-1,-1),'MIDDLE'),('FONTSIZE',(0,0),(-1,-1),7),('BACKGROUND',(0,-1),(-1,-1),colors.HexColor('#e9f1f7'))]))
         story.append(table)
     if not utenti: story.append(p('Nessun utente attivo appartiene al gruppo indicato.'))
