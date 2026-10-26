@@ -151,6 +151,7 @@ def costruisci_statino(mese, nome_gruppo='Servizio Civile', autore='Sistema'):
         story += [p(f'{utente.last_name} {utente.first_name}', 'Heading2'), p(f'Username: {utente.username} | Badge: {utente.badge or "-"}'), p(f'Ufficio/i: {uffici}'), Spacer(1, 2*mm)]
         rows = []
         totale = timedelta(0)
+        giornate_conteggiate = 0
         for giorno in range(1, ultimo.day + 1):
             giorno_date = primo.replace(day=giorno)
             giornalieri = [t for t in per_utente[utente.pk] if timezone.localtime(t.registrata_il).date() == giorno_date]
@@ -158,6 +159,8 @@ def costruisci_statino(mese, nome_gruppo='Servizio Civile', autore='Sistema'):
             coppie = [(x[2], x[3], x[4]) for x in dettagli]
             non_lavorativo = _non_lavorativo(giorno_date)
             durata = timedelta() if non_lavorativo else sum((x[2] for x in coppie), timedelta())
+            if coppie and not non_lavorativo:
+                giornate_conteggiate += 1
             totale += durata
             passaggi = ' | '.join(
                 f"{_orario_report(dettagli[i][0], x[0], 'E')} - "
@@ -174,8 +177,7 @@ def costruisci_statino(mese, nome_gruppo='Servizio Civile', autore='Sistema'):
             scarto = '' if senza_passaggi else _ore(differenza, segno=True)
             nota = 'Giornata non lavorativa' if non_lavorativo else ('Nessun passaggio' if senza_passaggi else '')
             rows.append([giorno_date.strftime('%d/%m/%Y'), GIORNI[giorno_date.weekday()], passaggi, ore_testo, scarto, ''])
-        giorni_lavorativi = sum(not _non_lavorativo(primo.replace(day=g)) for g in range(1, ultimo.day + 1))
-        atteso = ORE_GIORNALIERE * giorni_lavorativi
+        atteso = ORE_GIORNALIERE * giornate_conteggiate
         scarto_totale = totale - atteso
         rows.append(['', 'TOTALE', '', _ore(totale), _ore(scarto_totale, segno=True), ''])
         table_data = [[p(x, 'StatinoHeader') for x in ['Data','Giorno','Passaggi','Ore lavorate','Scarto','Note']]] + [[p(x) for x in row] for row in rows]
