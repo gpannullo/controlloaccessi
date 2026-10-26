@@ -42,6 +42,16 @@ def _non_lavorativo(giorno):
     return _festivo(giorno) or giorno.weekday() == 5 or _festivo(giorno + timedelta(days=1))
 
 
+def _ore(delta, segno=False):
+    secondi = int(abs(delta.total_seconds()))
+    testo = f'{secondi // 3600:02d}:{(secondi % 3600) // 60:02d}'
+    if segno and delta.total_seconds() > 0:
+        return '+' + testo
+    if segno and delta.total_seconds() < 0:
+        return '-' + testo
+    return testo
+
+
 def _normalizza(orario, verso):
     """Applica la tolleranza prevista dal servizio civile."""
     if verso == 'I' and orario <= time(8, 33):
@@ -122,13 +132,14 @@ def costruisci_statino(mese, nome_gruppo='Servizio Civile', autore='Sistema'):
                 differenza, esito = timedelta(0), 'Non lavorativo'
             else:
                 esito = 'Credito' if differenza > timedelta(0) else ('Deficit' if differenza < timedelta(0) else 'Regolare')
-            rows.append([giorno_date.strftime('%d/%m/%Y'), GIORNI[giorno_date.weekday()], entrate, uscite, str(durata)[:7], '-' if _non_lavorativo(giorno_date) and not coppie else str(abs(differenza))[:7], esito])
+            scarto = '-' if _non_lavorativo(giorno_date) and not coppie else _ore(differenza, segno=True)
+            rows.append([giorno_date.strftime('%d/%m/%Y'), GIORNI[giorno_date.weekday()], entrate, uscite, _ore(durata), scarto])
         giorni_lavorativi = sum(not _non_lavorativo(primo.replace(day=g)) for g in range(1, ultimo.day + 1))
         atteso = ORE_GIORNALIERE * giorni_lavorativi
         scarto_totale = totale - atteso
-        rows.append(['', 'TOTALE', '', '', str(totale)[:7], str(abs(scarto_totale))[:7], 'Credito' if scarto_totale > timedelta(0) else ('Deficit' if scarto_totale < timedelta(0) else 'Regolare')])
-        table_data = [[p(x, 'StatinoHeader') for x in ['Data','Giorno','Entrate','Uscite','Ore lavorate','Scarto','Esito']]] + [[p(x) for x in row] for row in rows]
-        table = Table(table_data, colWidths=[23*mm, 23*mm, 28*mm, 28*mm, 25*mm, 23*mm, 25*mm], repeatRows=1)
+        rows.append(['', 'TOTALE', '', '', _ore(totale), _ore(scarto_totale, segno=True)])
+        table_data = [[p(x, 'StatinoHeader') for x in ['Data','Giorno','Entrate','Uscite','Ore lavorate','Scarto']]] + [[p(x) for x in row] for row in rows]
+        table = Table(table_data, colWidths=[27*mm, 27*mm, 31*mm, 31*mm, 29*mm, 29*mm], repeatRows=1)
         table.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor('#173b59')),('TEXTCOLOR',(0,0),(-1,0),colors.white),('GRID',(0,0),(-1,-1),.25,colors.HexColor('#ccd5dc')),('VALIGN',(0,0),(-1,-1),'MIDDLE'),('FONTSIZE',(0,0),(-1,-1),7),('BACKGROUND',(0,-1),(-1,-1),colors.HexColor('#e9f1f7'))]))
         story.append(table)
     if not utenti: story.append(p('Nessun utente attivo appartiene al gruppo indicato.'))
