@@ -1,7 +1,7 @@
 from datetime import datetime
 from types import SimpleNamespace
 from django.test import SimpleTestCase
-from accounts.services.statino_servizio_civile import _normalizza, _coppie
+from accounts.services.statino_servizio_civile import _normalizza, _coppie, _non_lavorativo
 
 
 class StatinoServizioCivileTests(SimpleTestCase):
@@ -14,3 +14,7 @@ class StatinoServizioCivileTests(SimpleTestCase):
         rows = [SimpleNamespace(verso='I', registrata_il=base.replace(hour=8, minute=32)), SimpleNamespace(verso='U', registrata_il=base.replace(hour=13, minute=33))]
         result = _coppie(rows)
         self.assertEqual(result[0][2].total_seconds(), 5 * 3600)
+
+    def test_prefestivo_e_festivo(self):
+        self.assertTrue(_non_lavorativo(datetime(2026, 10, 3).date()))  # sabato
+        self.assertTrue(_non_lavorativo(datetime(2026, 12, 25).date()))

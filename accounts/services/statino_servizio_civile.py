@@ -17,6 +17,29 @@ from presenze_qr.models import Timbratura
 
 User = get_user_model()
 ORE_GIORNALIERE = timedelta(hours=5)
+GIORNI = ('lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica')
+MESI = ('gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre')
+
+
+def _pasqua(anno):
+    """Data della domenica di Pasqua (algoritmo gregoriano)."""
+    a = anno % 19; b = anno // 100; c = anno % 100; d = b // 4; e = b % 4
+    f = (b + 8) // 25; g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30; i = c // 4; k = c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7; m = (a + 11 * h + 22 * l) // 451
+    mese = (h + l - 7 * m + 114) // 31; giorno = ((h + l - 7 * m + 114) % 31) + 1
+    return date(anno, mese, giorno)
+
+
+def _festivo(giorno):
+    """Festività nazionali italiane e patrono locale di Aversa (20 gennaio)."""
+    fissi = {(1, 1), (1, 6), (4, 25), (5, 1), (6, 2), (8, 15), (11, 1), (12, 8), (12, 25), (12, 26), (1, 20)}
+    return giorno.weekday() >= 6 or (giorno.month, giorno.day) in fissi or giorno in (_pasqua(giorno.year), _pasqua(giorno.year) + timedelta(days=1))
+
+
+def _non_lavorativo(giorno):
+    """Comprende festivi e prefestivi (sabato o giorno precedente a una festa)."""
+    return _festivo(giorno) or giorno.weekday() == 5 or _festivo(giorno + timedelta(days=1))
 
 
 def _normalizza(orario, verso):
@@ -78,7 +101,7 @@ def costruisci_statino(mese, nome_gruppo='Servizio Civile', autore='Sistema'):
         canvas.setFont('Helvetica', 7); canvas.setFillColor(colors.grey); canvas.drawRightString(192*mm, 12*mm, f'Pagina {doc.page}')
         canvas.restoreState()
     doc = SimpleDocTemplate(output, pagesize=(210*mm, 297*mm), leftMargin=15*mm, rightMargin=15*mm, topMargin=42*mm, bottomMargin=18*mm, title=f'Statino {primo:%m/%Y}', author=autore)
-    story = [p(f'Statino presenze - {primo:%B %Y}', 'StatinoTitle'), p(f'Gruppo: {nome_gruppo} - Ore teoriche giornaliere: 05:00 - Generato da: {autore}'), Spacer(1, 4*mm)]
+    story = [p(f'Statino presenze - {MESI[primo.month - 1]} {primo.year}', 'StatinoTitle'), p(f'Gruppo: {nome_gruppo} - Ore teoriche giornaliere: 05:00 - Generato da: {autore}'), Spacer(1, 4*mm)]
     for index, utente in enumerate(utenti):
         if index: story.append(PageBreak())
         uffici = ', '.join(a.ufficio.nome for a in utente.assegnazioni_ufficio.filter(attiva=True).select_related('ufficio')) or 'Nessun ufficio'
@@ -94,9 +117,15 @@ def costruisci_statino(mese, nome_gruppo='Servizio Civile', autore='Sistema'):
             entrate = ' / '.join(x[0].strftime('%H:%M') for x in coppie) or '-'
             uscite = ' / '.join(x[1].strftime('%H:%M') for x in coppie) or '-'
             differenza = durata - ORE_GIORNALIERE
-            esito = 'Credito' if differenza > timedelta(0) else ('Deficit' if differenza < timedelta(0) else 'Regolare')
-            rows.append([giorno_date.strftime('%d/%m/%Y'), giorno_date.strftime('%A'), entrate, uscite, str(durata)[:7], str(abs(differenza))[:7], esito])
-        rows.append(['', 'TOTALE', '', '', str(totale)[:7], str(abs(totale - ORE_GIORNALIERE * ultimo.day))[:7], 'Credito' if totale > ORE_GIORNALIERE * ultimo.day else 'Deficit'])
+            if _non_lavorativo(giorno_date) and not coppie:
+                differenza, esito = timedelta(0), 'Non lavorativo'
+            else:
+                esito = 'Credito' if differenza > timedelta(0) else ('Deficit' if differenza < timedelta(0) else 'Regolare')
+            rows.append([giorno_date.strftime('%d/%m/%Y'), GIORNI[giorno_date.weekday()], entrate, uscite, str(durata)[:7], '-' if _non_lavorativo(giorno_date) and not coppie else str(abs(differenza))[:7], esito])
+        giorni_lavorativi = sum(not _non_lavorativo(primo.replace(day=g)) for g in range(1, ultimo.day + 1))
+        atteso = ORE_GIORNALIERE * giorni_lavorativi
+        scarto_totale = totale - atteso
+        rows.append(['', 'TOTALE', '', '', str(totale)[:7], str(abs(scarto_totale))[:7], 'Credito' if scarto_totale > timedelta(0) else ('Deficit' if scarto_totale < timedelta(0) else 'Regolare')])
         table = Table([[p(x) for x in row] for row in [['Data','Giorno','Entrate','Uscite','Ore lavorate','Scarto','Esito']] + rows], colWidths=[23*mm, 23*mm, 28*mm, 28*mm, 25*mm, 23*mm, 25*mm], repeatRows=1)
         table.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor('#173b59')),('TEXTCOLOR',(0,0),(-1,0),colors.white),('GRID',(0,0),(-1,-1),.25,colors.HexColor('#ccd5dc')),('VALIGN',(0,0),(-1,-1),'MIDDLE'),('FONTSIZE',(0,0),(-1,-1),7),('BACKGROUND',(0,-1),(-1,-1),colors.HexColor('#e9f1f7'))]))
         story.append(table)
