@@ -161,14 +161,17 @@ def costruisci_statino(mese, nome_gruppo='Servizio Civile', autore='Sistema'):
                 differenza, esito = timedelta(0), 'Non lavorativo'
             else:
                 esito = 'Credito' if differenza > timedelta(0) else ('Deficit' if differenza < timedelta(0) else 'Regolare')
-            scarto = '-' if non_lavorativo else _ore(differenza, segno=True)
-            rows.append([giorno_date.strftime('%d/%m/%Y'), GIORNI[giorno_date.weekday()], passaggi, _ore(durata), scarto])
+            senza_passaggi = non_lavorativo or not coppie
+            ore_testo = '' if senza_passaggi else _ore(durata)
+            scarto = '' if senza_passaggi else _ore(differenza, segno=True)
+            nota = 'Giornata non lavorativa' if non_lavorativo else ('Nessun passaggio' if senza_passaggi else '')
+            rows.append([giorno_date.strftime('%d/%m/%Y'), GIORNI[giorno_date.weekday()], passaggi, ore_testo, scarto, nota])
         giorni_lavorativi = sum(not _non_lavorativo(primo.replace(day=g)) for g in range(1, ultimo.day + 1))
         atteso = ORE_GIORNALIERE * giorni_lavorativi
         scarto_totale = totale - atteso
-        rows.append(['', 'TOTALE', '', _ore(totale), _ore(scarto_totale, segno=True)])
-        table_data = [[p(x, 'StatinoHeader') for x in ['Data','Giorno','Passaggi','Ore lavorate','Scarto']]] + [[p(x) for x in row] for row in rows]
-        table = Table(table_data, colWidths=[27*mm, 27*mm, 67*mm, 32*mm, 27*mm], repeatRows=1)
+        rows.append(['', 'TOTALE', '', _ore(totale), _ore(scarto_totale, segno=True), 'Totale mese'])
+        table_data = [[p(x, 'StatinoHeader') for x in ['Data','Giorno','Passaggi','Ore lavorate','Scarto','Note']]] + [[p(x) for x in row] for row in rows]
+        table = Table(table_data, colWidths=[24*mm, 24*mm, 54*mm, 28*mm, 24*mm, 30*mm], repeatRows=1)
         commands = [('BACKGROUND',(0,0),(-1,0),colors.HexColor('#173b59')),('TEXTCOLOR',(0,0),(-1,0),colors.white),('GRID',(0,0),(-1,-1),.25,colors.HexColor('#ccd5dc')),('VALIGN',(0,0),(-1,-1),'MIDDLE'),('FONTSIZE',(0,0),(-1,-1),7),('BACKGROUND',(0,-1),(-1,-1),colors.HexColor('#e9f1f7'))]
         for row_index in range(1, len(rows) + 1):
             giorno_val = rows[row_index - 1][0]
