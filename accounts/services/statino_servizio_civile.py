@@ -1,6 +1,7 @@
 """Generazione degli statini mensili del personale."""
 from calendar import monthrange
 from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 from io import BytesIO
 from pathlib import Path
 
@@ -19,6 +20,11 @@ User = get_user_model()
 ORE_GIORNALIERE = timedelta(hours=5)
 GIORNI = ('lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica')
 MESI = ('gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre')
+ROME = ZoneInfo('Europe/Rome')
+
+
+def _locale(dt):
+    return timezone.localtime(timezone.make_aware(dt, ROME) if timezone.is_naive(dt) else dt)
 
 
 def _pasqua(anno):
@@ -72,14 +78,14 @@ def _coppie(timbrature):
     aperta = None
     risultato = []
     for t in sorted(timbrature, key=lambda x: x.registrata_il):
-        t_time = timezone.localtime(t.registrata_il)
+        t_time = _locale(t.registrata_il)
         if t.verso == 'I':
             if aperta is None:
                 aperta = t
         elif t.verso == 'U' and aperta is not None:
-            ingresso = _normalizza(timezone.localtime(aperta.registrata_il).time(), 'I')
+            ingresso = _normalizza(_locale(aperta.registrata_il).time(), 'I')
             uscita = _normalizza(t_time.time(), 'U')
-            start = datetime.combine(timezone.localtime(aperta.registrata_il).date(), ingresso)
+            start = datetime.combine(_locale(aperta.registrata_il).date(), ingresso)
             end = datetime.combine(t_time.date(), uscita)
             risultato.append((start, end, max(timedelta(0), end - start)))
             aperta = None
@@ -91,11 +97,11 @@ def _coppie_con_orari(timbrature):
     aperta = None
     risultato = []
     for t in sorted(timbrature, key=lambda x: x.registrata_il):
-        t_time = timezone.localtime(t.registrata_il)
+        t_time = _locale(t.registrata_il)
         if t.verso == 'I' and aperta is None:
             aperta = t
         elif t.verso == 'U' and aperta is not None:
-            ingresso_reale = timezone.localtime(aperta.registrata_il)
+            ingresso_reale = _locale(aperta.registrata_il)
             uscita_reale = t_time
             ingresso = ingresso_reale.replace(hour=_normalizza(ingresso_reale.time(), 'I').hour, minute=_normalizza(ingresso_reale.time(), 'I').minute, second=0, microsecond=0)
             uscita = uscita_reale.replace(hour=_normalizza(uscita_reale.time(), 'U').hour, minute=_normalizza(uscita_reale.time(), 'U').minute, second=0, microsecond=0)
