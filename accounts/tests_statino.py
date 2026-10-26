@@ -1,7 +1,7 @@
 from datetime import datetime
 from types import SimpleNamespace
 from django.test import SimpleTestCase
-from accounts.services.statino_servizio_civile import _normalizza, _coppie, _non_lavorativo
+from accounts.services.statino_servizio_civile import _normalizza, _coppie, _non_lavorativo, _orario_report
 
 
 class StatinoServizioCivileTests(SimpleTestCase):
@@ -18,3 +18,7 @@ class StatinoServizioCivileTests(SimpleTestCase):
     def test_prefestivo_e_festivo(self):
         self.assertTrue(_non_lavorativo(datetime(2026, 10, 3).date()))  # sabato
         self.assertTrue(_non_lavorativo(datetime(2026, 12, 25).date()))
+
+    def test_orario_esatto_non_evidenziato(self):
+        preciso = datetime(2026, 10, 1, 8, 30)
+        self.assertEqual(_orario_report(preciso, preciso, 'E'), 'E08:30')

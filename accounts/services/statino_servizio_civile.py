@@ -52,6 +52,13 @@ def _ore(delta, segno=False):
     return testo
 
 
+def _orario_report(reale, calcolato, prefisso):
+    """Mostra l'orario effettivo e marca solo gli arrotondamenti visibili."""
+    testo = reale.strftime('%H:%M')
+    arrotondato = reale.strftime('%H:%M') != calcolato.strftime('%H:%M')
+    return f'{prefisso}{testo}{"*" if arrotondato else ""}'
+
+
 def _normalizza(orario, verso):
     """Applica la tolleranza prevista dal servizio civile."""
     if verso == 'I' and orario <= time(8, 33):
@@ -144,8 +151,8 @@ def costruisci_statino(mese, nome_gruppo='Servizio Civile', autore='Sistema'):
             durata = sum((x[2] for x in coppie), timedelta())
             totale += durata
             passaggi = ' | '.join(
-                f"E{x[0]:%H:%M}{'*' if x[0].strftime('%H:%M') != dettagli[i][0].strftime('%H:%M') else ''} - "
-                f"U{x[1]:%H:%M}{'*' if x[1].strftime('%H:%M') != dettagli[i][1].strftime('%H:%M') else ''}"
+                f"{_orario_report(dettagli[i][0], x[0], 'E')} - "
+                f"{_orario_report(dettagli[i][1], x[1], 'U')}"
                 for i, x in enumerate(coppie)
             ) or '-'
             differenza = durata - ORE_GIORNALIERE
