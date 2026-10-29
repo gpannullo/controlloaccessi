@@ -1,4 +1,4 @@
-Django==5.2.15
+Django==6.1.2
 gunicorn
 ldap3
 paramiko>=3.5,<4
