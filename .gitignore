@@ -33,3 +33,4 @@ media/
 Thumbs.db
 /ControlloAccessi/settings_develop.py
 /wordpress_plugin/aversa-appointments-connector-config.php
+/templates/temp/
