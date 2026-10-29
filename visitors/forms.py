@@ -4,7 +4,7 @@ from datetime import timedelta
 
 from access_control.models import IndisponibilitaUfficio, Ufficio
 from access_control.services.office_service import OfficeService
-from visitors.models import AccessoVisitatore
+from visitors.models import AccessoVisitatore, Badge
 
 
 class IndisponibilitaUfficioForm(forms.ModelForm):
@@ -286,6 +286,16 @@ class RientroBadgeForm(forms.Form):
 
     def clean_badge(self):
         return self.cleaned_data["badge"].strip().upper()
+
+
+class RettificaBadgeForm(forms.Form):
+    badge = forms.ModelChoiceField(queryset=Badge.objects.none(), label="Nuovo badge")
+
+    def __init__(self, *args, accesso=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        from visitors.services.badge_service import BadgeService
+        self.fields['badge'].queryset = BadgeService.disponibili().exclude(pk=getattr(accesso, 'badge_id', None))
+        self.fields['badge'].widget.attrs.update({'class': 'form-select'})
 
 
 class ChiusuraAccessoForm(forms.Form):

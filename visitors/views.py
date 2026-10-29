@@ -26,6 +26,7 @@ from visitors.forms import (
     RegistrazioneVisitatoreForm,
     ChiusuraAccessoForm,
     RientroBadgeForm,
+    RettificaBadgeForm,
 )
 from visitors.models import (
     Appuntamento,
@@ -43,6 +44,7 @@ from visitors.services.ticket_printer_service import (
 )
 from visitors.permissions import portineria_required
 from visitors.services.continuity_service import ContinuitaAccessoService
+from visitors.services.badge_service import BadgeService
 
 def _normalizza_testo(value):
     return " ".join(
@@ -482,6 +484,7 @@ def registrazione_completata(request, pk):
             "accesso": accesso,
             "ticket_stampato": ticket_stampato,
             "errore_stampa": errore_stampa,
+            "badge_disponibili": BadgeService.disponibili().exclude(pk=accesso.badge_id),
         },
     )
 
@@ -600,6 +603,29 @@ def ristampa_ticket(request, pk):
         "portineria:registrazione_completata",
         pk=accesso.pk,
     )
+
+
+@portineria_required
+@require_POST
+def rettifica_badge(request, pk):
+    with transaction.atomic():
+        accesso = get_object_or_404(AccessoVisitatore.objects.select_for_update(), pk=pk)
+        form = RettificaBadgeForm(request.POST, accesso=accesso)
+        if not form.is_valid():
+            messages.error(request, 'Selezionare un badge disponibile.')
+            return redirect('portineria:registrazione_completata', pk=pk)
+        nuovo = BadgeService.disponibili().select_for_update().filter(pk=form.cleaned_data['badge'].pk).first()
+        if nuovo is None:
+            messages.error(request, 'Il badge selezionato non è più disponibile.')
+            return redirect('portineria:registrazione_completata', pk=pk)
+        vecchio = accesso.badge.codice if accesso.badge else 'nessuno'
+        accesso.badge = nuovo
+        accesso.save(update_fields=['badge'])
+        from visitors.models import EventoAccesso
+        EventoAccesso.objects.create(accesso=accesso, tipo=EventoAccesso.Tipo.NOTA, operatore=request.user,
+            descrizione=f'Rettifica badge: {vecchio} → {nuovo.codice}', dati={'badge_precedente': vecchio, 'badge_nuovo': nuovo.codice})
+    messages.success(request, f'Badge rettificato. Nuovo badge: {nuovo.codice}.')
+    return redirect('portineria:registrazione_completata', pk=pk)
 
 def _get_client_ip(request):
     forwarded_for = request.META.get(

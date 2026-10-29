@@ -11,6 +11,7 @@ from visitors.views import (
     registrazione_completata,
     rientro_badge,
     ristampa_ticket,
+    rettifica_badge,
     amministratori,
     registra_transito_amministratore,
 )
@@ -28,6 +29,7 @@ urlpatterns = [
     path("cerca-visitatore/", cerca_visitatore, name="cerca_visitatore"),
     path("accessi/<int:pk>/chiudi/", chiudi_accesso, name="chiudi_accesso"),
     path("accessi/<int:pk>/ristampa-ticket/", ristampa_ticket, name="ristampa_ticket"),
+    path("accessi/<int:pk>/rettifica-badge/", rettifica_badge, name="rettifica_badge"),
     path("rientro-badge/", rientro_badge, name="rientro_badge"),
     path("rientro-badge/<int:badge_id>/libera/", libera_badge_rientro, name="libera_badge_rientro"),
     path("amministratori/", amministratori, name="amministratori"),
