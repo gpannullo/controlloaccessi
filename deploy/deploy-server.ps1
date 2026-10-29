@@ -4,7 +4,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
-$branch = 'develop/v0.4'
+$branch = 'develop/v0.5'
 $servers = @('192.168.15.26', '192.168.15.24')
 function Git-Checked([string[]]$Arguments) {
     $result = & git -C $repo @Arguments
