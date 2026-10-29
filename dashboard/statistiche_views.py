@@ -1,11 +1,11 @@
 from collections import defaultdict
 from datetime import timedelta
 
-from django.contrib.auth.decorators import user_passes_test
 from django.db.models import Avg
 from django.shortcuts import render
 from django.utils import timezone
 
+from common.module_access import DirigenzaAccessMixin, module_required
 from access_control.models import CalendarioApertura, Ufficio
 from accounts.models import SnapshotPresenzaUfficio
 from visitors.models import AccessoVisitatore
@@ -29,15 +29,7 @@ GIORNI = [
 
 
 def _puo_vedere_statistiche(user):
-    if not user.is_authenticated:
-        return False
-
-    if user.is_superuser:
-        return True
-
-    return user.groups.filter(
-        name__in=GRUPPI_STATISTICHE,
-    ).exists()
+    return DirigenzaAccessMixin.has_module_access(user)
 
 
 def _media_minuti(durate):
@@ -359,7 +351,7 @@ def _capacita_media_settimanale(
     return risultato
 
 
-@user_passes_test(_puo_vedere_statistiche)
+@module_required(DirigenzaAccessMixin)
 def statistiche_uffici(request):
     """
     Dashboard diagnostica per dirigenti/EQ.

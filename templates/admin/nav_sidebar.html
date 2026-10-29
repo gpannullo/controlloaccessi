@@ -1,0 +1,67 @@
+{% load i18n %}
+<style>
+  #nav-sidebar .app-menu-toggle {
+    float: right;
+    min-width: 2rem;
+    margin: .25rem .4rem 0 0;
+    border: 0;
+    border-radius: .2rem;
+    background: transparent;
+    color: var(--link-fg);
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+
+  #nav-sidebar .app-menu-toggle:hover,
+  #nav-sidebar .app-menu-toggle:focus {
+    background: var(--darkened-bg);
+  }
+
+  #nav-sidebar .menu-collapsed tbody,
+  #nav-sidebar .menu-collapsed thead {
+    display: none;
+  }
+
+  #nav-sidebar .menu-collapsed caption {
+    border-bottom: 0;
+  }
+</style>
+
+<button class="sticky toggle-nav-sidebar" id="toggle-nav-sidebar" aria-label="{% translate 'Toggle navigation' %}"></button>
+<nav class="sticky" id="nav-sidebar" aria-label="{% translate 'Sidebar' %}">
+  <input type="search" id="nav-filter"
+         placeholder="{% translate 'Start typing to filter…' %}"
+         aria-label="{% translate 'Filter navigation items' %}">
+  {% include 'admin/app_list.html' with app_list=available_apps show_changelinks=False %}
+</nav>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('#nav-sidebar .module').forEach(function(module, index) {
+      const caption = module.querySelector('caption');
+      if (!caption) return;
+
+      const key = 'controlloaccessi.admin.menu.' + index;
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'app-menu-toggle';
+      toggle.setAttribute('aria-label', 'Apri o chiudi sezione');
+      caption.appendChild(toggle);
+
+      function setCollapsed(collapsed) {
+        module.classList.toggle('menu-collapsed', collapsed);
+        toggle.textContent = collapsed ? '▸' : '▾';
+        toggle.setAttribute('aria-expanded', String(!collapsed));
+        localStorage.setItem(key, String(collapsed));
+      }
+
+      const isCurrent = module.classList.contains('current-app');
+      const saved = localStorage.getItem(key);
+      setCollapsed(isCurrent ? false : saved === 'true');
+      toggle.addEventListener('click', function() {
+        setCollapsed(!module.classList.contains('menu-collapsed'));
+      });
+    });
+  });
+</script>

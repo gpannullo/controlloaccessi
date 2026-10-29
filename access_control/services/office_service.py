@@ -5,6 +5,7 @@ from django.utils import timezone
 from access_control.models import (
     CalendarioApertura,
     GruppoOrganizzativo,
+    IndisponibilitaUfficio,
     Ufficio,
 )
 
@@ -23,7 +24,7 @@ class OfficeService:
             ):
                 continue
 
-            if gruppo.ufficio:
+            if gruppo.uffici.exists():
                 continue
 
             codice = self.generate_code(
@@ -36,13 +37,12 @@ class OfficeService:
                     "nome": gruppo.nome,
                     "attivo": True,
                     "riceve_pubblico": True,
+                    "gruppo_operativo": gruppo,
                 },
             )
-
-            gruppo.ufficio = ufficio
-            gruppo.save(
-                update_fields=["ufficio"]
-            )
+            if not created and ufficio.gruppo_operativo_id is None:
+                ufficio.gruppo_operativo = gruppo
+                ufficio.save(update_fields=["gruppo_operativo"])
 
             if created:
                 creati += 1
@@ -90,6 +90,14 @@ class OfficeService:
         data_ora = cls._local_datetime(
             data_ora
         )
+
+        if IndisponibilitaUfficio.objects.filter(
+            ufficio=ufficio,
+            attiva=True,
+            data_inizio__lte=data_ora.date(),
+            data_fine__gte=data_ora.date(),
+        ).exists():
+            return False
 
         return CalendarioApertura.objects.filter(
             ufficio=ufficio,
@@ -146,7 +154,13 @@ class OfficeService:
             data_ora
         )
 
-        return (
+        indisponibili_oggi = IndisponibilitaUfficio.objects.filter(
+            attiva=True,
+            data_inizio__lte=data_ora.date(),
+            data_fine__gte=data_ora.date(),
+        ).values("ufficio_id")
+
+        uffici = (
             Ufficio.objects
             .filter(
                 attivo=True,
@@ -161,9 +175,12 @@ class OfficeService:
                     data_ora.time()
                 ),
             )
+            .exclude(pk__in=indisponibili_oggi)
             .distinct()
             .order_by("nome")
         )
+
+        return uffici
 
     @classmethod
     def get_offices_with_present_staff(cls):
@@ -180,15 +197,34 @@ class OfficeService:
             Ufficio.objects
             .filter(
                 attivo=True,
-                gruppi__attivo=True,
-                gruppi__django_group__user__is_active=True,
-                gruppi__django_group__user__stato_presenza=(
+                assegnazioni_personale__attiva=True,
+                assegnazioni_personale__utente__is_active=True,
+                assegnazioni_personale__utente__stato_presenza=(
                     User.StatoPresenza.PRESENTE
                 ),
             )
             .distinct()
             .order_by("nome")
         )
+
+    @classmethod
+    def get_offices_receiving_with_present_staff(cls):
+        """Uffici che ricevono oggi e hanno almeno un dipendente presente.
+
+        Per il ricevimento si considera il calendario della giornata e le
+        indisponibilità comunicate dal responsabile. Prima dell'apertura il
+        cittadino può essere comunque registrato e resta in hall; dopo la
+        chiusura dell'ultima fascia non compare più nell'elenco.
+        """
+
+        User = get_user_model()
+        return cls.get_offices_receiving_today().filter(
+            assegnazioni_personale__attiva=True,
+            assegnazioni_personale__utente__is_active=True,
+            assegnazioni_personale__utente__stato_presenza=(
+                User.StatoPresenza.PRESENTE
+            ),
+        ).distinct()
 
     @staticmethod
     def get_active_offices_for_day(giorno):

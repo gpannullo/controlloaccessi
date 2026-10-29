@@ -1,6 +1,8 @@
 from django.contrib.auth import get_user_model
 
 from .sync_result import SyncResult
+from .directory_identity import get_or_create_directory_user
+from django.db import transaction
 
 User = get_user_model()
 
@@ -15,9 +17,9 @@ class UserSyncService:
 
         for u in users:
 
-            user, created = User.objects.update_or_create(
-                username=u["username"],
-                defaults={
+            with transaction.atomic():
+                user, created = get_or_create_directory_user(u['username'])
+                defaults = {
                     "first_name": u.get("first_name", ""),
                     "last_name": u.get("last_name", ""),
                     "email": u.get("email", ""),
@@ -26,8 +28,11 @@ class UserSyncService:
                     "password_senza_scadenza": u.get("password_never_expires", False),
                     "email_personale": u.get("personal_email", ""),
                     "cellulare_personale": u.get("mobile", ""),
+                    "badge": u.get("badge") or None,
                 }
-            )
+                for field, value in defaults.items():
+                    setattr(user, field, value)
+                user.save(update_fields=list(defaults))
 
             if created:
                 user.set_unusable_password()

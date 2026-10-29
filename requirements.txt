@@ -1,6 +1,11 @@
-Django==5.2.15
+Django==6.1.2
 gunicorn
 ldap3
+paramiko>=3.5,<4
 psycopg[binary]
 python-escpos
 django-post_office==3.11.2
+Authlib==1.7.2
+reportlab>=4.4,<5
+requests>=2.32,<3
+defusedxml>=0.7,<1

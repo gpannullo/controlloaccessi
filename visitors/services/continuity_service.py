@@ -32,7 +32,7 @@ class ContinuitaAccessoService:
     ):
         accesso = (
             AccessoVisitatore.objects
-            .select_for_update()
+            .select_for_update(of=("self",))
             .select_related("visitatore", "badge", "ufficio_destinazione")
             .get(pk=accesso.pk)
         )

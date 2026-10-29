@@ -6,10 +6,12 @@ from visitors.views import (
     libera_badge_rientro,
     nuova_registrazione,
     nuovo_ricevimento,
+    appuntamenti_oggi,
     nuova_visita,
     registrazione_completata,
     rientro_badge,
     ristampa_ticket,
+    rettifica_badge,
     amministratori,
     registra_transito_amministratore,
 )
@@ -19,6 +21,7 @@ app_name = "portineria"
 
 
 urlpatterns = [
+    path("appuntamenti-oggi/", appuntamenti_oggi, name="appuntamenti_oggi"),
     path("nuovo-ricevimento/", nuovo_ricevimento, name="nuovo_ricevimento"),
     path("nuova-visita/", nuova_visita, name="nuova_visita"),
     path("nuova-registrazione/", nuova_registrazione, name="nuova_registrazione"),
@@ -26,6 +29,7 @@ urlpatterns = [
     path("cerca-visitatore/", cerca_visitatore, name="cerca_visitatore"),
     path("accessi/<int:pk>/chiudi/", chiudi_accesso, name="chiudi_accesso"),
     path("accessi/<int:pk>/ristampa-ticket/", ristampa_ticket, name="ristampa_ticket"),
+    path("accessi/<int:pk>/rettifica-badge/", rettifica_badge, name="rettifica_badge"),
     path("rientro-badge/", rientro_badge, name="rientro_badge"),
     path("rientro-badge/<int:badge_id>/libera/", libera_badge_rientro, name="libera_badge_rientro"),
     path("amministratori/", amministratori, name="amministratori"),

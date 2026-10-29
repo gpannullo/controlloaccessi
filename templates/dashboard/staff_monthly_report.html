@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Statini mensili del personale{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <div class="no-print d-flex flex-wrap justify-content-between gap-2 mb-3">
+    <h1 class="h3">Statini mensili del personale</h1>
+    <a class="btn btn-outline-danger" href="{% url 'dashboard:directory_staff' %}">Torna al personale</a>
+  </div>
+  <form method="get" class="no-print card card-body mb-4">
+    <div class="row g-3 align-items-end">
+      {% for field in form %}<div class="col-md-3"><label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>{{ field }}<div class="text-danger">{{ field.errors }}</div></div>{% endfor %}
+      <div class="col-md-3"><button class="btn btn-danger">Genera statini</button></div>
+    </div>
+  </form>
+  {% if generato %}
+    <div class="no-print mb-3"><p>{{ gruppo.name }} · {{ mese }} {{ anno }} · {{ statini|length }} persone</p>
+    {% if statini %}<button class="btn btn-outline-primary" onclick="window.print()">Stampa / Salva PDF</button>{% endif %}</div>
+    {% for statino in statini %}
+    <section class="statino card card-body mb-4">
+      <header class="d-flex align-items-center gap-3 mb-3"><img src="{% static 'images/stemma-comune-aversa.jpg' %}" alt="Stemma del Comune di Aversa" width="48"><div><h2 class="h5 mb-1">Comune di Aversa — Statino mensile</h2><strong>{{ mese }} {{ anno }}</strong> · {{ gruppo.name }}</div></header>
+      <h3 class="h5">{{ statino.utente.last_name }} {{ statino.utente.first_name }}</h3>
+      <p class="mb-1">Username: {{ statino.utente.username }} · Badge: {{ statino.utente.badge|default:'Non assegnato' }} · Account: {{ statino.utente.is_active|yesno:'attivo,non attivo' }}</p>
+      <p class="mb-1">E-mail: {{ statino.utente.email|default:'—' }}</p>
+      <p>Uffici: {% for ufficio in statino.uffici %}{{ ufficio }}{% if not forloop.last %}; {% endif %}{% empty %}Nessun ufficio associato{% endfor %}</p>
+      <table class="table table-bordered table-sm"><thead><tr><th>Data</th><th>Giorno</th><th>Ingressi / Uscite</th></tr></thead><tbody>
+      {% for giorno in statino.giorni %}<tr{% if giorno.festivo %} class="table-light"{% endif %}><td class="text-nowrap">{{ giorno.data|date:'d/m/Y' }}</td><td>{{ giorno.giorno }}</td><td>{% for p in giorno.passaggi %}<span class="passaggio">{{ p.verso }} {{ p.ora }} <small>({{ p.origine }})</small></span>{% if not forloop.last %} · {% endif %}{% empty %}<span class="text-muted">Nessuna timbratura</span>{% endfor %}</td></tr>{% endfor %}
+      </tbody></table>
+      <p class="small mb-0">Gruppo e uffici corrispondono alle associazioni attuali. Sono riportati i passaggi QR e automatici presenti nello storico; nessuna timbratura non equivale ad assenza. Lo storico non ricostruisce passaggi mai acquisiti.</p>
+    </section>
+    {% empty %}<p class="alert alert-info">Nessun utente appartiene al gruppo selezionato.</p>{% endfor %}
+  {% endif %}
+</div>
+<style>
+.passaggio { white-space:nowrap; }
+@media print {
+  @page { size:A4 portrait; margin:12mm; }
+  .no-print, nav, .navbar, footer { display:none!important; }
+  .container { max-width:none!important; padding:0!important; }
+  .statino { border:0!important; padding:0!important; break-after:page; page-break-after:always; font-size:10pt; }
+  .statino:last-child { break-after:auto; page-break-after:auto; }
+  .statino table { font-size:9pt; } .statino td, .statino th { padding:2px 4px!important; }
+  tr { break-inside:avoid; page-break-inside:avoid; } thead { display:table-header-group; }
+}
+</style>
+{% endblock %}

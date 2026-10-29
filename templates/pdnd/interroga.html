@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}{{ servizio.titolo }}{% endblock %}
+
+{% block content %}
+<div class="container py-5" style="max-width: 920px;">
+  <div class="d-flex justify-content-between align-items-center mb-4"><div><h1 class="h2 mb-1">{{ servizio.titolo }}</h1><p class="text-muted mb-0">{{ servizio.descrizione }}</p></div><a class="btn btn-outline-secondary" href="{% url 'pdnd:home' %}">Torna ai servizi</a></div>
+  {% if messages %}{% for message in messages %}<div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>{% endfor %}{% endif %}
+  <div class="card shadow-sm"><div class="card-body p-4"><form method="post">{% csrf_token %}{{ form.as_p }}<button class="btn btn-primary" type="submit">Interroga servizio</button></form></div></div>
+  {% if result %}<section class="mt-4"><h2 class="h4">Esito</h2><div class="alert alert-info">Risposta visualizzata solo in questa pagina e non salvata nel database.</div><pre class="bg-light border rounded p-3 text-wrap">{{ result }}</pre></section>{% endif %}
+</div>
+{% endblock %}

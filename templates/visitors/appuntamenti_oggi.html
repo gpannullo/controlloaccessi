@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Appuntamenti di oggi{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <h1 class="h3 mb-1">Appuntamenti di oggi</h1>
+            <p class="text-muted mb-0">
+                {{ numero_appuntamenti }} appuntamento{{ numero_appuntamenti|pluralize:"i" }} da registrare.
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'portineria:nuovo_ricevimento' %}" class="btn btn-primary">Nuovo ricevimento</a>
+            <a href="{% url 'dashboard:home' %}" class="btn btn-outline-secondary">Torna alla dashboard</a>
+        </div>
+    </div>
+
+    <form method="get" class="card shadow-sm mb-4">
+        <div class="card-body">
+            <label class="form-label" for="id_q">Cerca persona</label>
+            <div class="input-group">
+                <input id="id_q" name="q" value="{{ ricerca }}" class="form-control" placeholder="Nome, cognome o codice fiscale">
+                <button class="btn btn-outline-primary" type="submit">
+                    <i class="bi bi-search me-1"></i>Cerca
+                </button>
+                {% if ricerca %}
+                    <a class="btn btn-outline-secondary" href="{% url 'portineria:appuntamenti_oggi' %}">Azzera</a>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+
+    {% for gruppo in appuntamenti_per_ufficio %}
+        <section class="card shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h2 class="h5 mb-0">{{ gruppo.ufficio.nome }}</h2>
+                <span class="badge text-bg-primary">{{ gruppo.appuntamenti|length }}</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th scope="col">Ora</th>
+                            <th scope="col">Persona prenotata</th>
+                            <th scope="col">Telefono</th>
+                            <th scope="col">Motivo</th>
+                            <th scope="col" class="text-end">Operazione</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for appuntamento in gruppo.appuntamenti %}
+                            <tr>
+                                <td class="fw-semibold">{{ appuntamento.data_ora|date:"H:i" }}</td>
+                                <td>{{ appuntamento.cognome_cittadino }} {{ appuntamento.nome_cittadino }}</td>
+                                <td>{{ appuntamento.telefono|default:"—" }}</td>
+                                <td>{{ appuntamento.motivo|default:"—" }}</td>
+                                <td class="text-end">
+                                    <a href="{% url 'portineria:nuovo_ricevimento' %}?appuntamento={{ appuntamento.pk }}" class="btn btn-primary btn-sm">
+                                        Ricevimento
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    {% empty %}
+        <div class="alert alert-secondary mb-0">
+            Non risultano appuntamenti da registrare per oggi.
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}

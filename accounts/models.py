@@ -1,4 +1,5 @@
 from django.contrib.auth.models import AbstractUser
+from django.core.validators import RegexValidator
 from django.db import models
 
 from access_control.models import Ufficio
@@ -37,6 +38,21 @@ class CustomUser(AbstractUser):
     password_senza_scadenza = models.BooleanField(default=False, editable=False)
     email_personale = models.EmailField(blank=True, editable=False)
     cellulare_personale = models.CharField(max_length=50, blank=True, editable=False)
+    badge = models.CharField(
+        max_length=10,
+        unique=True,
+        null=True,
+        blank=True,
+        verbose_name="Badge presenze",
+        help_text="Codice riportato nel file delle timbrature.",
+        validators=[RegexValidator(r"^\d{10}$", "Il badge deve essere composto da 10 cifre.")],
+    )
+
+    codice_protocollo = models.CharField(
+        max_length=50, unique=True, null=True, blank=True,
+        verbose_name="Codice protocollo",
+        help_text="Codice della persona nel gestionale di protocollo.",
+    )
 
     livello_sicurezza = models.PositiveSmallIntegerField(
         default=1,
@@ -63,6 +79,25 @@ class CustomUser(AbstractUser):
         blank=True,
         editable=False,
         verbose_name="Fonte della presenza",
+    )
+
+    ultima_timbratura_il = models.DateTimeField(
+        null=True,
+        blank=True,
+        editable=False,
+        verbose_name="Ultima timbratura letta",
+    )
+    ultima_timbratura_verso = models.CharField(
+        max_length=1,
+        blank=True,
+        editable=False,
+        verbose_name="Verso ultima timbratura",
+    )
+    ultima_timbratura_causale = models.CharField(
+        max_length=4,
+        blank=True,
+        editable=False,
+        verbose_name="Causale ultima timbratura",
     )
 
     class Meta:

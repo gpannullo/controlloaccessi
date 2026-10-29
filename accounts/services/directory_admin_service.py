@@ -3,6 +3,7 @@ from django.conf import settings
 from django.utils import timezone
 from ldap3 import MODIFY_ADD, MODIFY_DELETE, MODIFY_REPLACE
 from ldap3.utils.conv import escape_filter_chars
+from ldap3.utils.dn import escape_rdn
 
 from .active_directory_service import ActiveDirectoryService
 
@@ -23,10 +24,25 @@ class DirectoryAdminService(ActiveDirectoryService):
     def _user(self, username):
         conn = self._connection()
         safe = escape_filter_chars(username.strip())
-        if not conn.search(self.base_dn, "(&(objectCategory=person)(objectClass=user)(sAMAccountName=%s))" % safe, attributes=self.USER_ATTRIBUTES, size_limit=1) or not conn.entries:
-            conn.unbind()
-            raise DirectoryAdminException("Utente AD non trovato.")
-        return conn, conn.entries[0]
+        user_filter = "(&(objectCategory=person)(objectClass=user)(sAMAccountName=%s))" % safe
+        search_bases = [settings.DIRECTORY["USER_SEARCH_BASE"]]
+        base_dn = settings.DIRECTORY["BASE_DN"]
+        if base_dn.casefold() != search_bases[0].casefold():
+            # Alcuni domini usano CN=Users oppure OU differenti: la base
+            # configurata è un'ottimizzazione, non deve impedire le operazioni.
+            search_bases.append(base_dn)
+
+        for search_base in search_bases:
+            if conn.search(
+                search_base,
+                user_filter,
+                attributes=self.USER_ATTRIBUTES,
+                size_limit=1,
+            ) and conn.entries:
+                return conn, conn.entries[0]
+
+        conn.unbind()
+        raise DirectoryAdminException("Utente AD non trovato.")
 
     @staticmethod
     def _ok(conn, operation):
@@ -51,6 +67,7 @@ class DirectoryAdminService(ActiveDirectoryService):
                 "email": str(entry.mail or ""),
                 "personal_email": other_mailbox.values[0] if other_mailbox and other_mailbox.values else "",
                 "mobile": str(entry.mobile or ""),
+                "badge": str(entry.employeeID.value or "") if getattr(entry, "employeeID", None) else "",
                 "active": not bool(uac & 2),
                 "password_expiry": scadenza_password,
                 "password_never_expires": bool(uac & 0x10000),
@@ -79,6 +96,36 @@ class DirectoryAdminService(ActiveDirectoryService):
                     ]
             conn.modify(entry.entry_dn, changes)
             self._ok(conn, "Aggiornamento anagrafica")
+        finally:
+            conn.unbind()
+
+    def imposta_badge(self, username, badge):
+        """Allinea il badge locale con l'attributo standard AD employeeID."""
+        self._require_writes()
+        conn, entry = self._user(username)
+        try:
+            valore = (badge or "").strip()
+            attributo_badge = getattr(entry, "employeeID", None)
+            valore_corrente = (
+                str(attributo_badge.value or "").strip()
+                if attributo_badge is not None
+                else ""
+            )
+
+            # LDAP risponde con NO_ATTRIBUTE_OR_VAL quando viene tentata la
+            # cancellazione di employeeID che non è mai stato impostato.
+            # Il badge è facoltativo: nessuna scrittura è necessaria se il
+            # valore richiesto coincide già con quello presente in AD.
+            if valore == valore_corrente:
+                return
+
+            modifica = (
+                [(MODIFY_REPLACE, [valore])]
+                if valore
+                else [(MODIFY_DELETE, [])]
+            )
+            conn.modify(entry.entry_dn, {"employeeID": modifica})
+            self._ok(conn, "Aggiornamento badge")
         finally:
             conn.unbind()
 
@@ -156,7 +203,7 @@ class DirectoryAdminService(ActiveDirectoryService):
             current = set(entry.memberOf.values if hasattr(entry, "memberOf") else []); target = set()
             for nome in nomi:
                 safe = escape_filter_chars(nome)
-                if not conn.search(self.base_dn, "(&(objectClass=group)(cn=%s))" % safe, attributes=[], size_limit=1) or not conn.entries: raise DirectoryAdminException("Gruppo AD non trovato: %s." % nome)
+                if not conn.search(settings.DIRECTORY["GROUP_SEARCH_BASE"], "(&(objectClass=group)(cn=%s))" % safe, attributes=[], size_limit=1) or not conn.entries: raise DirectoryAdminException("Gruppo AD non trovato: %s." % nome)
                 target.add(conn.entries[0].entry_dn)
             for dn in current - target: conn.modify(dn, {"member": [(MODIFY_DELETE, [entry.entry_dn])]}); self._ok(conn, "Rimozione gruppo")
             for dn in target - current: conn.modify(dn, {"member": [(MODIFY_ADD, [entry.entry_dn])]}); self._ok(conn, "Aggiunta gruppo")
@@ -170,7 +217,7 @@ class DirectoryAdminService(ActiveDirectoryService):
         try:
             safe = escape_filter_chars(nome_gruppo.strip())
             if not conn.search(
-                self.base_dn,
+                settings.DIRECTORY["GROUP_SEARCH_BASE"],
                 "(&(objectClass=group)(cn=%s))" % safe,
                 attributes=[],
                 size_limit=1,
@@ -181,6 +228,24 @@ class DirectoryAdminService(ActiveDirectoryService):
         finally:
             conn.unbind()
 
+    def _ensure_group_member(self, conn, group_dn, user_dn):
+        """Check direct membership on AD, not the potentially stale Django mirror."""
+        conn.compare(group_dn, 'member', user_dn)
+        if conn.result.get('result') == 6:  # compareTrue
+            return
+        if conn.result.get('result') != 5:  # compareFalse
+            raise DirectoryAdminException('Verifica appartenenza AD non riuscita: %s' % (
+                conn.result.get('message') or conn.result.get('description')))
+        conn.modify(group_dn, {'member': [(MODIFY_ADD, [user_dn])]})
+        if conn.result.get('result') in (20, 68):
+            # A concurrent writer may have added it after the compare.
+            # Accept a duplicate response only after verifying membership.
+            conn.compare(group_dn, 'member', user_dn)
+            if conn.result.get('result') == 6:
+                return
+            raise DirectoryAdminException('Impossibile confermare l’appartenenza al gruppo AD dopo l’aggiunta.')
+        self._ok(conn, 'Aggiunta gruppo AD')
+
     def aggiungi_utente_al_gruppo(self, username, nome_gruppo):
         """Aggiunge l'utente a un singolo gruppo AD, senza toccare le altre appartenenze."""
         self._require_writes()
@@ -188,14 +253,13 @@ class DirectoryAdminService(ActiveDirectoryService):
         try:
             safe = escape_filter_chars(nome_gruppo.strip())
             if not conn.search(
-                self.base_dn,
+                settings.DIRECTORY["GROUP_SEARCH_BASE"],
                 "(&(objectClass=group)(cn=%s))" % safe,
                 attributes=[],
                 size_limit=1,
             ) or not conn.entries:
                 raise DirectoryAdminException("Gruppo AD non trovato: %s." % nome_gruppo)
-            conn.modify(conn.entries[0].entry_dn, {"member": [(MODIFY_ADD, [entry.entry_dn])]})
-            self._ok(conn, "Aggiunta gruppo AD")
+            self._ensure_group_member(conn, conn.entries[0].entry_dn, entry.entry_dn)
         finally:
             conn.unbind()
 
@@ -222,7 +286,7 @@ class DirectoryAdminService(ActiveDirectoryService):
                 self._ok(conn, "Rimozione mail istituzionale")
                 nome_gruppo, modifica = "MDAEMON", MODIFY_DELETE
             safe = escape_filter_chars(nome_gruppo)
-            if not conn.search(self.base_dn, "(&(objectClass=group)(cn=%s))" % safe, attributes=[], size_limit=1) or not conn.entries:
+            if not conn.search(settings.DIRECTORY["GROUP_SEARCH_BASE"], "(&(objectClass=group)(cn=%s))" % safe, attributes=[], size_limit=1) or not conn.entries:
                 raise DirectoryAdminException("Gruppo AD non trovato: MDAEMON.")
             gruppo_dn = conn.entries[0].entry_dn
             appartiene = gruppo_dn in set(entry.memberOf.values if hasattr(entry, "memberOf") else [])
@@ -240,7 +304,7 @@ class DirectoryAdminService(ActiveDirectoryService):
         aggiornati, saltati, errori = [], 0, []
         try:
             conn.search(
-                self.base_dn,
+                settings.DIRECTORY["USER_SEARCH_BASE"],
                 "(&(objectCategory=person)(objectClass=user))",
                 attributes=["sAMAccountName", "mail", "userPrincipalName"],
             )
@@ -262,7 +326,7 @@ class DirectoryAdminService(ActiveDirectoryService):
         finally:
             conn.unbind()
 
-    def crea_utente(self, username, first_name, last_name, email, personal_email, mobile, password, upn_domain=None):
+    def crea_utente(self, username, first_name, last_name, email, personal_email, mobile, password=None, upn_domain=None):
         self._require_writes()
         if not settings.DIRECTORY.get("USE_SSL", False):
             raise DirectoryAdminException("La creazione con password richiede LDAPS.")
@@ -289,14 +353,15 @@ class DirectoryAdminService(ActiveDirectoryService):
             if mobile.strip(): attributes["mobile"] = mobile.strip()
             if not conn.add(dn, ["top", "person", "organizationalPerson", "user"], attributes):
                 self._ok(conn, "Creazione utente")
-            # unicodePwd non si può valorizzare con LDAP Add: AD richiede una
-            # modifica separata su canale LDAPS/TLS.
-            conn.modify(dn, {
-                "unicodePwd": [(MODIFY_REPLACE, [('"%s"' % password).encode("utf-16-le")])],
-                "pwdLastSet": [(MODIFY_REPLACE, ["0"])],
-                "userAccountControl": [(MODIFY_REPLACE, ["512"])],
-            })
-            self._ok(conn, "Impostazione password e attivazione account")
+            if password:
+                # unicodePwd non si può valorizzare con LDAP Add: AD richiede una
+                # modifica separata su canale LDAPS/TLS.
+                conn.modify(dn, {
+                    "unicodePwd": [(MODIFY_REPLACE, [('"%s"' % password).encode("utf-16-le")])],
+                    "pwdLastSet": [(MODIFY_REPLACE, ["0"])],
+                    "userAccountControl": [(MODIFY_REPLACE, ["512"])],
+                })
+                self._ok(conn, "Impostazione password e attivazione account")
             return dn
         finally:
             conn.unbind()
@@ -309,7 +374,7 @@ class DirectoryAdminService(ActiveDirectoryService):
             safe = escape_filter_chars(username.strip())
             return bool(
                 conn.search(
-                    self.base_dn,
+                    settings.DIRECTORY["USER_SEARCH_BASE"],
                     "(&(objectCategory=person)(objectClass=user)(sAMAccountName=%s))" % safe,
                     attributes=[],
                     size_limit=1,
@@ -333,8 +398,7 @@ class DirectoryAdminService(ActiveDirectoryService):
                 size_limit=1,
             ) or not conn.entries:
                 raise DirectoryAdminException("Gruppo AD non trovato: %s." % nome_gruppo)
-            conn.modify(conn.entries[0].entry_dn, {"member": [(MODIFY_ADD, [user_dn])]})
-            self._ok(conn, "Assegnazione gruppo operativo")
+            self._ensure_group_member(conn, conn.entries[0].entry_dn, user_dn)
         finally:
             conn.unbind()
 
@@ -343,6 +407,128 @@ class DirectoryAdminService(ActiveDirectoryService):
         try:
             conn.search(self.base_dn, "(objectClass=group)", attributes=["cn", "description", "member"])
             return sorted([{"name": str(entry.cn), "description": str(entry.description or ""), "members": [dn.split(",", 1)[0][3:] for dn in entry.member.values] if hasattr(entry, "member") else []} for entry in conn.entries], key=lambda item: item["name"].casefold())
+        finally:
+            conn.unbind()
+
+    def sincronizza_gruppi_selezionati(self, username, da_aggiungere, da_rimuovere):
+        """Sincronizza solo le appartenenze AD gestite dalla modifica admin.
+
+        Non usa :meth:`aggiorna_gruppi`, che ha semantica di sostituzione
+        completa e quindi potrebbe rimuovere gruppi AD non amministrati dal
+        portale. Le operazioni gia' eseguite vengono annullate se una delle
+        successive fallisce.
+        """
+        self._require_writes()
+        da_aggiungere = {nome.strip() for nome in da_aggiungere if nome and nome.strip()}
+        da_rimuovere = {nome.strip() for nome in da_rimuovere if nome and nome.strip()}
+        if not da_aggiungere and not da_rimuovere:
+            return
+
+        conn, entry = self._user(username)
+        operazioni_eseguite = []
+        try:
+            gruppi = {}
+            for nome in da_aggiungere | da_rimuovere:
+                safe = escape_filter_chars(nome)
+                if not conn.search(
+                    settings.DIRECTORY["GROUP_SEARCH_BASE"],
+                    "(&(objectClass=group)(cn=%s))" % safe,
+                    attributes=[],
+                    size_limit=1,
+                ) or not conn.entries:
+                    raise DirectoryAdminException("Gruppo AD non trovato: %s." % nome)
+                gruppi[nome] = conn.entries[0].entry_dn
+
+            appartenenze_correnti = set(
+                entry.memberOf.values if hasattr(entry, "memberOf") else []
+            )
+
+            try:
+                for nome in sorted(da_rimuovere, key=str.casefold):
+                    gruppo_dn = gruppi[nome]
+                    if gruppo_dn not in appartenenze_correnti:
+                        continue
+                    conn.modify(
+                        gruppo_dn,
+                        {"member": [(MODIFY_DELETE, [entry.entry_dn])]},
+                    )
+                    self._ok(conn, "Rimozione gruppo")
+                    operazioni_eseguite.append((MODIFY_DELETE, gruppo_dn))
+
+                for nome in sorted(da_aggiungere, key=str.casefold):
+                    gruppo_dn = gruppi[nome]
+                    if gruppo_dn in appartenenze_correnti:
+                        continue
+                    conn.modify(
+                        gruppo_dn,
+                        {"member": [(MODIFY_ADD, [entry.entry_dn])]},
+                    )
+                    self._ok(conn, "Aggiunta gruppo")
+                    operazioni_eseguite.append((MODIFY_ADD, gruppo_dn))
+            except DirectoryAdminException:
+                # Best effort: riporta AD allo stato precedente senza toccare
+                # gruppi estranei alla modifica corrente.
+                for operazione, gruppo_dn in reversed(operazioni_eseguite):
+                    inversa = MODIFY_ADD if operazione == MODIFY_DELETE else MODIFY_DELETE
+                    conn.modify(gruppo_dn, {"member": [(inversa, [entry.entry_dn])]})
+                raise
+        finally:
+            conn.unbind()
+
+    def crea_gruppo(self, nome, descrizione=""):
+        """Crea un gruppo di sicurezza globale nell'OU gruppi configurata.
+
+        Il valore restituito indica se il gruppo e' stato creato ora oppure
+        era gia' presente. In quest'ultimo caso l'azione amministrativa puo'
+        collegare in sicurezza il gruppo locale, senza creare duplicati AD.
+        """
+        self._require_writes()
+        nome = (nome or "").strip()
+        if not nome:
+            raise DirectoryAdminException("Indicare il nome del gruppo Active Directory.")
+
+        conn = self._connection()
+        try:
+            search_base = settings.DIRECTORY["GROUP_SEARCH_BASE"]
+            filtro = "(&(objectClass=group)(cn=%s))" % escape_filter_chars(nome)
+            if conn.search(
+                search_base,
+                filtro,
+                attributes=self.GROUP_ATTRIBUTES,
+                size_limit=1,
+            ) and conn.entries:
+                entry = conn.entries[0]
+                return {
+                    "created": False,
+                    "sid": str(entry.objectSid) if getattr(entry, "objectSid", None) else "",
+                }
+
+            group_dn = "CN=%s,%s" % (escape_rdn(nome), search_base)
+            attributes = {
+                # Gruppo globale di sicurezza: puo' essere assegnato agli
+                # utenti ed e' il tipo normalmente usato per gli uffici.
+                "groupType": "-2147483646",
+            }
+            if descrizione:
+                attributes["description"] = descrizione.strip()
+
+            conn.add(group_dn, ["top", "group"], attributes)
+            self._ok(conn, "Creazione gruppo Active Directory")
+
+            if not conn.search(
+                search_base,
+                filtro,
+                attributes=self.GROUP_ATTRIBUTES,
+                size_limit=1,
+            ) or not conn.entries:
+                raise DirectoryAdminException(
+                    "Gruppo creato in Active Directory, ma non rilevabile subito dopo la creazione."
+                )
+            entry = conn.entries[0]
+            return {
+                "created": True,
+                "sid": str(entry.objectSid) if getattr(entry, "objectSid", None) else "",
+            }
         finally:
             conn.unbind()
 

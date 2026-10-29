@@ -1,4 +1,8 @@
-from django.contrib.auth.decorators import user_passes_test
+from common.module_access import (
+    DirectoryAdministrationAccessMixin,
+    DirigenzaAccessMixin,
+    module_required,
+)
 
 
 GRUPPI_DIRIGENZA = {
@@ -8,24 +12,14 @@ GRUPPI_DIRIGENZA = {
 
 
 def puo_accedere_area_dirigenza(user):
-    if not user.is_authenticated:
-        return False
-
-    if user.is_superuser:
-        return True
-
-    return user.groups.filter(
-        name__in=GRUPPI_DIRIGENZA,
-    ).exists()
+    return DirigenzaAccessMixin.has_module_access(user)
 
 
-dirigenza_required = user_passes_test(
-    puo_accedere_area_dirigenza
-)
+dirigenza_required = module_required(DirigenzaAccessMixin)
 
 
 def puo_amministrare_directory(user):
-    return bool(user.is_authenticated and user.is_superuser)
+    return DirectoryAdministrationAccessMixin.has_module_access(user)
 
 
-directory_admin_required = user_passes_test(puo_amministrare_directory)
+directory_admin_required = module_required(DirectoryAdministrationAccessMixin)

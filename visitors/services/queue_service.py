@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from django.contrib.auth import get_user_model
@@ -92,7 +93,7 @@ class QueueService:
                 visita_conclusa_il__isnull=True,
             )
             .order_by(
-                "ingresso",
+                Coalesce('reinserito_hall_il', 'ingresso'),
                 "numero_coda",
             )
         )
@@ -115,7 +116,7 @@ class QueueService:
             .select_related("appuntamento")
             .order_by(
                 "-rientro_prioritario",
-                "ingresso",
+                Coalesce('reinserito_hall_il', 'appuntamento__data_ora', 'ingresso'),
                 "numero_coda",
             )
         )
@@ -175,7 +176,7 @@ class QueueService:
 
         accesso = (
             AccessoVisitatore.objects
-            .select_for_update()
+            .select_for_update(of=("self",))
             .select_related(
                 "ufficio_destinazione",
                 "badge",
@@ -185,14 +186,9 @@ class QueueService:
 
         ufficio = accesso.ufficio_destinazione
 
-        # La capacità della coda fuori porta coincide
-        # con il numero degli sportellisti disponibili.
-        capacita_fuori = (
-            CapacityService
-            .numero_operatori_attivi(
-                ufficio
-            )
-        )
+        # La disponibilita dipende dalla presenza effettiva del personale
+        # assegnato, non dal calendario delle fasce di ricevimento.
+        capacita_fuori = CapacityService.numero_dipendenti_presenti(ufficio)
 
         numero_fuori = (
             AccessoVisitatore.objects
@@ -684,7 +680,7 @@ class QueueService:
 
         accesso = (
             AccessoVisitatore.objects
-            .select_for_update()
+            .select_for_update(of=("self",))
             .select_related("ufficio_destinazione")
             .get(pk=accesso.pk)
         )

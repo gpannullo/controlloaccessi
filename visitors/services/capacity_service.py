@@ -19,54 +19,39 @@ User = get_user_model()
 class CapacityService:
 
     @staticmethod
-    def numero_operatori_attivi(ufficio):
+    def numero_dipendenti_presenti(ufficio):
+        """Conta i dipendenti assegnati, attivi e presenti.
+
+        Questa verifica è sempre rigorosa: serve a stabilire se il
+        visitatore può essere inviato fisicamente fuori dall'ufficio,
+        indipendentemente dall'eventuale configurazione generale dei
+        controlli presenze.
         """
-        Conta gli utenti attivi assegnati all'ufficio,
-        configurati come sportellisti e, quando previsto,
-        presenti secondo il sistema esterno.
+        return User.objects.filter(
+            assegnazioni_ufficio__ufficio=ufficio,
+            assegnazioni_ufficio__attiva=True,
+            is_active=True,
+            stato_presenza=User.StatoPresenza.PRESENTE,
+        ).distinct().count()
+
+    @staticmethod
+    def operatori_per_capacita(ufficio):
+        """Sportellisti e tecnici attivi, associati e presenti.
+
+        La presenza e' sempre richiesta. Il flag dell'associazione usato
+        dalla scheda utente come visibilita' non limita questo conteggio:
+        anche il personale non pubblicato contribuisce alla capacita'.
         """
+        return User.objects.filter(
+            assegnazioni_ufficio__ufficio=ufficio,
+            is_active=True,
+            tipo_attivita__in=[User.TipoAttivita.SPORTELLISTA, User.TipoAttivita.TECNICO],
+            stato_presenza=User.StatoPresenza.PRESENTE,
+        ).distinct()
 
-        controllo_presenze = getattr(
-            settings,
-            "PRESENCE_CHECK_ENABLED",
-            False,
-        )
-
-        utenti_ids = set()
-
-        gruppi = (
-            ufficio.gruppi
-            .filter(attivo=True)
-            .select_related("django_group")
-        )
-
-        for gruppo in gruppi:
-            utenti = (
-                gruppo.django_group
-                .user_set
-                .filter(
-                    is_active=True,
-                    tipo_attivita=(
-                        User.TipoAttivita.SPORTELLISTA
-                    ),
-                )
-            )
-
-            if controllo_presenze:
-                utenti = utenti.filter(
-                    stato_presenza=(
-                        User.StatoPresenza.PRESENTE
-                    ),
-                )
-
-            utenti_ids.update(
-                utenti.values_list(
-                    "pk",
-                    flat=True,
-                )
-            )
-
-        return len(utenti_ids)
+    @classmethod
+    def numero_operatori_attivi(cls, ufficio):
+        return cls.operatori_per_capacita(ufficio).count()
 
     @staticmethod
     def tempo_medio_servizio(ufficio):

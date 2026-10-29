@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.conf import settings
 from django.utils import timezone
 
 from audit.services.audit_service import AuditService
@@ -42,9 +43,12 @@ class ReceptionService:
         )
 
         if (
-            tipo_accesso
-            == AccessoVisitatore.TipoAccesso.RICEVIMENTO
+            tipo_accesso == AccessoVisitatore.TipoAccesso.RICEVIMENTO
+            and getattr(settings, "RECEPTION_ENFORCE_DAILY_CAPACITY", False)
         ):
+            # Il limite stimato sulla capacità giornaliera è opzionale: la
+            # normale regola è che un ufficio che riceve oggi e ha personale
+            # presente possa sempre accettare il visitatore e accodarlo.
             capacita = CapacityService.capacita_residua(
                 ufficio
             )
@@ -133,7 +137,7 @@ class ReceptionService:
     ):
         accesso = (
             AccessoVisitatore.objects
-            .select_for_update()
+            .select_for_update(of=("self",))
             .select_related(
                 "ufficio_destinazione",
                 "badge",

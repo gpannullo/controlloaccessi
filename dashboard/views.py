@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.contrib.auth.decorators import login_required
+from common.module_access import PortineriaAccessMixin, module_required
 from django.db.models import Count, Prefetch, Q
 from django.shortcuts import render
 from django.utils import timezone
@@ -29,31 +29,17 @@ GIORNI_SETTIMANA = [
 
 def _dipendenti_assegnati_ufficio(ufficio):
     """
-    Restituisce gli utenti attivi appartenenti ai gruppi
-    organizzativi collegati all'ufficio, senza duplicati.
+    Restituisce gli utenti attivi assegnati esplicitamente all'ufficio.
     """
-
-    utenti_ids = set()
-
-    gruppi = (
-        ufficio.gruppi
-        .filter(attivo=True)
-        .select_related("django_group")
-    )
-
-    for gruppo in gruppi:
-        ids_gruppo = (
-            gruppo.django_group
-            .user_set
-            .filter(is_active=True)
-            .values_list("pk", flat=True)
-        )
-
-        utenti_ids.update(ids_gruppo)
 
     return list(
         User.objects
-        .filter(pk__in=utenti_ids)
+        .filter(
+            assegnazioni_ufficio__ufficio=ufficio,
+            assegnazioni_ufficio__attiva=True,
+            is_active=True,
+        )
+        .distinct()
         .order_by(
             "last_name",
             "first_name",
@@ -63,44 +49,14 @@ def _dipendenti_assegnati_ufficio(ufficio):
 
 
 def _operatori_disponibili_ufficio(ufficio):
-    """
-    Restituisce i dipendenti che:
-    - sono assegnati all'ufficio;
-    - sono attivi;
-    - sono configurati come sportellisti;
-    - risultano presenti, quando il controllo presenze è attivo.
-    """
-
-    dipendenti = _dipendenti_assegnati_ufficio(
-        ufficio
-    )
-
-    operatori = []
-
-    for dipendente in dipendenti:
-        if (
-            dipendente.tipo_attivita
-            != User.TipoAttivita.SPORTELLISTA
-        ):
-            continue
-
-        if getattr(
-            settings,
-            "PRESENCE_CHECK_ENABLED",
-            False,
-        ):
-            if (
-                dipendente.stato_presenza
-                != User.StatoPresenza.PRESENTE
-            ):
-                continue
-
-        operatori.append(dipendente)
-
-    return operatori
+    """Stessa regola del calcolo della capacita', senza filtri di visibilita'."""
+    from visitors.services.capacity_service import CapacityService
+    return list(CapacityService.operatori_per_capacita(ufficio).order_by(
+        "last_name", "first_name", "username",
+    ))
 
 
-@login_required
+@module_required(PortineriaAccessMixin)
 def dashboard_home(request):
     adesso = timezone.localtime()
     oggi = timezone.localdate()
@@ -167,12 +123,22 @@ def dashboard_home(request):
         .order_by("-ingresso")[:10]
     )
 
-    # Il contatore "Uffici attivi" deve riflettere gli uffici
-    # realmente selezionabili nel form "Nuovo ricevimento".
+    # Uffici con una fascia di ricevimento pianificata per oggi:
+    # rappresentano l'offerta di appuntamenti del giorno.
+    uffici_in_calendario_oggi = (
+        OfficeService
+        .get_active_offices_for_day(giorno_corrente)
+    )
+
+    # Uffici realmente selezionabili nel form "Nuovo ricevimento".
+    # Se non c'è personale presente, il visitatore resta in hall.
     uffici_prenotabili = (
         OfficeService
-        .get_offices_receiving_today(adesso)
+        .get_offices_receiving_today()
     )
+
+    uffici_visita_ids = set(OfficeService.get_offices_with_present_staff().values_list("pk", flat=True))
+    uffici_ricevimento_ids = set(uffici_prenotabili.values_list("pk", flat=True))
 
     aperture_odierne = (
         CalendarioApertura.objects
@@ -181,8 +147,7 @@ def dashboard_home(request):
     )
 
     uffici_che_ricevono_oggi = (
-        OfficeService
-        .get_offices_receiving_today(adesso)
+        Ufficio.objects.filter(pk__in=uffici_visita_ids | uffici_ricevimento_ids).order_by("nome")
         .annotate(
             visitatori_in_coda=Count(
                 "visite",
@@ -207,37 +172,39 @@ def dashboard_home(request):
                 queryset=aperture_odierne,
                 to_attr="aperture_di_oggi",
             ),
-            "gruppi__django_group__user_set",
+            "assegnazioni_personale__utente",
         )
     )
 
     uffici_oggi = []
 
     for ufficio in uffici_che_ricevono_oggi:
-        ufficio.aperto_adesso = OfficeService.is_open(
-            ufficio,
-            adesso,
-        )
-
         ufficio.dipendenti_assegnati = (
             _dipendenti_assegnati_ufficio(ufficio)
         )
 
-        ufficio.operatori_disponibili = (
-            _operatori_disponibili_ufficio(ufficio)
-        )
+        ufficio.dipendenti_presenti = [
+            dipendente
+            for dipendente in ufficio.dipendenti_assegnati
+            if dipendente.stato_presenza == User.StatoPresenza.PRESENTE
+        ]
 
         ufficio.numero_dipendenti_assegnati = len(
             ufficio.dipendenti_assegnati
         )
 
-        ufficio.numero_operatori_disponibili = len(
-            ufficio.operatori_disponibili
+        ufficio.numero_dipendenti_presenti = len(
+            ufficio.dipendenti_presenti
         )
 
         uffici_oggi.append(ufficio)
 
     calendario_settimanale = []
+    uffici_con_personale_presente = set(
+        OfficeService
+        .get_offices_with_present_staff()
+        .values_list("pk", flat=True)
+    )
 
     for giorno in GIORNI_SETTIMANA:
         aperture_giorno = (
@@ -260,10 +227,18 @@ def dashboard_home(request):
             )
         )
 
+        uffici_giorno = list(uffici_giorno)
+        for ufficio in uffici_giorno:
+            # La disponibilità è riferita alla situazione effettiva adesso,
+            # non al solo calendario della giornata selezionata nel modal.
+            ufficio.personale_disponibile = (
+                ufficio.pk in uffici_con_personale_presente
+            )
+
         calendario_settimanale.append(
             {
                 **giorno,
-                "uffici": list(uffici_giorno),
+                "uffici": uffici_giorno,
             }
         )
 
@@ -282,8 +257,9 @@ def dashboard_home(request):
 
         "ultime_registrazioni": ultime_registrazioni,
 
-        "numero_uffici_attivi": uffici_prenotabili.count(),
-        "numero_uffici_che_ricevono": len(uffici_oggi),
+        "numero_uffici_prenotazioni": uffici_in_calendario_oggi.count(),
+        "numero_uffici_che_ricevono": len(uffici_visita_ids),
+        "uffici_visita": [u for u in uffici_oggi if u.pk in uffici_visita_ids],
 
         "numero_utenti_attivi": (
             User.objects

@@ -37,7 +37,8 @@ ALLOWED_HOSTS = [
             "192.168.15.24,127.0.0.1,localhost,"
             "ticket.comune.aversa.ce.it,"
             "account.comune.aversa.ce.it,"
-            "controlloaccessi.comune.aversa.ce.it"
+            "controlloaccessi.comune.aversa.ce.it,"
+            "prenotazioni.comune.aversa.ce.it"
         ),
     ).split(",")
     if host.strip()
@@ -45,7 +46,15 @@ ALLOWED_HOSTS = [
 
 # Application definition
 
+# Backend sostituibile: le app chiamanti importano solo protocollazione.services.
+PROTOCOLLAZIONE_ENABLED = os.getenv('PROTOCOLLAZIONE_ENABLED', 'false').lower() in {'1', 'true', 'yes', 'on'}
+PROTOCOLLAZIONE_BACKEND = os.getenv('PROTOCOLLAZIONE_BACKEND', 'protocollazione.providers.cityware.backend.CitywareBackend')
+
 INSTALLED_APPS = [
+    'audit_ad.apps.AuditAdConfig',
+    'presenze_qr',
+    'protocollazione.apps.ProtocollazioneConfig',
+    'cityware.apps.CitywareConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -59,21 +68,41 @@ INSTALLED_APPS = [
     "dashboard",
     "common",
     "post_office",
+    "spid_cie",
+    "prenotazioni",
+    "pdnd",
+    "comunicazioni",
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'common.middleware.HostAccessMiddleware',
+    'spid_cie.middleware.PublicBookingHostMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'common.module_access.AdminModuleAccessMiddleware',
     'accounts.middleware.ProfileCompletionMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
 ROOT_URLCONF = 'ControlloAccessi.urls'
+
+AUDIT_AD_ENABLED = os.getenv('AUDIT_AD_ENABLED', 'false').lower() in {'1', 'true', 'yes', 'on'}
+AUDIT_AD_SOURCES = {
+    '192.168.15.100': os.getenv('AUDIT_AD_SECRET_DC100', ''),
+    '192.168.15.101': os.getenv('AUDIT_AD_SECRET_DC101', ''),
+}
+AUDIT_AD_TRUSTED_PROXIES = ['127.0.0.1', '::1']
+AUDIT_AD_FAILURE_THRESHOLD = int(os.getenv('AUDIT_AD_FAILURE_THRESHOLD', '10'))
+
+# Enable only after migration and reverse-proxy configuration.
+PRESENZE_QR_ENABLED = os.getenv('PRESENZE_QR_ENABLED', 'false').lower() in {'1', 'true', 'yes', 'on'}
+PRESENZE_QR_SOLO_RETE_COMUNALE = os.getenv('PRESENZE_QR_SOLO_RETE_COMUNALE', 'false').lower() in {'1', 'true', 'yes', 'on'}
+PRESENZE_QR_RETI_CONSENTITE = os.getenv('PRESENZE_QR_RETI_CONSENTITE', '10.0.0.0/22,192.168.15.0/24').split(',')
+PRESENZE_QR_PROXY_ATTENDIBILI = os.getenv('PRESENZE_QR_PROXY_ATTENDIBILI', '127.0.0.1/32,::1/128').split(',')
 
 TEMPLATES = [
     {
@@ -84,6 +113,7 @@ TEMPLATES = [
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.request',
+                'presenze_qr.context.presenze',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
@@ -163,12 +193,15 @@ AUTHENTICATION_BACKENDS = [
 DIRECTORY_PROVIDER = "ACTIVE_DIRECTORY"
 
 DIRECTORY = {
-    # Configurazione LDAPS del primo Domain Controller.
-    "SERVER": "srvdomain.comuneaversa.local",
-    "PORT": 636,
-    "USE_SSL": True,
-    "TLS_CA_CERT_FILE": BASE_DIR / "cert" / "srvdomain-ldaps.cer",
-    "TLS_VALIDATE": True,
+    # Configurazione LDAPS del primo Domain Controller. I valori possono
+    # essere differenziati tra gli ambienti tramite /etc/controlloaccessi.env.
+    "SERVER": os.getenv("AD_SERVER", "srvdomain.comuneaversa.local"),
+    "PORT": int(os.getenv("AD_PORT", "636")),
+    "USE_SSL": os.getenv("AD_USE_SSL", "True").lower() in {"1", "true", "yes", "on"},
+    "TLS_CA_CERT_FILE": os.getenv(
+        "AD_TLS_CA_CERT_FILE", str(BASE_DIR / "cert" / "srvdomain-ldaps.cer")
+    ),
+    "TLS_VALIDATE": os.getenv("AD_TLS_VALIDATE", "True").lower() in {"1", "true", "yes", "on"},
     "DOMAIN": os.getenv("AD_DOMAIN", "comuneaversa.local"),
     "BASE_DN": os.getenv(
         "AD_BASE_DN",
@@ -183,7 +216,9 @@ DIRECTORY = {
     ),
     "GROUP_SEARCH_BASE": os.getenv(
         "AD_GROUP_SEARCH_BASE",
-        "OU=Groups,DC=comuneaversa,DC=local",
+        # Nel dominio i gruppi applicativi risiedono nel contenitore AD
+        # predefinito ``Users``; l'OU=Groups non è presente.
+        "CN=Users,DC=comuneaversa,DC=local",
     ),
     "AUTH_FORMAT": os.getenv("AD_AUTH_FORMAT", "UPN"),
     "DJANGO_STAFF_GROUPS": [
@@ -202,13 +237,14 @@ DIRECTORY = {
         ).split(",")
         if item.strip()
     ],
+    "ADMINISTRATION_GROUP": os.getenv("AD_ADMINISTRATION_GROUP", "UffPersonale"),
     "GIUNTA_GROUP": "ASSESSORE",
     "CONSIGLIERI_GROUP": "CONSIGLIERE",
 }
 
 
 LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "dashboard:home"
+LOGIN_REDIRECT_URL = "home"
 LOGOUT_REDIRECT_URL = "login"
 
 TICKET_PRINTER = {
@@ -217,6 +253,14 @@ TICKET_PRINTER = {
     "HOST": os.getenv("TICKET_PRINTER_HOST", "192.168.15.80"),
     "PORT": int(os.getenv("TICKET_PRINTER_PORT", "9100")),
     "TIMEOUT": int(os.getenv("TICKET_PRINTER_TIMEOUT", "5")),
+    "EPOS_URL": os.getenv("TICKET_PRINTER_EPOS_URL", ""),
+    "EPOS_DEVICE_ID": os.getenv(
+        "TICKET_PRINTER_EPOS_DEVICE_ID", "local_printer"
+    ),
+    "EPOS_TIMEOUT": int(os.getenv("TICKET_PRINTER_EPOS_TIMEOUT", "10000")),
+    "EPOS_VERIFY_SSL": os.getenv(
+        "TICKET_PRINTER_EPOS_VERIFY_SSL", "False"
+    ).lower() in {"1", "true", "yes", "on"},
     "PRINT_QR": os.getenv("TICKET_PRINTER_PRINT_QR", "False").lower()
     in {"1", "true", "yes", "on"},
     "PUBLIC_TICKET_BASE_URL": os.getenv(
@@ -239,6 +283,16 @@ INTERNAL_APPLICATION_HOST = os.getenv(
 PUBLIC_TICKET_TOKEN_HOURS = int(
     os.getenv("PUBLIC_TICKET_TOKEN_HOURS", "24")
 )
+# Token casuale dedicato al monitor mostrato al pubblico. Quando è vuoto,
+# l'endpoint pubblico del monitor resta disattivato.
+PUBLIC_MONITOR_TOKEN = os.getenv("PUBLIC_MONITOR_TOKEN", "")
+PUBLIC_BOOKING_HOST = os.getenv(
+    "PUBLIC_BOOKING_HOST", "prenotazioni.comune.aversa.ce.it"
+).lower()
+
+# Webhook Meta WhatsApp: il token di verifica non è l'access token API.
+WHATSAPP_WEBHOOK_VERIFY_TOKEN = os.getenv("WHATSAPP_WEBHOOK_VERIFY_TOKEN", "")
+WHATSAPP_APP_SECRET = os.getenv("WHATSAPP_APP_SECRET", "")
 
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
@@ -247,7 +301,8 @@ CSRF_TRUSTED_ORIGINS = [
         (
             "https://ticket.comune.aversa.ce.it,"
             "https://account.comune.aversa.ce.it,"
-            "https://controlloaccessi.comune.aversa.ce.it"
+            "https://controlloaccessi.comune.aversa.ce.it,"
+            "https://prenotazioni.comune.aversa.ce.it"
         ),
     ).split(",")
     if origin.strip()
@@ -267,17 +322,27 @@ PRESENCE_CHECK_ENABLED = os.getenv(
     "False",
 ).lower() in {"1", "true", "yes", "on"}
 
+# Importazione presenze dal file timbrature esposto via SFTP/SSH.
+PRESENCE_SSH_ENABLED = os.getenv("PRESENCE_SSH_ENABLED", "False").lower() in {"1", "true", "yes", "on"}
+PRESENCE_SSH_HOST = os.getenv("PRESENCE_SSH_HOST", "")
+PRESENCE_SSH_PORT = int(os.getenv("PRESENCE_SSH_PORT", "22"))
+PRESENCE_SSH_USERNAME = os.getenv("PRESENCE_SSH_USERNAME", "")
+PRESENCE_SSH_PRIVATE_KEY = os.getenv("PRESENCE_SSH_PRIVATE_KEY", "")
+PRESENCE_SSH_KNOWN_HOSTS = os.getenv("PRESENCE_SSH_KNOWN_HOSTS", "")
+PRESENCE_SSH_REMOTE_PATH = os.getenv("PRESENCE_SSH_REMOTE_PATH", "/C:/h/timbrature.txt")
+PRESENCE_SSH_INTERVAL_SECONDS = int(os.getenv("PRESENCE_SSH_INTERVAL_SECONDS", "60"))
+
 PORTINERIA_GROUP_NAME = os.getenv("PORTINERIA_GROUP_NAME", "Portineria")
 
 # Coda e-mail gestita da django-post-office. Le credenziali SMTP restano
 # esterne al repository e sono fornite con variabili d'ambiente.
 EMAIL_BACKEND = "post_office.EmailBackend"
-EMAIL_HOST = os.getenv("EMAIL_HOST", "mail.comune.aversa.ce.it")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
-EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "g.pannullo@comune.aversa.ce.it")
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", 25))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() in {"1", "true", "yes", "on"}
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@comune.aversa.ce.it")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "")
 # Recapito dell'ufficio competente per le richieste di aggiornamento anagrafico.
 ACCOUNT_UPDATE_CONTACT_EMAIL = os.getenv("ACCOUNT_UPDATE_CONTACT_EMAIL", EMAIL_HOST_USER)
 
@@ -291,6 +356,84 @@ INSTITUTIONAL_EMAIL_DOMAINS = (
 POST_OFFICE = {
     "DEFAULT_PRIORITY": "medium",
     "MAX_RETRIES": 4,
+}
+
+# Accesso pubblico tramite la federazione/aggregatore OIDC dell'Ente.
+# Credenziali e metadata restano nel file /etc/controlloaccessi.env.
+SPID_CIE = {
+    "ENABLED": os.getenv("SPID_CIE_ENABLED", "False").lower()
+    in {"1", "true", "yes", "on"},
+    "SERVER_METADATA_URL": os.getenv("SPID_CIE_SERVER_METADATA_URL", ""),
+    "CLIENT_ID": os.getenv("SPID_CIE_CLIENT_ID", ""),
+    "CLIENT_SECRET": os.getenv("SPID_CIE_CLIENT_SECRET", ""),
+    "SCOPE": os.getenv("SPID_CIE_SCOPE", "openid profile email"),
+}
+
+# Gateway SAML separato: la chiave è condivisa solo fra gateway e applicazione.
+SPID_GATEWAY = {
+    "ENABLED": os.getenv("SPID_GATEWAY_ENABLED", "False").lower() in {"1", "true", "yes", "on"},
+    "BASE_URL": os.getenv("SPID_GATEWAY_BASE_URL", "https://prenotazioni.comune.aversa.ce.it/identita/spid"),
+    "SHARED_SECRET": os.getenv("SPID_GATEWAY_SHARED_SECRET", ""),
+    "MAX_AGE_SECONDS": int(os.getenv("SPID_GATEWAY_MAX_AGE_SECONDS", "60")),
+}
+
+# App IO: inserire la chiave "use" del servizio nel file
+# /etc/controlloaccessi.env. L'invio resta inattivo finché ENABLED è False.
+APP_IO = {
+    "ENABLED": os.getenv("APP_IO_ENABLED", "False").lower() in {"1", "true", "yes", "on"},
+    "SUBSCRIPTION_KEY": os.getenv("APP_IO_SUBSCRIPTION_KEY", ""),
+    "BASE_URL": os.getenv("APP_IO_BASE_URL", "https://api.io.pagopa.it/api/v1"),
+    "TIMEOUT": int(os.getenv("APP_IO_TIMEOUT", "15")),
+}
+
+# PDND Interoperabilità. Ogni ENDPOINT e PURPOSE_ID viene rilasciato per lo
+# specifico e-service dopo la richiesta di fruizione e la relativa finalità.
+# La chiave privata non deve mai essere inclusa nel repository.
+ANPR = {
+    "SECURITY_HEADERS_PROVIDER": os.getenv("PDND_ANPR_SECURITY_HEADERS_PROVIDER", ""),
+    **{code: {
+        "ENDPOINT": os.getenv(f"PDND_ANPR_{code}_ENDPOINT", ""),
+        "PURPOSE_ID": os.getenv(f"PDND_ANPR_{code}_PURPOSE_ID", ""),
+        "AUDIENCE": os.getenv(f"PDND_ANPR_{code}_AUDIENCE", ""),
+    } for code in ("C020", "C029")},
+}
+
+PDND = {
+    "ENABLED": os.getenv("PDND_ENABLED", "False").lower() in {"1", "true", "yes", "on"},
+    "TOKEN_URL": os.getenv("PDND_TOKEN_URL", "https://auth.interop.pagopa.it/token.oauth2"),
+    "CLIENT_ASSERTION_AUDIENCE": os.getenv("PDND_CLIENT_ASSERTION_AUDIENCE", "https://auth.interop.pagopa.it/client-assertion"),
+    "CLIENT_ID": os.getenv("PDND_CLIENT_ID", ""),
+    "KID": os.getenv("PDND_KID", ""),
+    "PRIVATE_KEY_PATH": os.getenv("PDND_PRIVATE_KEY_PATH", ""),
+    "TIMEOUT": int(os.getenv("PDND_TIMEOUT", "20")),
+    "SERVICES": {
+        "ANPR_SOGGETTO": {"ENDPOINT": os.getenv("PDND_ANPR_SOGGETTO_ENDPOINT", ""), "PURPOSE_ID": os.getenv("PDND_ANPR_SOGGETTO_PURPOSE_ID", ""), "METHOD": os.getenv("PDND_ANPR_SOGGETTO_METHOD", "POST"), "PAYLOAD_FIELD": os.getenv("PDND_ANPR_SOGGETTO_PAYLOAD_FIELD", "codiceFiscale")},
+        "ANPR_FAMIGLIA": {"ENDPOINT": os.getenv("PDND_ANPR_FAMIGLIA_ENDPOINT", ""), "PURPOSE_ID": os.getenv("PDND_ANPR_FAMIGLIA_PURPOSE_ID", ""), "METHOD": os.getenv("PDND_ANPR_FAMIGLIA_METHOD", "POST"), "PAYLOAD_FIELD": os.getenv("PDND_ANPR_FAMIGLIA_PAYLOAD_FIELD", "codiceFiscale")},
+        "INPS_ISEE": {"ENDPOINT": os.getenv("PDND_INPS_ISEE_ENDPOINT", ""), "PURPOSE_ID": os.getenv("PDND_INPS_ISEE_PURPOSE_ID", ""), "METHOD": os.getenv("PDND_INPS_ISEE_METHOD", "POST"), "PAYLOAD_FIELD": os.getenv("PDND_INPS_ISEE_PAYLOAD_FIELD", "codiceFiscale")},
+        "DURC": {"ENDPOINT": os.getenv("PDND_DURC_ENDPOINT", ""), "PURPOSE_ID": os.getenv("PDND_DURC_PURPOSE_ID", ""), "METHOD": os.getenv("PDND_DURC_METHOD", "POST"), "PAYLOAD_FIELD": os.getenv("PDND_DURC_PAYLOAD_FIELD", "codiceFiscale")},
+    },
+}
+
+PRENOTAZIONI_DURATA_SLOT_MINUTI = int(
+    os.getenv("PRENOTAZIONI_DURATA_SLOT_MINUTI", "30")
+)
+PRENOTAZIONI_MAX_GIORNI = int(
+    os.getenv("PRENOTAZIONI_MAX_GIORNI", "90")
+)
+
+# Connettore verso il WordPress storico. La chiave HMAC e l'endpoint sono
+# definiti solamente nell'ambiente di produzione.
+WORDPRESS_APPOINTMENTS = {
+    "ENABLED": os.getenv("WORDPRESS_APPOINTMENTS_ENABLED", "False").lower()
+    in {"1", "true", "yes", "on"},
+    "ENDPOINT": os.getenv("WORDPRESS_APPOINTMENTS_ENDPOINT", ""),
+    "SHARED_SECRET": os.getenv("WORDPRESS_APPOINTMENTS_SHARED_SECRET", ""),
+    "TIMEOUT": int(os.getenv("WORDPRESS_APPOINTMENTS_TIMEOUT", "30")),
+    "PAGE_SIZE": int(os.getenv("WORDPRESS_APPOINTMENTS_PAGE_SIZE", "100")),
+    "ANAGRAFICHE_ENDPOINT": os.getenv("WORDPRESS_ANAGRAFICHE_ENDPOINT", ""),
+    "CALENDARI_ENDPOINT": os.getenv("WORDPRESS_CALENDARI_ENDPOINT", ""),
+    "PERSONE_PUBBLICHE_ENDPOINT": os.getenv("WORDPRESS_PERSONE_PUBBLICHE_ENDPOINT", ""),
+    "UNITE_ORGANIZZATIVE_ENDPOINT": os.getenv("WORDPRESS_UNITE_ORGANIZZATIVE_ENDPOINT", ""),
 }
 
 # Nginx / reverse proxy
@@ -315,6 +458,7 @@ ALLOWED_HOSTS = list(
             PUBLIC_TICKET_HOST,
             PUBLIC_ACCOUNT_HOST,
             INTERNAL_APPLICATION_HOST,
+            PUBLIC_BOOKING_HOST,
         ]
     )
 )

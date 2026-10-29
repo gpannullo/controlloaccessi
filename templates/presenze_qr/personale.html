@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Presenze QR{% endblock %}
+{% block content %}
+<div class="container py-4" style="max-width:760px">
+  <a href="{% url 'my_account' %}" class="btn btn-outline-secondary mb-3">Torna al mio account</a>
+  <h1>Timbrature del personale</h1>
+  <p>{{ request.user.get_full_name|default:request.user.username }}</p>
+  {% for message in messages %}<div class="alert alert-info" role="status">{{ message }}</div>{% endfor %}
+  {% if abilitato_qr %}<div class="alert alert-primary">Per timbrare inquadra il QR sul monitor della sede. Puoi invertire Entrata e Uscita entro 60 secondi dal timbro.</div>
+  {% else %}<div class="alert alert-secondary">La timbratura QR è riservata agli utenti attivi senza badge. Lo storico rimane consultabile.</div>{% endif %}
+  <h2 class="h4">Ultime 10 timbrature</h2>
+  {% for r in timbrature %}<article class="card mb-3"><div class="card-body">
+    <div class="d-flex justify-content-between gap-2"><strong>{{ r.get_verso_display }}</strong><time>{{ r.registrata_il|date:"d/m/Y H:i:s" }}</time></div>
+    <p class="text-muted mb-2">{{ r.get_origine_display }}{% if r.postazione %} · {{ r.postazione.nome }}{% endif %}{% if r.badge %} · Badge {{ r.badge }}{% endif %}</p>
+    {% if r.verso != r.verso_originale %}<p class="small">Verso corretto rispetto alla registrazione originale.</p>{% endif %}
+    {% if r.modificabile %}<form method="post" action="{% url 'presenze_qr:inverti' r.pk %}" onsubmit="return confirm('Invertire Entrata/Uscita per questa timbratura?');">
+      {% csrf_token %}<input type="hidden" name="verso_atteso" value="{{ r.verso }}">
+      <button class="btn btn-outline-primary w-100 py-3" data-created="{{ r.registrata_il|date:'c' }}">Correggi in {% if r.verso == 'I' %}Uscita{% else %}Entrata{% endif %}</button>
+    </form>{% endif %}
+  </div></article>{% empty %}<p>Nessuna timbratura registrata.</p>{% endfor %}
+</div>
+<script>
+setInterval(() => document.querySelectorAll('[data-created]').forEach(b => {
+  if (Date.now() - Date.parse(b.dataset.created) >= 60000) {b.disabled = true; b.textContent = 'Tempo di correzione terminato';}
+}), 500);
+</script>
+{% endblock %}

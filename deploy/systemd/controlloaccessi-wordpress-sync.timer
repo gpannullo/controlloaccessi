@@ -1,0 +1,10 @@
+[Unit]
+Description=Sincronizzazione ogni 5 minuti appuntamenti WordPress ControlloAccessi
+
+[Timer]
+OnCalendar=*-*-* *:0/5:00
+Persistent=true
+Unit=controlloaccessi-wordpress-sync.service
+
+[Install]
+WantedBy=timers.target

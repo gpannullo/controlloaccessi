@@ -3,6 +3,7 @@ from ldap3 import Connection
 from django.contrib.auth import get_user_model
 from access_control.models import Ufficio
 from accounts.services.active_directory_service import ActiveDirectoryService
+from accounts.services.directory_identity import get_or_create_directory_user
 
 User = get_user_model()
 
@@ -33,7 +34,7 @@ class ActiveDirectoryAuth:
             entry = conn.entries[0]
 
             # crea/aggiorna utente Django
-            user, created = User.objects.get_or_create(username=username, )
+            user, created = get_or_create_directory_user(username)
 
             user.email = entry.mail.value if hasattr(entry, "mail") else ""
             user.first_name = entry.givenName.value if hasattr(entry, "givenName") else ""

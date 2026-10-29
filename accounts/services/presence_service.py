@@ -75,6 +75,11 @@ class PresenceService:
             .get(pk=user.pk)
         )
 
+        if user.presenza_fonte == 'QR' and result.source == 'API_NON_CONFIGURATA':
+            return PresenceResult(username=user.username, status=(
+                ExternalPresenceStatus.PRESENT if user.stato_presenza == 'PRE' else ExternalPresenceStatus.ABSENT
+            ), source='QR')
+
         user.stato_presenza = self._django_status(
             result.status
         )

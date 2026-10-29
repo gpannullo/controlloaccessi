@@ -1,0 +1,24 @@
+from datetime import datetime
+from types import SimpleNamespace
+from django.test import SimpleTestCase
+from accounts.services.statino_servizio_civile import _normalizza, _coppie, _non_lavorativo, _orario_report
+
+
+class StatinoServizioCivileTests(SimpleTestCase):
+    def test_tolleranza_orari(self):
+        self.assertEqual(_normalizza(datetime.strptime('08:33', '%H:%M').time(), 'I').strftime('%H:%M'), '08:30')
+        self.assertEqual(_normalizza(datetime.strptime('13:33', '%H:%M').time(), 'U').strftime('%H:%M'), '13:30')
+
+    def test_coppia_e_durata(self):
+        base = datetime(2026, 10, 1)
+        rows = [SimpleNamespace(verso='I', registrata_il=base.replace(hour=8, minute=32)), SimpleNamespace(verso='U', registrata_il=base.replace(hour=13, minute=33))]
+        result = _coppie(rows)
+        self.assertEqual(result[0][2].total_seconds(), 5 * 3600)
+
+    def test_prefestivo_e_festivo(self):
+        self.assertTrue(_non_lavorativo(datetime(2026, 10, 3).date()))  # sabato
+        self.assertTrue(_non_lavorativo(datetime(2026, 12, 25).date()))
+
+    def test_orario_esatto_non_evidenziato(self):
+        preciso = datetime(2026, 10, 1, 8, 30)
+        self.assertEqual(_orario_report(preciso, preciso, 'E'), 'E08:30')

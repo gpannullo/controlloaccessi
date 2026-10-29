@@ -32,6 +32,26 @@
         </a>
     </div>
 
+    {% if not is_visita %}
+        <div class="d-flex justify-content-end mb-3">
+            <a href="{% url 'portineria:appuntamenti_oggi' %}" class="btn btn-outline-primary">
+                <i class="bi bi-calendar-check me-1"></i>
+                Appuntamenti di oggi
+            </a>
+        </div>
+    {% endif %}
+
+    {% if appuntamento_selezionato %}
+        <div class="alert alert-primary">
+            <strong>Appuntamento selezionato:</strong>
+            {{ appuntamento_selezionato.cognome_cittadino }} {{ appuntamento_selezionato.nome_cittadino }}
+            — {{ appuntamento_selezionato.ufficio.nome }} alle
+            {{ appuntamento_selezionato.data_ora|date:"H:i" }}.
+            Completare o verificare i dati mancanti e registrare il ricevimento.
+            La priorità dell'appuntamento sarà mantenuta in coda.
+        </div>
+    {% endif %}
+
     {% if is_visita %}
         <div class="alert alert-success">
             <strong>Visita:</strong> vengono mostrati solo gli uffici
@@ -56,8 +76,10 @@
             <form
                 method="post"
                 novalidate
+                id="registrazione-visitatore-form"
             >
                 {% csrf_token %}
+                {{ form.appuntamento_id }}
 
                 <section class="mb-4">
 
@@ -256,18 +278,28 @@
                                 <span class="text-danger">*</span>
                             </label>
 
-                            {{ form.ufficio }}
-
-                            {% for error in form.ufficio.errors %}
-                                <div class="text-danger small mt-1">
-                                    {{ error }}
+                            {% if appuntamento_selezionato %}
+                                {{ form.ufficio.as_hidden }}
+                                <div class="form-control bg-light" aria-readonly="true">
+                                    {{ appuntamento_selezionato.ufficio.nome }}
                                 </div>
-                            {% endfor %}
+                                <div class="form-text">
+                                    L'ufficio è quello indicato nell'appuntamento e non può essere modificato.
+                                </div>
+                            {% else %}
+                                {{ form.ufficio }}
 
-                            <div class="form-text">
-                                Sono mostrati gli uffici che ricevono
-                                pubblico nella giornata corrente.
-                            </div>
+                                {% for error in form.ufficio.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {{ error }}
+                                    </div>
+                                {% endfor %}
+
+                                <div class="form-text">
+                                    Sono mostrati gli uffici che ricevono
+                                    pubblico nella giornata corrente.
+                                </div>
+                            {% endif %}
                         </div>
 
                         <div class="col-md-6">
@@ -329,6 +361,7 @@
                     <button
                         type="submit"
                         class="btn btn-primary px-4"
+                        id="registra-visitatore-button"
                     >
                         Registra visitatore
                     </button>
@@ -343,8 +376,49 @@
 
 </div>
 
+<div
+    id="stampa-in-corso-overlay"
+    class="d-none position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+    style="z-index: 2000; background: rgba(20, 32, 50, .62);"
+    aria-live="assertive"
+    aria-busy="true"
+>
+    <div class="card shadow-lg border-0 text-center" style="max-width: 25rem;">
+        <div class="card-body p-4">
+            <div class="spinner-border text-primary mb-3" role="status" aria-hidden="true"></div>
+            <h2 class="h5 mb-2">Registrazione in corso</h2>
+            <p class="text-muted mb-0">
+                Attendere: il ticket è in fase di stampa. Non chiudere la pagina.
+            </p>
+        </div>
+    </div>
+</div>
+
 <script>
 document.addEventListener("DOMContentLoaded", function () {
+    const registrationForm = document.getElementById(
+        "registrazione-visitatore-form"
+    );
+    const printingOverlay = document.getElementById(
+        "stampa-in-corso-overlay"
+    );
+    const submitButton = document.getElementById(
+        "registra-visitatore-button"
+    );
+    let submissionInProgress = false;
+
+    registrationForm.addEventListener("submit", function (event) {
+        if (submissionInProgress) {
+            event.preventDefault();
+            return;
+        }
+
+        submissionInProgress = true;
+        submitButton.disabled = true;
+        submitButton.textContent = "Registrazione in corso…";
+        printingOverlay.classList.remove("d-none");
+    });
+
     const documentoPresentato = document.getElementById(
         "id_documento_presentato"
     );

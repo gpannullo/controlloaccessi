@@ -12,11 +12,26 @@ from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 
 from accounts.services.directory_admin_service import DirectoryAdminException, DirectoryAdminService
-from access_control.models import GruppoOrganizzativo, Ufficio
+from access_control.models import AssegnazioneUfficio, GruppoOrganizzativo, Ufficio
 from audit.services.audit_service import AuditService
 from dashboard.permissions import directory_admin_required
+from prenotazioni.models import PersonaleWordPress, UnitaOrganizzativaWordPress
+from prenotazioni.wordpress_connector import (
+    WordPressConnectorError,
+    crea_unita_organizzativa_wordpress,
+    pubblica_persona_pubblica_wordpress,
+    crea_persona_pubblica_wordpress,
+)
 
 User = get_user_model()
+
+
+def _unita_wordpress_attese_per_utente(utente):
+    """Unità WordPress che devono seguire gli uffici locali dell'utente."""
+    return UnitaOrganizzativaWordPress.objects.filter(
+        ufficio__assegnazioni_personale__utente=utente,
+        ufficio__assegnazioni_personale__attiva=True,
+    ).distinct()
 
 
 def _username_base(first_name, last_name):
@@ -62,11 +77,11 @@ def directory_home(request):
 
 
 def _directory_user_create_context(form_data=None):
-    gruppi_operativi = GruppoOrganizzativo.objects.filter(
-        tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
+    gruppi_operativi = Ufficio.objects.filter(
         attivo=True,
-        ufficio__attivo=True,
-    ).select_related("ufficio", "django_group").order_by("ufficio__nome", "nome")
+        gruppo_operativo__tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
+        gruppo_operativo__attivo=True,
+    ).select_related("gruppo_operativo").order_by("nome")
     return {
         "uffici": Ufficio.objects.filter(attivo=True).order_by("nome"),
         "gruppi_operativi": gruppi_operativi,
@@ -101,14 +116,15 @@ def directory_user_create_submit(request):
         mobile = request.POST.get("mobile", "").strip()
         if not first_name or not last_name or not email:
             raise DirectoryAdminException("Nome, cognome ed e-mail sono obbligatori.")
-        gruppo = get_object_or_404(
-            GruppoOrganizzativo.objects.select_related("ufficio", "django_group"),
-            pk=request.POST.get("gruppo_organizzativo"),
-            tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
+        ufficio = get_object_or_404(
+            Ufficio.objects.select_related("gruppo_operativo__django_group"),
+            pk=request.POST.get("ufficio"),
             attivo=True,
-            ufficio_id=request.POST.get("ufficio"),
-            ufficio__attivo=True,
+            gruppo_operativo__pk=request.POST.get("gruppo_organizzativo"),
+            gruppo_operativo__tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
+            gruppo_operativo__attivo=True,
         )
+        gruppo = ufficio.gruppo_operativo
         username = _username_proposto(first_name, last_name)
         password = _password_provvisoria()
         mail_istituzionale = request.POST.get("mail_istituzionale") == "on"
@@ -143,12 +159,17 @@ def directory_user_create_submit(request):
             utente.set_unusable_password()
             utente.save(update_fields=["password"])
         utente.groups.set(gruppi_locali)
+        AssegnazioneUfficio.objects.get_or_create(
+            utente=utente,
+            ufficio=ufficio,
+            defaults={"attiva": True},
+        )
         AuditService.log(
             user=request.user,
             tipo="CREATE",
             oggetto="ActiveDirectory:%s" % username,
             descrizione="Creato utente AD nell'ufficio %s e assegnato al gruppo %s%s" % (
-                gruppo.ufficio,
+                ufficio,
                 gruppo.directory_name,
                 " e MDAEMON (%s)" % email_directory if mail_istituzionale else "",
             ),
@@ -160,13 +181,9 @@ def directory_user_create_submit(request):
             mail.send(
                 recipients=[email],
                 sender=settings.DEFAULT_FROM_EMAIL,
-                subject="Credenziali di accesso",
-                message=(
-                    "Buongiorno %s %s,\n\n"
-                    "è stato creato il suo account.\n"
-                    "Username: %s\nPassword provvisoria: %s\n\n"
-                    "Al primo accesso sarà richiesto di cambiare la password."
-                ) % (first_name, last_name, username, password),
+                template="account_creato",
+                context={"nome": (first_name + " " + last_name).strip(), "username": username,
+                         "password_provvisoria": password, "url": "https://account.comune.aversa.ce.it/account/"},
             )
         except Exception as exc:
             messages.warning(request, "Account creato, ma l'e-mail non è stata accodata: %s" % exc)
@@ -189,7 +206,7 @@ def directory_users(request):
         request.session.pop(session_key, None)
         filtri = {}
     elif request.GET:
-        filtri = {"q": request.GET.get("q", ""), "tipo_attivita": request.GET.getlist("tipo_attivita"), "stato_presenza": request.GET.get("stato_presenza", ""), "stato_account": request.GET.get("stato_account", ""), "gruppo": request.GET.get("gruppo", "")}
+        filtri = {"q": request.GET.get("q", ""), "tipo_attivita": request.GET.getlist("tipo_attivita"), "stato_presenza": request.GET.get("stato_presenza", ""), "stato_account": request.GET.get("stato_account", ""), "gruppo": request.GET.get("gruppo", ""), "ufficio": request.GET.getlist("ufficio")}
         request.session[session_key] = filtri
     else:
         filtri = request.session.get(session_key, {})
@@ -201,13 +218,18 @@ def directory_users(request):
     presenza = filtri.get("stato_presenza", "")
     attivo = filtri.get("stato_account", "")
     gruppo = filtri.get("gruppo", "")
+    uffici_selezionati = filtri.get("ufficio", [])
+    if isinstance(uffici_selezionati, str):
+        uffici_selezionati = [uffici_selezionati] if uffici_selezionati else []
     if tipi: utenti = utenti.filter(tipo_attivita__in=tipi)
     if presenza: utenti = utenti.filter(stato_presenza=presenza)
     if attivo == "attivi": utenti = utenti.filter(is_active=True)
     elif attivo == "disattivi": utenti = utenti.filter(is_active=False)
     if gruppo: utenti = utenti.filter(groups__pk=gruppo)
+    if uffici_selezionati:
+        utenti = utenti.filter(assegnazioni_ufficio__ufficio_id__in=uffici_selezionati)
     risultati = utenti.distinct().order_by("last_name", "first_name", "username")
-    return render(request, "dashboard/directory_home.html", {"query": query, "utenti": risultati, "totale_utenti": User.objects.count(), "totale_filtrati": risultati.count(), "gruppi": Group.objects.order_by("name"), "tipi": tipi, "presenza": presenza, "attivo": attivo, "gruppo": gruppo})
+    return render(request, "dashboard/directory_home.html", {"query": query, "utenti": risultati, "totale_utenti": User.objects.count(), "totale_filtrati": risultati.count(), "gruppi": Group.objects.order_by("name"), "uffici": Ufficio.objects.filter(attivo=True).order_by("nome"), "uffici_selezionati": [str(pk) for pk in uffici_selezionati], "tipi": tipi, "presenza": presenza, "attivo": attivo, "gruppo": gruppo})
 
 
 @directory_admin_required
@@ -239,17 +261,16 @@ def directory_staff(request):
     else:
         uffici_selezionati = request.session.get(session_key, [])
     personale = User.objects.filter(
-        groups__gruppo_organizzativo__ufficio__isnull=False,
-        groups__gruppo_organizzativo__ufficio__attivo=True,
-    ).distinct().prefetch_related("groups__gruppo_organizzativo__ufficio").order_by("last_name", "first_name", "username")
+        assegnazioni_ufficio__attiva=True,
+        assegnazioni_ufficio__ufficio__attivo=True,
+    ).distinct().prefetch_related("assegnazioni_ufficio__ufficio").order_by("last_name", "first_name", "username")
     if uffici_selezionati:
-        personale = personale.filter(groups__gruppo_organizzativo__ufficio_id__in=uffici_selezionati).distinct()
+        personale = personale.filter(assegnazioni_ufficio__ufficio_id__in=uffici_selezionati).distinct()
     for utente in personale:
         assegnazioni = [
-            gruppo.gruppo_organizzativo.ufficio
-            for gruppo in utente.groups.all()
-            if hasattr(gruppo, "gruppo_organizzativo")
-            and gruppo.gruppo_organizzativo.ufficio_id
+            assegnazione.ufficio
+            for assegnazione in utente.assegnazioni_ufficio.all()
+            if assegnazione.attiva
         ]
         utente.uffici_associati = list({ufficio.pk: ufficio for ufficio in assegnazioni}.values())
         utente.numero_uffici = len(utente.uffici_associati)
@@ -315,35 +336,71 @@ def directory_sync_mail_from_upn(request):
 @directory_admin_required
 def directory_user(request, pk):
     utente = get_object_or_404(User, pk=pk)
-    uffici_associati = GruppoOrganizzativo.objects.filter(
-        django_group__user=utente,
-        tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
-        ufficio__isnull=False,
-    ).select_related("ufficio", "django_group").order_by("ufficio__nome", "nome")
-    gruppi_ufficio_disponibili = GruppoOrganizzativo.objects.filter(
-        tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
+    uffici_associati = AssegnazioneUfficio.objects.filter(
+        utente=utente,
+    ).select_related("ufficio", "ufficio__gruppo_operativo").order_by("ufficio__nome")
+    gruppi_ufficio_disponibili = Ufficio.objects.filter(
         attivo=True,
-        ufficio__attivo=True,
-    ).exclude(django_group__user=utente).select_related("ufficio", "django_group").order_by("ufficio__nome", "nome")
+    ).exclude(
+        # Le associazioni esistenti, anche disattivate, si gestiscono nel riepilogo.
+        pk__in=AssegnazioneUfficio.objects.filter(
+            utente=utente,
+        ).values("ufficio_id"),
+    ).select_related("gruppo_operativo").order_by("nome")
+    unita_per_ufficio = {
+        unita.ufficio_id: unita
+        for unita in UnitaOrganizzativaWordPress.objects.filter(
+            ufficio__in=[assegnazione.ufficio for assegnazione in uffici_associati]
+        ).select_related("ufficio")
+    }
+    for assegnazione in uffici_associati:
+        assegnazione.unita_organizzativa_wordpress = unita_per_ufficio.get(assegnazione.ufficio_id)
+    persone_pubbliche = PersonaleWordPress.objects.filter(
+        utente=utente,
+    ).prefetch_related("unita_organizzative").order_by("cognome", "nome", "titolo")
+    unita_attese = list(_unita_wordpress_attese_per_utente(utente))
+    unita_attese_ids = {unita.pk for unita in unita_attese}
+    for persona in persone_pubbliche:
+        unita_attuali = list(persona.unita_organizzative.all())
+        persona.unita_mancanti = [
+            unita for unita in unita_attese if unita.pk not in {item.pk for item in unita_attuali}
+        ]
+        persona.unita_in_eccesso = [
+            unita for unita in unita_attuali if unita.pk not in unita_attese_ids
+        ]
+        persona.uffici_disallineati = bool(persona.unita_mancanti or persona.unita_in_eccesso)
+    for assegnazione in uffici_associati:
+        unita = assegnazione.unita_organizzativa_wordpress
+        assegnazione.persone_pubbliche_mancanti = [
+            persona for persona in persone_pubbliche
+            if unita and unita in persona.unita_mancanti
+        ]
+    dettaglio = None
+    gruppi_ad_disponibili = []
+    dominio_istituzionale = ""
     try:
         dettaglio = DirectoryAdminService().dettaglio(utente.username)
+    except Exception as exc:
+        messages.error(request, "Impossibile leggere AD: %s" % exc)
+
+    if dettaglio is not None:
         gruppi_automatici = set(
             GruppoOrganizzativo.objects.filter(
                 tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO
             ).values_list("directory_name", flat=True)
         )
         gruppi_automatici.add("MDAEMON")
-        gruppi_ad_disponibili = [
-            gruppo["name"] for gruppo in DirectoryAdminService().lista_gruppi()
-            if gruppo["name"] not in gruppi_automatici and gruppo["name"] not in dettaglio["groups"]
-        ]
-        dominio_istituzionale = ""
+        try:
+            gruppi_ad_disponibili = [
+                gruppo["name"] for gruppo in DirectoryAdminService().lista_gruppi()
+                if gruppo["name"] not in gruppi_automatici and gruppo["name"] not in dettaglio["groups"]
+            ]
+        except Exception as exc:
+            messages.warning(request, "Impossibile caricare i gruppi AD disponibili: %s" % exc)
         if "@" in dettaglio["email"]:
             candidato = dettaglio["email"].rsplit("@", 1)[1].lower()
             if candidato in settings.INSTITUTIONAL_EMAIL_DOMAINS:
                 dominio_istituzionale = candidato
-    except Exception as exc:
-        dettaglio = None; gruppi_ad_disponibili = []; dominio_istituzionale = ""; messages.error(request, "Impossibile leggere AD: %s" % exc)
     return render(request, "dashboard/directory_user.html", {
         "utente": utente,
         "dettaglio": dettaglio,
@@ -352,13 +409,16 @@ def directory_user(request, pk):
         "domini_istituzionali": settings.INSTITUTIONAL_EMAIL_DOMAINS,
         "dominio_istituzionale": dominio_istituzionale,
         "gruppi_ad_disponibili": gruppi_ad_disponibili,
+        "persone_pubbliche": persone_pubbliche,
+        "persone_collegabili": PersonaleWordPress.objects.filter(utente__isnull=True).order_by("cognome", "nome", "titolo"),
     })
 
 
 @directory_admin_required
 @require_POST
 def directory_action(request, pk):
-    utente = get_object_or_404(User, pk=pk); service = DirectoryAdminService(); azione = request.POST.get("azione")
+    utente = get_object_or_404(User, pk=pk); azione = request.POST.get("azione")
+    service = None if azione in {"visibilita_ufficio", "elimina_ufficio"} else DirectoryAdminService()
     try:
         messaggio_successo = "Operazione completata."
         avviso_email = None
@@ -366,6 +426,19 @@ def directory_action(request, pk):
             first_name = request.POST.get("first_name", "").strip()
             last_name = request.POST.get("last_name", "").strip()
             personal_email = request.POST.get("personal_email", "").strip()
+            badge = request.POST.get("badge", "").strip()
+            # 0000000000 è il segnaposto visivo usato dalla form quando il
+            # badge non è assegnato: non va salvato né scritto in LDAP.
+            if badge == "0000000000":
+                badge = ""
+            elif badge:
+                if not badge.isdigit() or len(badge) > 10:
+                    raise DirectoryAdminException(
+                        "Il badge deve contenere al massimo 10 cifre."
+                    )
+                badge = badge.zfill(10)
+            if badge and User.objects.exclude(pk=utente.pk).filter(badge=badge).exists():
+                raise DirectoryAdminException("Il badge è già assegnato a un altro utente.")
             service.aggiorna_anagrafica(
                 utente.username,
                 first_name,
@@ -383,10 +456,19 @@ def directory_action(request, pk):
                 utente.groups.add(gruppo_mdaemon)
             else:
                 utente.groups.remove(gruppo_mdaemon)
-            User.objects.filter(pk=utente.pk).update(first_name=first_name, last_name=last_name, email=email_istituzionale or personal_email)
-            messaggio_successo = "Anagrafica e impostazioni della mail istituzionale aggiornate."
+            service.imposta_badge(utente.username, badge)
+            User.objects.filter(pk=utente.pk).update(
+                first_name=first_name,
+                last_name=last_name,
+                email=email_istituzionale or personal_email,
+                badge=badge or None,
+            )
+            messaggio_successo = "Anagrafica, badge e impostazioni della mail istituzionale aggiornati."
         elif azione == "stato":
-            service.imposta_attivo(utente.username, request.POST.get("attivo") == "true")
+            attivo = request.POST.get("attivo") == "true"
+            service.imposta_attivo(utente.username, attivo)
+            utente.is_active = attivo
+            utente.save(update_fields=["is_active"])
         elif azione == "password":
             destinatario = service.dettaglio(utente.username).get("personal_email", "").strip()
             if not destinatario:
@@ -399,13 +481,9 @@ def directory_action(request, pk):
                 mail.send(
                     recipients=[destinatario],
                     sender=settings.DEFAULT_FROM_EMAIL,
-                    subject="Nuova password di accesso",
-                    message=(
-                        "Buongiorno %s %s,\n\n"
-                        "la password del suo account è stata reimpostata.\n"
-                        "Username: %s\nPassword provvisoria: %s\n\n"
-                        "Al primo accesso sarà richiesto di cambiare la password."
-                    ) % (utente.first_name, utente.last_name, utente.username, password),
+                    template="password_reimpostata",
+                    context={"nome": utente.get_full_name() or utente.username, "username": utente.username,
+                             "password_provvisoria": password, "url": "https://account.comune.aversa.ce.it/account/"},
                 )
             except Exception as exc:
                 avviso_email = "Password reimpostata, ma l'e-mail non è stata accodata: %s" % exc
@@ -414,30 +492,89 @@ def directory_action(request, pk):
                 if avviso_email
                 else "Password reimpostata e credenziali accodate per l'invio all'e-mail personale."
             )
+        elif azione == "scollega_persona_pubblica":
+            persona = get_object_or_404(PersonaleWordPress, pk=request.POST.get("persona_pubblica"), utente=utente)
+            PersonaleWordPress.objects.filter(pk=persona.pk, utente=utente).update(utente=None)
+            messaggio_successo = "Collegamento alla persona pubblica rimosso."
+        elif azione == "collega_persona_pubblica":
+            if PersonaleWordPress.objects.filter(utente=utente).exists():
+                raise DirectoryAdminException("L'account ha gia una persona pubblica collegata.")
+            persona = get_object_or_404(PersonaleWordPress, pk=request.POST.get("persona_pubblica"), utente__isnull=True)
+            if not PersonaleWordPress.objects.filter(pk=persona.pk, utente__isnull=True).update(utente=utente):
+                raise DirectoryAdminException("Persona pubblica gia collegata a un altro account.")
+            messaggio_successo = "Persona pubblica collegata all'account."
+        elif azione == "crea_persona_pubblica":
+            persona = crea_persona_pubblica_wordpress(utente)
+            messaggio_successo = "Persona pubblica creata su WordPress e collegata all'account."
+        elif azione == "visibilita_ufficio":
+            assegnazione = get_object_or_404(
+                AssegnazioneUfficio.objects.select_related("ufficio"),
+                pk=request.POST.get("assegnazione"),
+                utente=utente,
+            )
+            visibile = request.POST.get("visibile") == "1"
+            if assegnazione.attiva != visibile:
+                assegnazione.attiva = visibile
+                assegnazione.save(update_fields=["attiva", "aggiornata_il"])
+            messaggio_successo = "Utente %s nell'ufficio %s. Gruppi AD invariati." % (
+                "visibile" if visibile else "non visibile", assegnazione.ufficio,
+            )
+        elif azione == "elimina_ufficio":
+            assegnazione = get_object_or_404(AssegnazioneUfficio.objects.select_related("ufficio"), pk=request.POST.get("assegnazione"), utente=utente)
+            nome_ufficio = str(assegnazione.ufficio)
+            assegnazione.delete()
+            messaggio_successo = "Associazione all'ufficio %s eliminata. Gruppi AD invariati." % nome_ufficio
         elif azione == "rimuovi_ufficio":
             assegnazione = get_object_or_404(
-                GruppoOrganizzativo.objects.select_related("django_group", "ufficio"),
+                AssegnazioneUfficio.objects.select_related("ufficio", "ufficio__gruppo_operativo"),
                 pk=request.POST.get("gruppo_organizzativo"),
-                django_group__user=utente,
-                tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
-                ufficio__isnull=False,
+                utente=utente,
+                attiva=True,
             )
-            service.rimuovi_da_gruppo(utente.username, assegnazione.directory_name)
-            utente.groups.remove(assegnazione.django_group)
+            from access_control.services.office_assignment_service import OfficeAssignmentService
+            OfficeAssignmentService().rimuovi(utente, assegnazione.ufficio)
             messaggio_successo = "Ufficio %s rimosso dall'account." % assegnazione.ufficio
         elif azione == "aggiungi_ufficio":
             assegnazione = get_object_or_404(
-                GruppoOrganizzativo.objects.select_related("django_group", "ufficio"),
+                Ufficio.objects.select_related("gruppo_operativo"),
                 pk=request.POST.get("gruppo_organizzativo"),
-                tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO,
                 attivo=True,
-                ufficio__attivo=True,
             )
-            if utente.groups.filter(pk=assegnazione.django_group_id).exists():
+            from access_control.services.office_assignment_service import OfficeAssignmentService
+            _, creata = OfficeAssignmentService().assegna(utente, assegnazione)
+            if not creata:
                 raise DirectoryAdminException("L'ufficio è già associato all'account.")
-            service.aggiungi_utente_al_gruppo(utente.username, assegnazione.directory_name)
-            utente.groups.add(assegnazione.django_group)
-            messaggio_successo = "Ufficio %s aggiunto all'account." % assegnazione.ufficio
+            messaggio_successo = "Ufficio %s aggiunto all'account." % assegnazione
+        elif azione == "crea_unita_organizzativa":
+            ufficio = get_object_or_404(
+                Ufficio.objects.distinct(),
+                pk=request.POST.get("ufficio"),
+                assegnazioni_personale__utente=utente,
+                assegnazioni_personale__attiva=True,
+            )
+            esistente = UnitaOrganizzativaWordPress.objects.filter(ufficio=ufficio).first()
+            if esistente:
+                raise DirectoryAdminException("L'ufficio %s è già collegato all'unità organizzativa WordPress %s." % (ufficio, esistente.nome))
+            unita = crea_unita_organizzativa_wordpress(ufficio)
+            messaggio_successo = "Creata l'unità organizzativa %s su WordPress e collegata all'ufficio %s." % (unita.nome, ufficio.nome)
+        elif azione == "allinea_uffici_persona_pubblica":
+            persona = get_object_or_404(
+                PersonaleWordPress.objects.prefetch_related("unita_organizzative"),
+                pk=request.POST.get("persona_pubblica"),
+                utente=utente,
+            )
+            unita_attese = _unita_wordpress_attese_per_utente(utente)
+            persona.unita_organizzative.set(unita_attese)
+            pubblica_persona_pubblica_wordpress(persona)
+            messaggio_successo = "Uffici della persona pubblica %s allineati con gli uffici dell'account e aggiornati su WordPress." % persona
+        elif azione == "rimuovi_gruppo_ad":
+            nome_gruppo = request.POST.get("gruppo_ad", "").strip()
+            if not nome_gruppo:
+                raise DirectoryAdminException("Selezionare un gruppo AD.")
+            service.rimuovi_da_gruppo(utente.username, nome_gruppo)
+            gruppi_locali = Group.objects.filter(Q(name__iexact=nome_gruppo) | Q(gruppo_organizzativo__directory_name__iexact=nome_gruppo)).distinct()
+            utente.groups.remove(*gruppi_locali)
+            messaggio_successo = "Appartenenza al gruppo AD %s rimossa. Gli uffici associati restano invariati." % nome_gruppo
         elif azione == "aggiungi_gruppo_ad":
             nome_gruppo = request.POST.get("gruppo_ad", "").strip()
             if not nome_gruppo:

@@ -10,7 +10,8 @@ from django.views.decorators.http import require_http_methods
 
 from accounts.services.active_directory_service import ActiveDirectoryService
 from accounts.services.directory_admin_service import DirectoryAdminException, DirectoryAdminService
-from access_control.models import GruppoOrganizzativo
+from access_control.models import AssegnazioneUfficio, GruppoOrganizzativo
+from common.module_access import PortineriaAccessMixin
 
 
 PENDING_PASSWORD_CHANGE = "initial_password_change"
@@ -25,7 +26,15 @@ def _safe_next(request, value):
 def _default_destination(request):
     if request.get_host().split(":", 1)[0].lower() == settings.PUBLIC_ACCOUNT_HOST:
         return reverse("my_account")
-    return settings.LOGIN_REDIRECT_URL
+    user = getattr(request, "user", None)
+    if (
+        user
+        and user.is_authenticated
+        and not user.is_superuser
+        and PortineriaAccessMixin.has_module_access(user)
+    ):
+        return reverse("dashboard:home")
+    return reverse("home")
 
 
 def _aggiorna_stato_password_locale(user):
@@ -41,9 +50,13 @@ class DirectoryLoginView(LoginView):
     template_name = "registration/login.html"
 
     def get_success_url(self):
+        # Preserve the QR landing page without changing other public redirects.
+        destination = self.get_redirect_url()
+        if destination in {reverse("presenze_qr:scan"), reverse("presenze_qr:personale")}:
+            return destination
         if self.request.get_host().split(":", 1)[0].lower() == settings.PUBLIC_ACCOUNT_HOST:
             return reverse("my_account")
-        return super().get_success_url()
+        return self.get_redirect_url() or _default_destination(self.request)
 
     def post(self, request, *args, **kwargs):
         username = request.POST.get("username", "").strip()
@@ -91,21 +104,29 @@ def initial_password_change(request):
 @login_required
 @require_http_methods(["GET", "POST"])
 def my_account(request):
+    from presenze_qr.services import storico_personale, abilitato
+    tab = request.GET.get("tab", "anagrafica")
     if request.method == "POST":
         request.user.email_aggiuntiva = request.POST.get("email_aggiuntiva", "").strip()
         request.user.telefono_aggiuntivo = request.POST.get("telefono_aggiuntivo", "").strip()
         request.user.save(update_fields=["email_aggiuntiva", "telefono_aggiuntivo"])
         messages.success(request, "Recapiti aggiuntivi aggiornati.")
-        return redirect("my_account")
+        return redirect("%s?tab=anagrafica" % reverse("my_account"))
     try:
         dettaglio = DirectoryAdminService().dettaglio(request.user.username)
     except Exception as exc:
         dettaglio = None; messages.warning(request, "Dati directory non disponibili: %s" % exc)
-    uffici = GruppoOrganizzativo.objects.filter(django_group__user=request.user, tipo=GruppoOrganizzativo.Tipo.ORGANIZZATIVO, ufficio__isnull=False).select_related("ufficio").order_by("ufficio__nome")
+    uffici = AssegnazioneUfficio.objects.filter(utente=request.user, attiva=True).select_related("ufficio", "ufficio__gruppo_operativo").order_by("ufficio__nome")
+    uffici_responsabili = request.user.uffici_responsabili.filter(attivo=True).order_by("nome")
     return render(request, "accounts/my_account.html", {
         "dettaglio": dettaglio,
+        "timbrature": storico_personale(request.user) if tab == 'presenza' else [],
+        "abilitato_qr": settings.PRESENZE_QR_ENABLED and abilitato(request.user),
         "uffici": uffici,
+        "uffici_responsabili": uffici_responsabili,
+        "tab": tab if tab in {"anagrafica", "uffici", "abilitazioni", "presenza"} else "anagrafica",
         "account_update_contact_email": settings.ACCOUNT_UPDATE_CONTACT_EMAIL,
+        "is_public_account": request.get_host().split(":", 1)[0].lower() == settings.PUBLIC_ACCOUNT_HOST,
     })
 
 

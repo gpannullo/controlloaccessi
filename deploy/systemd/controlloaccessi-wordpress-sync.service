@@ -1,0 +1,12 @@
+[Unit]
+Description=Sincronizzazione appuntamenti WordPress ControlloAccessi
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=controlloaccessi
+Group=controlloaccessi
+WorkingDirectory=/var/www/controlloaccessi/app
+EnvironmentFile=/etc/controlloaccessi.env
+ExecStart=/var/www/controlloaccessi/venv/bin/python manage.py sync_wordpress_appointments

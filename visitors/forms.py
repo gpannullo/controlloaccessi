@@ -2,12 +2,33 @@ from django import forms
 from django.utils import timezone
 from datetime import timedelta
 
-from access_control.models import Ufficio
+from access_control.models import IndisponibilitaUfficio, Ufficio
 from access_control.services.office_service import OfficeService
-from visitors.models import AccessoVisitatore
+from visitors.models import AccessoVisitatore, Badge
+
+
+class IndisponibilitaUfficioForm(forms.ModelForm):
+    class Meta:
+        model = IndisponibilitaUfficio
+        fields = ("data_inizio", "data_fine", "motivo")
+        widgets = {
+            "data_inizio": forms.DateInput(attrs={"type": "date"}),
+            "data_fine": forms.DateInput(attrs={"type": "date"}),
+            "motivo": forms.TextInput(attrs={"placeholder": "Es. ferie del personale"}),
+        }
+        labels = {
+            "data_inizio": "Dal giorno",
+            "data_fine": "Al giorno",
+            "motivo": "Motivazione",
+        }
 
 
 class RegistrazioneVisitatoreForm(forms.Form):
+    appuntamento_id = forms.IntegerField(
+        required=False,
+        widget=forms.HiddenInput,
+    )
+
     documento_presentato = forms.BooleanField(
         required=False,
         initial=True,
@@ -185,7 +206,12 @@ class RegistrazioneVisitatoreForm(forms.Form):
                 or ""
         )
 
-        return numero.strip().upper()
+        return (
+            numero.strip().upper()
+            .replace(" ", "")
+            .replace("-", "")
+            .replace(".", "")
+        )
 
     def clean_motivo(self):
         motivo = (
@@ -260,6 +286,16 @@ class RientroBadgeForm(forms.Form):
 
     def clean_badge(self):
         return self.cleaned_data["badge"].strip().upper()
+
+
+class RettificaBadgeForm(forms.Form):
+    badge = forms.ModelChoiceField(queryset=Badge.objects.none(), label="Nuovo badge")
+
+    def __init__(self, *args, accesso=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        from visitors.services.badge_service import BadgeService
+        self.fields['badge'].queryset = BadgeService.disponibili().exclude(pk=getattr(accesso, 'badge_id', None))
+        self.fields['badge'].widget.attrs.update({'class': 'form-select'})
 
 
 class ChiusuraAccessoForm(forms.Form):

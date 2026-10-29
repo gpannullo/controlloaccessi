@@ -1,5 +1,7 @@
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Max
+from django.db.models.functions import Coalesce
+from datetime import timedelta
 from django.utils import timezone
 
 from audit.services.audit_service import AuditService
@@ -8,10 +10,47 @@ from visitors.models import AccessoVisitatore, EventoAccesso
 
 
 class OfficeQueueService:
-    """
-    Gestisce le operazioni effettuate dai dipendenti
-    dell'ufficio sulle code dei visitatori.
-    """
+    """Gestisce le operazioni dei dipendenti sulle code dei visitatori."""
+
+    @staticmethod
+    def _ordine_hall(prenotati=False):
+        fields = ['reinserito_hall_il']
+        if prenotati:
+            fields.append('appuntamento__data_ora')
+        return Coalesce(*fields, 'ingresso')
+
+    @classmethod
+    @transaction.atomic
+    def salta_non_presente(cls, *, accesso_id, ufficio, operatore, ip_address=None):
+        accesso = AccessoVisitatore.objects.select_for_update(of=('self',)).get(pk=accesso_id, ufficio_destinazione=ufficio)
+        if (accesso.uscita or accesso.visita_conclusa_il or not accesso.ingresso_ufficio_il
+                or accesso.operatore_assegnato_id != operatore.pk):
+            raise BusinessException('Puoi saltare soltanto il visitatore attualmente chiamato da te.')
+        now = timezone.now()
+        peers = AccessoVisitatore.objects.filter(ufficio_destinazione=ufficio, uscita__isnull=True,
+            visita_conclusa_il__isnull=True, ingresso_ufficio_il__isnull=True,
+            rientro_prioritario=accesso.rientro_prioritario,
+            appuntamento__isnull=accesso.appuntamento_id is None)
+        last = peers.aggregate(last=Max(cls._ordine_hall(bool(accesso.appuntamento_id))))['last']
+        order = max(now, last + timedelta(microseconds=1)) if last else now
+        previous = {'chiamata_il': accesso.ingresso_ufficio_il.isoformat(),
+                    'fuori_ufficio_il': accesso.spostato_fuori_ufficio_il.isoformat() if accesso.spostato_fuori_ufficio_il else None}
+        accesso.reinserito_hall_il = order
+        accesso.ingresso_ufficio_il = None
+        accesso.spostato_fuori_ufficio_il = None
+        accesso.operatore_assegnato = None
+        accesso.stato_coda = AccessoVisitatore.StatoCoda.HALL
+        accesso.save(update_fields=['reinserito_hall_il', 'ingresso_ufficio_il', 'spostato_fuori_ufficio_il', 'operatore_assegnato', 'stato_coda'])
+        description = 'Visitatore non presente alla chiamata: reinserito in fondo alla hall della propria categoria.'
+        EventoAccesso.objects.create(accesso=accesso, tipo=EventoAccesso.Tipo.HALL, timestamp=now,
+            ufficio=ufficio, operatore=operatore, descrizione=description, dati={'azione':'salto_non_presente', **previous})
+        cls._audit(user=operatore, accesso=accesso, descrizione=description, ip_address=ip_address)
+        # Nessun ingresso diretto dalla hall: il successivo deve essere già fuori porta.
+        if cls.coda_fuori_ufficio(ufficio).filter(Q(rientro_prioritario=True) | Q(appuntamento__isnull=False) | Q(tipo_accesso=AccessoVisitatore.TipoAccesso.RICEVIMENTO)).exists():
+            cls.fai_entrare_prossimo(ufficio=ufficio, operatore=operatore, ip_address=ip_address, escludi_promozione=accesso.pk)
+        else:
+            cls.promuovi_dalla_hall(ufficio=ufficio, operatore=operatore, ip_address=ip_address, escludi_accesso=accesso.pk)
+        return accesso
 
     @staticmethod
     def _audit(
@@ -100,7 +139,7 @@ class OfficeQueueService:
             .select_related("visitatore", "badge", "appuntamento")
             .order_by(
                 "-rientro_prioritario",
-                "ingresso",
+                Coalesce('reinserito_hall_il', 'appuntamento__data_ora', 'ingresso'),
                 "numero_coda",
             )
         )
@@ -128,7 +167,7 @@ class OfficeQueueService:
                 "badge",
             )
             .order_by(
-                "ingresso",
+                Coalesce('reinserito_hall_il', 'ingresso'),
                 "numero_coda",
             )
         )
@@ -165,6 +204,7 @@ class OfficeQueueService:
         numero_posti=1,
         operatore=None,
         ip_address=None,
+        escludi_accesso=None,
     ):
         """
         Sposta automaticamente dalla hall alla porta soltanto
@@ -179,7 +219,7 @@ class OfficeQueueService:
 
         rientri = list(
             AccessoVisitatore.objects
-            .select_for_update()
+            .select_for_update(of=('self',))
             .filter(
                 ufficio_destinazione=ufficio,
                 uscita__isnull=True,
@@ -188,7 +228,8 @@ class OfficeQueueService:
                 ingresso_ufficio_il__isnull=True,
                 visita_conclusa_il__isnull=True,
             )
-            .order_by("ingresso", "numero_coda")[:numero_posti]
+            .exclude(pk=escludi_accesso)
+            .order_by(cls._ordine_hall(), "numero_coda", "pk")[:numero_posti]
         )
 
         posti_residui = numero_posti - len(rientri)
@@ -196,7 +237,7 @@ class OfficeQueueService:
         if posti_residui > 0:
             prioritari = list(
                 AccessoVisitatore.objects
-                .select_for_update()
+                .select_for_update(of=('self',))
                 .filter(
                     ufficio_destinazione=ufficio,
                     uscita__isnull=True,
@@ -207,8 +248,9 @@ class OfficeQueueService:
                     ingresso_ufficio_il__isnull=True,
                     visita_conclusa_il__isnull=True,
                 )
+                .exclude(pk=escludi_accesso)
                 .order_by(
-                    "appuntamento__data_ora", "ingresso", "numero_coda"
+                    cls._ordine_hall(True), "ingresso", "numero_coda", "pk"
                 )[:posti_residui]
             )
 
@@ -217,7 +259,7 @@ class OfficeQueueService:
         if posti_residui > 0:
             ordinari = list(
                 AccessoVisitatore.objects
-                .select_for_update()
+                .select_for_update(of=('self',))
                 .filter(
                     ufficio_destinazione=ufficio,
                     uscita__isnull=True,
@@ -228,7 +270,8 @@ class OfficeQueueService:
                     ingresso_ufficio_il__isnull=True,
                     visita_conclusa_il__isnull=True,
                 )
-                .order_by("ingresso", "numero_coda")[:posti_residui]
+                .exclude(pk=escludi_accesso)
+                .order_by(cls._ordine_hall(), "numero_coda", "pk")[:posti_residui]
             )
 
         accessi = rientri + prioritari + ordinari
@@ -279,7 +322,7 @@ class OfficeQueueService:
 
         accesso = (
             AccessoVisitatore.objects
-            .select_for_update()
+            .select_for_update(of=('self',))
             .get(
                 pk=accesso.pk,
                 ufficio_destinazione=ufficio,
@@ -347,7 +390,7 @@ class OfficeQueueService:
     ):
         visita_corrente = (
             AccessoVisitatore.objects
-            .select_for_update()
+            .select_for_update(of=('self',))
             .filter(
                 ufficio_destinazione=ufficio,
                 operatore_assegnato=operatore,
@@ -372,6 +415,7 @@ class OfficeQueueService:
         operatore,
         ip_address=None,
         promuovi_ricevimento=False,
+        escludi_promozione=None,
     ):
         momento = timezone.now()
 
@@ -427,6 +471,7 @@ class OfficeQueueService:
                 numero_posti=1,
                 operatore=operatore,
                 ip_address=ip_address,
+                escludi_accesso=escludi_promozione,
             )
 
         return accesso
@@ -439,6 +484,7 @@ class OfficeQueueService:
         ufficio,
         operatore,
         ip_address=None,
+        escludi_promozione=None,
     ):
         """
         Fa entrare il prossimo RICEVIMENTO, dando precedenza
@@ -453,7 +499,7 @@ class OfficeQueueService:
 
         base = (
             AccessoVisitatore.objects
-            .select_for_update()
+            .select_for_update(of=('self',))
             .filter(
                 ufficio_destinazione=ufficio,
                 uscita__isnull=True,
@@ -487,7 +533,7 @@ class OfficeQueueService:
                     appuntamento__isnull=False,
                 )
                 .order_by(
-                    "appuntamento__data_ora",
+                    cls._ordine_hall(True),
                     "spostato_fuori_ufficio_il",
                     "ingresso",
                     "numero_coda",
@@ -518,6 +564,7 @@ class OfficeQueueService:
             operatore=operatore,
             ip_address=ip_address,
             promuovi_ricevimento=True,
+            escludi_promozione=escludi_promozione,
         )
 
     @classmethod
@@ -539,7 +586,7 @@ class OfficeQueueService:
 
         accesso = (
             AccessoVisitatore.objects
-            .select_for_update()
+            .select_for_update(of=('self',))
             .get(
                 pk=accesso.pk,
                 ufficio_destinazione=ufficio,
@@ -599,7 +646,7 @@ class OfficeQueueService:
 
         accesso = (
             AccessoVisitatore.objects
-            .select_for_update()
+            .select_for_update(of=("self",))
             .select_related(
                 "ufficio_destinazione",
                 "visitatore",

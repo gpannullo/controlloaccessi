@@ -1,0 +1,16 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div id="content-main">
+  <div class="module aligned">
+    <h1>Anteprima e-mail</h1>
+    <div class="form-row"><strong>Da:</strong> {{ mittente }}</div>
+    <div class="form-row"><strong>Oggetto:</strong> {{ comunicazione.oggetto }}</div>
+    <div class="form-row"><strong>Destinazione selezionata:</strong> {{ comunicazione.get_destinazione_display }}</div>
+    <div class="form-row" style="margin-top: 1.5rem; padding: 1rem; background: #fff; border: 1px solid #ddd; line-height: 1.6;">
+      {{ comunicazione.messaggio|linebreaksbr }}
+    </div>
+  </div>
+  <p><a class="button" href="{% url 'admin:comunicazioni_comunicazioneemail_change' comunicazione.pk %}">Torna alla comunicazione</a></p>
+</div>
+{% endblock %}

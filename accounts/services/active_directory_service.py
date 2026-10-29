@@ -2,10 +2,11 @@ from datetime import datetime
 from datetime import timezone as datetime_timezone
 
 import ssl
+import time
 from pathlib import Path
 
 from ldap3 import ALL, Connection, MODIFY_ADD, MODIFY_DELETE, Server, SUBTREE, Tls
-from ldap3.core.exceptions import LDAPBindError
+from ldap3.core.exceptions import LDAPBindError, LDAPSocketOpenError
 from django.conf import settings
 from ldap3.utils.conv import escape_filter_chars
 
@@ -21,6 +22,7 @@ class ActiveDirectoryService(DirectoryService):
         "mail",
         "otherMailbox",
         "mobile",
+        "employeeID",
         "memberOf",
         "userAccountControl",
         "msDS-UserPasswordExpiryTimeComputed",
@@ -33,7 +35,15 @@ class ActiveDirectoryService(DirectoryService):
     ]
 
     def __init__(self):
-        server_name = settings.DIRECTORY["SERVER"].removeprefix("ldap://").removeprefix("ldaps://").rstrip("/")
+        server_name = (
+            str(settings.DIRECTORY["SERVER"])
+            .strip()
+            .removeprefix("ldap://")
+            .removeprefix("ldaps://")
+            .rstrip("/")
+        )
+        if not server_name:
+            raise ValueError("AD_SERVER non configurato.")
         ca_cert_file = settings.DIRECTORY.get("TLS_CA_CERT_FILE")
         ca_cert_data = None
         if ca_cert_file:
@@ -68,15 +78,27 @@ class ActiveDirectoryService(DirectoryService):
         return snapshot
 
     def _connection(self):
-
-        conn = Connection(
-            self.server,
-            user=self.bind_user,
-            password=self.bind_password,
-            auto_bind=True,
-        )
-
-        return conn
+        # Il DNS del Domain Controller può essere momentaneamente indisponibile:
+        # un secondo tentativo evita di degradare l'intera scheda utente per un
+        # errore transitorio di apertura socket.
+        last_error = None
+        for attempt in range(2):
+            try:
+                return Connection(
+                    self.server,
+                    user=self.bind_user,
+                    password=self.bind_password,
+                    auto_bind=True,
+                    # Il controller puo' restituire referral LDAP verso endpoint
+                    # non pubblicati/risolvibili. Le operazioni devono restare sul
+                    # Domain Controller LDAPS configurato esplicitamente.
+                    auto_referrals=False,
+                )
+            except LDAPSocketOpenError as exc:
+                last_error = exc
+                if attempt == 0:
+                    time.sleep(1)
+        raise last_error
 
     def authenticate(self, username: str, password: str) -> bool:
 
@@ -95,6 +117,7 @@ class ActiveDirectoryService(DirectoryService):
                 user=f"{username.strip()}@{self.domain}",
                 password=password_attuale,
                 auto_bind=True,
+                auto_referrals=False,
             )
         except LDAPBindError as exc:
             raise ValueError("La password attuale non è corretta.") from exc
@@ -140,25 +163,52 @@ class ActiveDirectoryService(DirectoryService):
             conn.unbind()
 
     def authentication_status(self, username: str, password: str) -> str:
-        """Restituisce anche il caso AD ``data 773``: password da cambiare."""
+        """Distingue login valido, password da cambiare e credenziali errate.
 
+        Active Directory restituisce ``data 773`` per la password provvisoria
+        e ``data 532`` per una password scaduta. In entrambi i casi l'utente
+        deve poter scegliere subito una nuova password.
+        """
+
+        conn = None
         try:
+            # Evitiamo ``auto_bind``: ldap3 in base alla versione/protocollo
+            # può restituire l'esito della bind in ``conn.result`` anziché
+            # sollevare LDAPBindError. In entrambi i casi dobbiamo intercettare
+            # l'account con password scaduta o provvisoria.
             conn = Connection(
                 self.server,
                 user=f"{username}@{self.domain}",
                 password=password,
-                auto_bind=True,
+                auto_bind=False,
+                auto_referrals=False,
             )
 
-            stato = "authenticated" if conn.bound else "invalid"
-            conn.unbind()
-            return stato
+            if conn.bind():
+                return "authenticated"
+
+            result = conn.result or {}
+            diagnostic = " ".join(
+                str(result.get(key, ""))
+                for key in ("message", "description", "result")
+            ).lower()
+            if any(marker in diagnostic for marker in (
+                "data 532", "data 773", "password expired", "must change password",
+            )):
+                return "password_change_required"
+            return "invalid"
         except LDAPBindError as exc:
-            # Active Directory restituisce 773 quando le credenziali sono
-            # corrette ma la password provvisoria deve essere cambiata.
-            return "password_change_required" if "773" in str(exc) else "invalid"
+            # Le credenziali sono corrette, ma AD richiede il cambio password:
+            # 773 = password provvisoria; 532 = password scaduta.
+            diagnostic = str(exc).lower()
+            return "password_change_required" if any(marker in diagnostic for marker in (
+                "data 532", "data 773", "password expired", "must change password",
+            )) else "invalid"
         except Exception:
             return "invalid"
+        finally:
+            if conn is not None:
+                conn.unbind()
 
     def get_groups(self):
 
@@ -234,6 +284,7 @@ class ActiveDirectoryService(DirectoryService):
 
                 "personal_email": entry.otherMailbox.values[0] if hasattr(entry, "otherMailbox") and entry.otherMailbox.values else "",
                 "mobile": str(entry.mobile) if entry.mobile else "",
+                "badge": str(entry.employeeID.value or "") if getattr(entry, "employeeID", None) else "",
 
                 "groups": member_of,
 

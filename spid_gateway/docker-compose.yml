@@ -1,0 +1,9 @@
+services:
+  spid-gateway:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:8010:8010"
+    volumes:
+      - /etc/controlloaccessi/spid:/etc/controlloaccessi/spid:ro

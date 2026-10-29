@@ -2,6 +2,8 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
+from django.db.models import Value
+from django.db.models.functions import Replace, Upper
 from django.http import JsonResponse
 from django.shortcuts import (
     get_object_or_404,
@@ -14,6 +16,8 @@ from django.views.decorators.http import (
     require_POST,
 )
 
+from ControlloAccessi.settings import DIRECTORY
+from prenotazioni.services import appuntamento_wordpress_per_checkin
 from common.exceptions import (
     BusinessException,
     TicketPrinterException,
@@ -22,8 +26,10 @@ from visitors.forms import (
     RegistrazioneVisitatoreForm,
     ChiusuraAccessoForm,
     RientroBadgeForm,
+    RettificaBadgeForm,
 )
 from visitors.models import (
+    Appuntamento,
     AccessoVisitatore,
     Visitatore,
     Badge,
@@ -38,10 +44,23 @@ from visitors.services.ticket_printer_service import (
 )
 from visitors.permissions import portineria_required
 from visitors.services.continuity_service import ContinuitaAccessoService
+from visitors.services.badge_service import BadgeService
 
 def _normalizza_testo(value):
     return " ".join(
         (value or "").strip().split()
+    )
+
+
+def _normalizza_numero_documento(value):
+    """Rende confrontabili i numeri documento inseriti in formati diversi."""
+    return (
+        (value or "")
+        .strip()
+        .upper()
+        .replace(" ", "")
+        .replace("-", "")
+        .replace(".", "")
     )
 
 
@@ -66,16 +85,111 @@ def _trova_visitatore(
         if visitatore:
             return visitatore
 
+    documento_numero = _normalizza_numero_documento(documento_numero)
     if documento_numero:
         return (
             Visitatore.objects
+            .annotate(
+                documento_normalizzato=Replace(
+                    Replace(
+                        Replace(
+                            Upper("documento_numero"),
+                            Value(" "),
+                            Value(""),
+                        ),
+                        Value("-"),
+                        Value(""),
+                    ),
+                    Value("."),
+                    Value(""),
+                )
+            )
             .filter(
-                documento_numero__iexact=documento_numero,
+                documento_normalizzato=documento_numero,
             )
             .first()
         )
 
     return None
+
+
+def _appuntamento_per_ricevimento(request):
+    """Restituisce l'appuntamento scelto dalla lista di Portineria.
+
+    L'appuntamento deve essere odierno, non annullato e non ancora collegato
+    a un accesso. In questo modo il collegamento non dipende dal confronto
+    del nominativo digitato dall'operatore.
+    """
+    appuntamento_id = (
+        request.POST.get("appuntamento_id")
+        or request.GET.get("appuntamento")
+    )
+    if not appuntamento_id:
+        return None
+
+    return get_object_or_404(
+        Appuntamento.objects.select_related("ufficio").filter(
+            pk=appuntamento_id,
+            data_ora__date=timezone.localdate(),
+            stato__in=[
+                Appuntamento.Stato.PRENOTATO,
+                Appuntamento.Stato.CONFERMATO,
+            ],
+            accesso__isnull=True,
+        ),
+    )
+
+
+@portineria_required
+def appuntamenti_oggi(request):
+    """Elenco operativo degli appuntamenti da registrare in Portineria."""
+    ricerca = " ".join((request.GET.get("q") or "").split())
+    appuntamenti = (
+        Appuntamento.objects.select_related("ufficio")
+        .filter(
+            data_ora__date=timezone.localdate(),
+            stato__in=[
+                Appuntamento.Stato.PRENOTATO,
+                Appuntamento.Stato.CONFERMATO,
+            ],
+            accesso__isnull=True,
+        )
+        .order_by("ufficio__nome", "data_ora", "cognome_cittadino", "nome_cittadino")
+    )
+    if ricerca:
+        from django.db.models import Q
+
+        appuntamenti = appuntamenti.filter(
+            Q(nome_cittadino__icontains=ricerca)
+            | Q(cognome_cittadino__icontains=ricerca)
+            | Q(origine_wordpress__nome_prenotato__icontains=ricerca)
+            | Q(origine_wordpress__codice_fiscale__icontains=ricerca)
+        )
+
+    appuntamenti_per_ufficio = []
+    for appuntamento in appuntamenti:
+        if (
+            not appuntamenti_per_ufficio
+            or appuntamenti_per_ufficio[-1]["ufficio"].pk
+            != appuntamento.ufficio_id
+        ):
+            appuntamenti_per_ufficio.append(
+                {"ufficio": appuntamento.ufficio, "appuntamenti": []}
+            )
+        appuntamenti_per_ufficio[-1]["appuntamenti"].append(appuntamento)
+
+    return render(
+        request,
+        "visitors/appuntamenti_oggi.html",
+        {
+            "ricerca": ricerca,
+            "appuntamenti_per_ufficio": appuntamenti_per_ufficio,
+            "numero_appuntamenti": sum(
+                len(gruppo["appuntamenti"])
+                for gruppo in appuntamenti_per_ufficio
+            ),
+        },
+    )
 
 
 def _nuovo_accesso(request, tipo_accesso):
@@ -104,9 +218,23 @@ def _nuovo_accesso(request, tipo_accesso):
         .distinct()
     )
 
+    appuntamento_selezionato = None
+    if not is_visita:
+        appuntamento_selezionato = _appuntamento_per_ricevimento(request)
+
     form_kwargs = {
         "tipo_accesso": tipo_accesso,
     }
+
+    if appuntamento_selezionato and request.method != "POST":
+        form_kwargs["initial"] = {
+            "appuntamento_id": appuntamento_selezionato.pk,
+            "nome": appuntamento_selezionato.nome_cittadino,
+            "cognome": appuntamento_selezionato.cognome_cittadino,
+            "telefono": appuntamento_selezionato.telefono,
+            "ufficio": appuntamento_selezionato.ufficio_id,
+            "motivo": appuntamento_selezionato.motivo,
+        }
 
     if request.method == "POST":
         form_kwargs["data"] = request.POST
@@ -222,6 +350,17 @@ def _nuovo_accesso(request, tipo_accesso):
                             update_fields=campi_modificati,
                         )
 
+                appuntamento = appuntamento_selezionato
+                if appuntamento and appuntamento.ufficio_id != form.cleaned_data["ufficio"].pk:
+                    raise BusinessException(
+                        "L'ufficio selezionato non corrisponde all'appuntamento."
+                    )
+                if not is_visita and appuntamento is None:
+                    appuntamento = appuntamento_wordpress_per_checkin(
+                        visitatore,
+                        form.cleaned_data["ufficio"],
+                    )
+
                 accesso = ReceptionService.check_in(
                     visitatore=visitatore,
                     ufficio=form.cleaned_data["ufficio"],
@@ -232,7 +371,15 @@ def _nuovo_accesso(request, tipo_accesso):
                     ip_address=_get_client_ip(request),
                     tipo_accesso=tipo_accesso,
                     accompagnato=form.cleaned_data.get("accompagnato", False),
+                    appuntamento=appuntamento,
                 )
+
+                if appuntamento:
+                    appuntamento.conferma()
+                    messages.success(
+                        request,
+                        "Appuntamento verificato: al visitatore è stata attribuita la priorità in coda.",
+                    )
 
             ticket_stampato = False
             errore_stampa = ""
@@ -269,6 +416,7 @@ def _nuovo_accesso(request, tipo_accesso):
             "motivi_visita": motivi_visita,
             "tipo_accesso": tipo_accesso,
             "is_visita": is_visita,
+            "appuntamento_selezionato": appuntamento_selezionato,
             "titolo_registrazione": (
                 "Nuova visita"
                 if is_visita
@@ -336,6 +484,7 @@ def registrazione_completata(request, pk):
             "accesso": accesso,
             "ticket_stampato": ticket_stampato,
             "errore_stampa": errore_stampa,
+            "badge_disponibili": BadgeService.disponibili().exclude(pk=accesso.badge_id),
         },
     )
 
@@ -353,10 +502,9 @@ def cerca_visitatore(request):
         or ""
     ).strip().upper()
 
-    documento_numero = (
-        request.GET.get("documento_numero")
-        or ""
-    ).strip().upper()
+    documento_numero = _normalizza_numero_documento(
+        request.GET.get("documento_numero") or ""
+    )
 
     if not codice_fiscale and not documento_numero:
         return JsonResponse(
@@ -425,6 +573,9 @@ def ristampa_ticket(request, pk):
             )
         )
 
+        request.session[f"ticket_stampato_{accesso.pk}"] = stampato
+        request.session[f"errore_stampa_{accesso.pk}"] = ""
+
         if stampato:
             messages.success(
                 request,
@@ -441,6 +592,8 @@ def ristampa_ticket(request, pk):
             )
 
     except TicketPrinterException as exc:
+        request.session[f"ticket_stampato_{accesso.pk}"] = False
+        request.session[f"errore_stampa_{accesso.pk}"] = str(exc)
         messages.error(
             request,
             str(exc),
@@ -450,6 +603,29 @@ def ristampa_ticket(request, pk):
         "portineria:registrazione_completata",
         pk=accesso.pk,
     )
+
+
+@portineria_required
+@require_POST
+def rettifica_badge(request, pk):
+    with transaction.atomic():
+        accesso = get_object_or_404(AccessoVisitatore.objects.select_for_update(), pk=pk)
+        form = RettificaBadgeForm(request.POST, accesso=accesso)
+        if not form.is_valid():
+            messages.error(request, 'Selezionare un badge disponibile.')
+            return redirect('portineria:registrazione_completata', pk=pk)
+        nuovo = BadgeService.disponibili().select_for_update().filter(pk=form.cleaned_data['badge'].pk).first()
+        if nuovo is None:
+            messages.error(request, 'Il badge selezionato non è più disponibile.')
+            return redirect('portineria:registrazione_completata', pk=pk)
+        vecchio = accesso.badge.codice if accesso.badge else 'nessuno'
+        accesso.badge = nuovo
+        accesso.save(update_fields=['badge'])
+        from visitors.models import EventoAccesso
+        EventoAccesso.objects.create(accesso=accesso, tipo=EventoAccesso.Tipo.NOTA, operatore=request.user,
+            descrizione=f'Rettifica badge: {vecchio} → {nuovo.codice}', dati={'badge_precedente': vecchio, 'badge_nuovo': nuovo.codice})
+    messages.success(request, f'Badge rettificato. Nuovo badge: {nuovo.codice}.')
+    return redirect('portineria:registrazione_completata', pk=pk)
 
 def _get_client_ip(request):
     forwarded_for = request.META.get(
@@ -629,8 +805,8 @@ def amministratori(request):
         request,
         "visitors/amministratori.html",
         {
-            "giunta": prepara_gruppo("Giunta"),
-            "consiglieri": prepara_gruppo("Consiglieri"),
+            "giunta": prepara_gruppo(DIRECTORY['GIUNTA_GROUP']),
+            "consiglieri": prepara_gruppo(DIRECTORY['CONSIGLIERI_GROUP']),
         },
     )
 
