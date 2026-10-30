@@ -28,6 +28,8 @@ class ActiveDirectoryBackend(BaseBackend):
         username = username.strip().lower()
         if not username:
             return None
+        if User.objects.filter(username__iexact=username, autenticazione_locale=True).exists():
+            return None
         directory = DirectoryFactory.get_service()
 
         if not directory.authenticate(username, password):

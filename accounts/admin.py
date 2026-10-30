@@ -92,6 +92,7 @@ class CustomUserAdmin(UserAdmin):
             {
                 "fields": (
                     "tipo_attivita",
+                    "autenticazione_locale",
                     "badge",
                     "stato_presenza",
                     "presenza_verificata_il",
@@ -110,6 +111,7 @@ class CustomUserAdmin(UserAdmin):
             {
                 "fields": (
                     "tipo_attivita",
+                    "autenticazione_locale",
                     "badge",
                     "stato_presenza",
                 )

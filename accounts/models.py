@@ -32,6 +32,12 @@ class CustomUser(AbstractUser):
         verbose_name="Tipo di attività",
     )
 
+    autenticazione_locale = models.BooleanField(
+        default=False,
+        verbose_name="Autenticazione locale",
+        help_text="Se attivo, l'account non viene autenticato tramite LDAP/Active Directory.",
+    )
+
     email_aggiuntiva = models.EmailField(blank=True, verbose_name="E-mail aggiuntiva")
     telefono_aggiuntivo = models.CharField(max_length=50, blank=True, verbose_name="Telefono aggiuntivo")
     scadenza_password = models.DateTimeField(null=True, blank=True, editable=False)

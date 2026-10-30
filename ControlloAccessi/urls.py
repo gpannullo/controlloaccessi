@@ -29,6 +29,7 @@ urlpatterns = [
     path("prenotazioni/", include(("prenotazioni.urls", "prenotazioni"), namespace="prenotazioni")),
     path("identita/", include(("spid_cie.urls", "spid_cie"), namespace="spid_cie")),
     path("pdnd/", include(("pdnd.urls", "pdnd"), namespace="pdnd")),
+    path("sec/", include(("sec.urls", "sec"), namespace="sec")),
 
     # Home applicativa
     path("", home, name="home"),

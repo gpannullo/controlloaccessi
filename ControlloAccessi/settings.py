@@ -72,6 +72,7 @@ INSTALLED_APPS = [
     "prenotazioni",
     "pdnd",
     "comunicazioni",
+    "sec.apps.SecConfig",
 ]
 
 MIDDLEWARE = [
