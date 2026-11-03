@@ -1,0 +1,8 @@
+/* Changelist: elenco centrale, filtri nella colonna destra. */
+@media (min-width: 900px) {
+  #changelist { display: grid; grid-template-columns: minmax(0, 1fr) 280px; column-gap: 24px; align-items: start; }
+  #changelist-form { grid-column: 1; grid-row: 1; min-width: 0; }
+  #changelist-filter { grid-column: 2; grid-row: 1; float: none; width: auto; margin: 0; position: sticky; top: 16px; }
+  #changelist-filter h2 { margin-top: 0; }
+}
+@media (max-width: 899px) { #changelist-filter { float: none; width: auto; } }

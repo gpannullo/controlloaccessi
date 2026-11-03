@@ -1,0 +1,4 @@
+{% extends "admin/base.html" %}
+{% load static %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'admin/css/controlloaccessi-admin.css' %}">{% endblock %}
+{% block branding %}<h1 id="site-name"><a href="{% url 'admin:index' %}">Amministrazione ControlloAccessi</a></h1>{% endblock %}
