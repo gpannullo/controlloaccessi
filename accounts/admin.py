@@ -60,6 +60,7 @@ class CustomUserAdmin(UserAdmin):
         "uffici_assegnati",
         "badge",
         "tipo_attivita",
+        "autenticazione_locale_badge",
         "stato_presenza",
         "is_active",
         "is_staff",
@@ -70,6 +71,7 @@ class CustomUserAdmin(UserAdmin):
         "stato_presenza",
         "is_active",
         "is_staff",
+        "autenticazione_locale",
         UtenteUfficioFilter,
         UfficioUtenteFilter,
     )
@@ -126,6 +128,10 @@ class CustomUserAdmin(UserAdmin):
         "imposta_disuso",
         "crea_persone_pubbliche_wordpress",
     )
+
+    @admin.display(boolean=True, description="Autenticazione locale")
+    def autenticazione_locale_badge(self, obj):
+        return obj.autenticazione_locale
 
     def get_queryset(self, request):
         return super().get_queryset(request).prefetch_related(
