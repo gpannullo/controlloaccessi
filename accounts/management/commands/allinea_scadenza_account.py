@@ -1,5 +1,6 @@
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.utils import timezone
 
 from accounts.models import CustomUser
 from accounts.services.factory import DirectoryFactory
@@ -13,37 +14,62 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--applica", action="store_true", help="Scrive le date nel DB; senza opzione esegue solo una simulazione.")
 
+    @staticmethod
+    def _data(value):
+        if not value:
+            return "Mai"
+        return timezone.localtime(value).strftime("%d/%m/%Y %H:%M")
+
+    def _tabella(self, righe):
+        headers = ("Login", "Scadenza password", "Scadenza account", "Nuova scadenza account")
+        values = [headers] + [
+            (r["username"], self._data(r["password"]), self._data(r["account"]), self._data(r["nuova"]))
+            for r in righe
+        ]
+        widths = [max(len(str(row[i])) for row in values) for i in range(4)]
+        line = "  ".join("-" * width for width in widths)
+        self.stdout.write("  ".join(headers[i].ljust(widths[i]) for i in range(4)))
+        self.stdout.write(line)
+        for r, row in zip(righe, values[1:]):
+            text = "  ".join(str(row[i]).ljust(widths[i]) for i in range(4))
+            # Blu: l'account scade prima della password.
+            if r["account"] and r["password"] and r["account"] < r["password"]:
+                text = f"\033[94m{text}\033[0m"
+            self.stdout.write(text)
+
     def handle(self, *args, **options):
         applica = options["applica"]
         utenti_ad = DirectoryFactory.get_service().get_users()
         mappa = {str(u.get("username", "")).casefold(): u for u in utenti_ad}
-        aggiornati = 0
-        invariati = 0
-        mancanti = 0
+        da_modificare = []
+        gia_allineati = []
+        non_presenti = []
 
         for user in CustomUser.objects.all().order_by("username"):
             dato = mappa.get(user.username.casefold())
             if dato is None:
-                mancanti += 1
+                non_presenti.append(user.username)
                 continue
             password_expiry = dato.get("password_expiry")
             if not password_expiry:
-                self.stdout.write(f"{user.username}: scadenza password non disponibile, saltato")
-                invariati += 1
+                gia_allineati.append({"username": user.username, "password": None, "account": user.scadenza_account, "nuova": user.scadenza_account})
                 continue
             nuova = password_expiry + timedelta(days=30)
-            if user.scadenza_account == nuova:
-                invariati += 1
-                continue
-            self.stdout.write(f"{user.username}: {user.scadenza_account or 'Mai'} -> {nuova or 'Mai'}")
+            riga = {"username": user.username, "password": password_expiry, "account": user.scadenza_account, "nuova": nuova}
+            destinazione = gia_allineati if user.scadenza_account == nuova else da_modificare
+            destinazione.append(riga)
             if applica:
                 with transaction.atomic():
-                    DirectoryAdminService().imposta_scadenza_account(user.username, nuova)
-                    user.scadenza_account = nuova
-                    user.save(update_fields=["scadenza_account"])
-            aggiornati += 1
+                    if destinazione is da_modificare:
+                        DirectoryAdminService().imposta_scadenza_account(user.username, nuova)
+                        user.scadenza_account = nuova
+                        user.save(update_fields=["scadenza_account"])
 
         modalita = "APPLICATA" if applica else "SIMULAZIONE"
-        self.stdout.write(self.style.SUCCESS(
-            f"{modalita}: {aggiornati} da aggiornare, {invariati} invariati, {mancanti} non presenti in AD."
-        ))
+        self.stdout.write(self.style.SUCCESS(f"\n{modalita} - DA MODIFICARE ({len(da_modificare)})"))
+        self._tabella(da_modificare) if da_modificare else self.stdout.write("Nessun account da modificare.")
+        self.stdout.write(self.style.SUCCESS(f"\nNON MODIFICATI ({len(gia_allineati)})"))
+        self._tabella(gia_allineati) if gia_allineati else self.stdout.write("Nessun account già allineato.")
+        self.stdout.write(self.style.WARNING(f"\nNON PRESENTI IN AD ({len(non_presenti)})"))
+        for username in non_presenti:
+            self.stdout.write(username)
