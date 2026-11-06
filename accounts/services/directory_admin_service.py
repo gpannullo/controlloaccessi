@@ -378,7 +378,8 @@ class DirectoryAdminService(ActiveDirectoryService):
         self._require_writes()
         if not settings.DIRECTORY.get("USE_SSL", False):
             raise DirectoryAdminException("La creazione con password richiede LDAPS.")
-        display_name = " ".join(item for item in [first_name.strip(), last_name.strip()] if item) or username.strip()
+        # In AD ``name``/``displayName`` are shown as ``Cognome Nome``.
+        display_name = " ".join(item for item in [last_name.strip(), first_name.strip()] if item) or username.strip()
         # Il CN deve essere univoco anche per utenti omonimi: lo username è già
         # normalizzato e verificato in AD prima della creazione.
         dn = "CN=%s,%s" % (username.strip(), settings.DIRECTORY["USER_SEARCH_BASE"])
