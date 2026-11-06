@@ -41,6 +41,13 @@ class CustomUser(AbstractUser):
     email_aggiuntiva = models.EmailField(blank=True, verbose_name="E-mail aggiuntiva")
     telefono_aggiuntivo = models.CharField(max_length=50, blank=True, verbose_name="Telefono aggiuntivo")
     scadenza_password = models.DateTimeField(null=True, blank=True, editable=False)
+    scadenza_account = models.DateTimeField(
+        null=True,
+        blank=True,
+        editable=False,
+        verbose_name="Scadenza account AD",
+        help_text="Valore accountExpires letto da Active Directory.",
+    )
     password_senza_scadenza = models.BooleanField(default=False, editable=False)
     email_personale = models.EmailField(blank=True, editable=False)
     cellulare_personale = models.CharField(max_length=50, blank=True, editable=False)

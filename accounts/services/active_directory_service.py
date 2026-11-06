@@ -26,6 +26,7 @@ class ActiveDirectoryService(DirectoryService):
         "memberOf",
         "userAccountControl",
         "msDS-UserPasswordExpiryTimeComputed",
+        "accountExpires",
     ]
 
     GROUP_ATTRIBUTES = [
@@ -258,6 +259,7 @@ class ActiveDirectoryService(DirectoryService):
 
             disabled = False
             password_expiry = None
+            account_expiry = None
             password_never_expires = False
 
             if hasattr(entry, "userAccountControl"):
@@ -268,6 +270,13 @@ class ActiveDirectoryService(DirectoryService):
             expiry = getattr(entry, "msDS-UserPasswordExpiryTimeComputed", None)
             if expiry and expiry.value and int(expiry.value) not in {0, 9223372036854775807}:
                 password_expiry = datetime.fromtimestamp((int(expiry.value) - 116444736000000000) / 10000000, tz=datetime_timezone.utc)
+            account_expires = getattr(entry, "accountExpires", None)
+            if account_expires and account_expires.value:
+                value = account_expires.value
+                if hasattr(value, "tzinfo"):
+                    account_expiry = value if value.tzinfo else value.replace(tzinfo=datetime_timezone.utc)
+                elif int(value) not in {0, 9223372036854775807}:
+                    account_expiry = datetime.fromtimestamp((int(value) - 116444736000000000) / 10000000, tz=datetime_timezone.utc)
 
             users.append({
 
@@ -290,6 +299,7 @@ class ActiveDirectoryService(DirectoryService):
 
                 "active": not disabled,
                 "password_expiry": password_expiry,
+                "account_expiry": account_expiry,
                 "password_never_expires": password_never_expires,
 
             })

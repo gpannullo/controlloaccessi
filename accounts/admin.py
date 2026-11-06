@@ -86,6 +86,7 @@ class CustomUserAdmin(UserAdmin):
         "ultima_timbratura_il",
         "ultima_timbratura_verso",
         "ultima_timbratura_causale",
+        "scadenza_account",
     )
 
     fieldsets = UserAdmin.fieldsets + (
@@ -97,6 +98,7 @@ class CustomUserAdmin(UserAdmin):
                     "autenticazione_locale",
                     "badge",
                     "stato_presenza",
+                    "scadenza_account",
                     "presenza_verificata_il",
                     "presenza_fonte",
                     "ultima_timbratura_il",
