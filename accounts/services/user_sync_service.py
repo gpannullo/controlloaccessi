@@ -3,6 +3,8 @@ from django.contrib.auth import get_user_model
 from .sync_result import SyncResult
 from .directory_identity import get_or_create_directory_user
 from django.db import transaction
+from accounts.services.directory_admin_service import DirectoryAdminService
+from django.conf import settings
 
 User = get_user_model()
 
@@ -34,6 +36,14 @@ class UserSyncService:
                 for field, value in defaults.items():
                     setattr(user, field, value)
                 user.save(update_fields=list(defaults))
+
+                desired_name = " ".join(part for part in [u.get("last_name", "").strip(), u.get("first_name", "").strip()] if part)
+                if desired_name and settings.DIRECTORY.get("WRITE_ENABLED", False) and u.get("directory_name", "") != desired_name:
+                    try:
+                        DirectoryAdminService().aggiorna_nome_directory(u["username"], desired_name)
+                    except Exception:
+                        # Il sync locale non deve fallire se la scrittura AD è temporaneamente indisponibile.
+                        pass
 
             if created:
                 user.set_unusable_password()

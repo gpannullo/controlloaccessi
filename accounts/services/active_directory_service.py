@@ -19,6 +19,7 @@ class ActiveDirectoryService(DirectoryService):
         "sAMAccountName",
         "givenName",
         "sn",
+        "name",
         "mail",
         "otherMailbox",
         "mobile",
@@ -287,6 +288,7 @@ class ActiveDirectoryService(DirectoryService):
 
                 "last_name": str(entry.sn)
                 if entry.sn else "",
+                "directory_name": str(entry.name) if getattr(entry, "name", None) else "",
 
                 "email": str(entry.mail)
                 if entry.mail else "",

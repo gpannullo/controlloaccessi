@@ -21,6 +21,19 @@ class DirectoryAdminService(ActiveDirectoryService):
                 "Le scritture AD sono disabilitate: impostare AD_WRITE_ENABLED=True."
             )
 
+    def aggiorna_nome_directory(self, username, nome):
+        """Aggiorna l'attributo AD ``name`` senza modificare altri attributi."""
+        self._require_writes()
+        conn, entry = self._user(username)
+        try:
+            if str(getattr(entry, "name", "") or "") == nome:
+                return False
+            if not conn.modify(entry.entry_dn, {"name": [(MODIFY_REPLACE, [nome])]}):
+                self._ok(conn, "Aggiornamento nome AD")
+            return True
+        finally:
+            conn.unbind()
+
     def _user(self, username):
         conn = self._connection()
         safe = escape_filter_chars(username.strip())
@@ -379,6 +392,7 @@ class DirectoryAdminService(ActiveDirectoryService):
                 "givenName": first_name.strip(),
                 "sn": last_name.strip(),
                 "displayName": display_name,
+                "name": display_name,
                 # L'utente resta disabilitato finché password e cambio obbligatorio
                 # non sono stati impostati correttamente sulla connessione LDAPS.
                 "userAccountControl": 514,
