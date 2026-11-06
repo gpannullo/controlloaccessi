@@ -22,13 +22,21 @@ class DirectoryAdminService(ActiveDirectoryService):
             )
 
     def aggiorna_nome_directory(self, username, nome):
-        """Aggiorna l'attributo AD ``name`` senza modificare altri attributi."""
+        """Aggiorna il nome AD tramite ModifyDN.
+
+        In Active Directory ``name`` è il RDN/CN dell'oggetto: una normale
+        modifica dell'attributo viene rifiutata con ``CANT_ON_RDN``.
+        """
         self._require_writes()
         conn, entry = self._user(username)
         try:
             if str(getattr(entry, "name", "") or "") == nome:
                 return False
-            if not conn.modify(entry.entry_dn, {"name": [(MODIFY_REPLACE, [nome])]}):
+            if not conn.modify_dn(
+                entry.entry_dn,
+                "CN=%s" % escape_rdn(nome),
+                delete_old_rdn=True,
+            ):
                 self._ok(conn, "Aggiornamento nome AD")
             return True
         finally:
