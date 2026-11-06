@@ -53,13 +53,16 @@ class Command(BaseCommand):
         non_presenti = []
         scadenza_non_attivo = datetime(2026, 11, 1, tzinfo=ZoneInfo("Europe/Rome"))
         adesso = timezone.now()
+        account_servizio = {"user.protocollo", "user.sportello", "utenza.m2m"}
 
         for user in CustomUser.objects.all().order_by("username"):
             dato = mappa.get(user.username.casefold())
             if dato is None:
                 non_presenti.append(user.username)
                 continue
-            if ("." not in user.username and "_" not in user.username) or user.username.casefold() == "g.pannullo":
+            if (("." not in user.username and "_" not in user.username)
+                    or user.username.casefold() == "g.pannullo"
+                    or user.username.casefold() in account_servizio):
                 servizi.append(user.username)
                 continue
             account_attivo = bool(dato.get("active"))
