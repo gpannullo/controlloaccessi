@@ -35,7 +35,7 @@ class DirectoryAdminService(ActiveDirectoryService):
             if not conn.modify_dn(
                 entry.entry_dn,
                 "CN=%s" % escape_rdn(nome),
-                delete_old_rdn=True,
+                delete_old_dn=True,
             ):
                 self._ok(conn, "Aggiornamento nome AD")
             return True
