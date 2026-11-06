@@ -52,7 +52,7 @@
     <section class="tab-pane fade" id="presenza" role="tabpanel" aria-labelledby="presenza-tab">
       <div class="card"><div class="card-body">
         <h2 class="h5">Presenza</h2>
-        <dl class="row mb-0">
+<dl class="row mb-0" style="margin-top: 1rem;">
           <dt class="col-sm-4">Badge</dt><dd class="col-sm-8">{{ dettaglio.badge|default:utente.badge }}</dd>
           <dt class="col-sm-4">Stato attuale</dt><dd class="col-sm-8">{% if utente.stato_presenza == 'PRE' %}<span class="badge text-bg-success">Presente</span>{% elif utente.stato_presenza == 'ASS' %}<span class="badge text-bg-danger">Non presente</span>{% else %}<span class="badge text-bg-secondary">Non verificata</span>{% endif %}</dd>
           <dt class="col-sm-4">Ultimo controllo</dt><dd class="col-sm-8">{{ utente.presenza_verificata_il|date:"d/m/Y H:i"|default:"—" }}</dd>
