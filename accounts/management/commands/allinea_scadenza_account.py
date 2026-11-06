@@ -53,7 +53,6 @@ class Command(BaseCommand):
         non_presenti = []
         scadenza_non_attivo = datetime(2026, 11, 1, tzinfo=ZoneInfo("Europe/Rome"))
         adesso = timezone.now()
-        scadenza_ordinari = adesso + timedelta(days=30)
 
         for user in CustomUser.objects.all().order_by("username"):
             dato = mappa.get(user.username.casefold())
@@ -75,24 +74,23 @@ class Command(BaseCommand):
                         user.save(update_fields=["scadenza_account"])
                 continue
             gruppi = {str(g).casefold() for g in dato.get("groups", [])}
-            if gruppi.intersection({"consigliere", "assessore"}):
-                nuova_password = adesso + timedelta(days=30)
-                nuova = adesso + timedelta(days=60)
-                riga = {"username": user.username, "active": True, "password": dato.get("password_expiry"), "nuova_password": nuova_password, "account": account_attuale, "nuova": nuova}
-                politici.append(riga)
-                if applica and account_attuale != nuova:
-                    with transaction.atomic():
-                        DirectoryAdminService().imposta_scadenza_account(user.username, nuova)
-                        user.scadenza_account = nuova
-                        user.save(update_fields=["scadenza_account"])
-                continue
-            riga = {"username": user.username, "active": account_attivo, "password": dato.get("password_expiry"), "nuova_password": adesso, "account": account_attuale, "nuova": scadenza_ordinari}
-            ordinari.append(riga)
+            password_expiry = dato.get("password_expiry")
+            password_mai = password_expiry is None
+            nuova_password = adesso if password_mai else password_expiry
+            nuova_account = adesso + timedelta(days=30) if password_mai else password_expiry + timedelta(days=30)
+            riga = {"username": user.username, "active": account_attivo, "password": password_expiry, "nuova_password": nuova_password, "account": account_attuale, "nuova": nuova_account}
+            destinazione = politici if gruppi.intersection({"consigliere", "assessore"}) else ordinari
+            destinazione.append(riga)
+            if account_attuale == nuova_account:
+                gia_allineati.append(riga)
+            else:
+                da_modificare.append(riga)
             if applica:
                 with transaction.atomic():
-                    DirectoryAdminService().imposta_password_scaduta(user.username)
-                    DirectoryAdminService().imposta_scadenza_account(user.username, scadenza_ordinari)
-                    user.scadenza_account = scadenza_ordinari
+                    if password_mai:
+                        DirectoryAdminService().imposta_password_scaduta(user.username)
+                    DirectoryAdminService().imposta_scadenza_account(user.username, nuova_account)
+                    user.scadenza_account = nuova_account
                     user.save(update_fields=["scadenza_account"])
             continue
 
@@ -100,13 +98,13 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f"\n{modalita} - DA MODIFICARE ({len(da_modificare)})"))
         self._tabella(da_modificare) if da_modificare else self.stdout.write("Nessun account da modificare.")
         self.stdout.write(self.style.SUCCESS(f"\nCLASSE POLITICA - CONSIGLIERE/ASSESSORE ({len(politici)})"))
-        self.stdout.write("Obiettivo: password tra 30 giorni, account tra 60 giorni.")
+        self.stdout.write("Gruppi invariati. Password con data già presente non modificata; password Mai impostata come scaduta oggi; account +30 giorni.")
         self._tabella(politici) if politici else self.stdout.write("Nessun account della classe politica da aggiornare.")
         self.stdout.write(self.style.SUCCESS(f"\nNON MODIFICATI ({len(gia_allineati)})"))
         self._tabella(gia_allineati) if gia_allineati else self.stdout.write("Nessun account già allineato.")
         self.stdout.write(self.style.WARNING(f"\nNON ATTIVI - SCADENZA IMPOSTATA AL 01/11/2026 ({len(non_attivi)})"))
         self._tabella(non_attivi) if non_attivi else self.stdout.write("Nessun account non attivo da aggiornare.")
-        self.stdout.write(self.style.WARNING(f"\nACCOUNT ORDINARI - PASSWORD SCADUTA OGGI / ACCOUNT +30 GIORNI ({len(ordinari)})"))
+        self.stdout.write(self.style.WARNING(f"\nACCOUNT ORDINARI - POLICY PASSWORD/ACCOUNT ({len(ordinari)})"))
         self._tabella(ordinari) if ordinari else self.stdout.write("Nessun account ordinario.")
         self.stdout.write(self.style.SUCCESS(f"\nACCOUNT DI SERVIZIO - NON MODIFICATI ({len(servizi)})"))
         for username in servizi:
