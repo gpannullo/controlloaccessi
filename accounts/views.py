@@ -44,6 +44,19 @@ def _aggiorna_stato_password_locale(user):
     user.save(update_fields=["password_senza_scadenza", "scadenza_password"])
 
 
+def _aggiorna_scadenze_dopo_password(user):
+    """Rilegge AD dopo il cambio password e aggiorna account +30 giorni."""
+    from accounts.services.directory_admin_service import DirectoryAdminService
+    try:
+        password_expiry, account_expiry = DirectoryAdminService().allinea_account_a_scadenza_password(user.username)
+    except Exception:
+        return
+    user.scadenza_password = password_expiry
+    user.scadenza_account = account_expiry
+    user.password_senza_scadenza = False
+    user.save(update_fields=["scadenza_password", "scadenza_account", "password_senza_scadenza"])
+
+
 class DirectoryLoginView(LoginView):
     """Login AD che intercetta la password provvisoria obbligatoria."""
 
@@ -92,6 +105,7 @@ def initial_password_change(request):
                     raise DirectoryAdminException("Password aggiornata, ma non è stato possibile completare l'accesso. Riprova ad accedere.")
                 login(request, user)
                 _aggiorna_stato_password_locale(user)
+                _aggiorna_scadenze_dopo_password(user)
                 destination = pending.get("next") or _default_destination(request)
                 request.session.pop(PENDING_PASSWORD_CHANGE, None)
                 messages.success(request, "Password aggiornata correttamente.")
@@ -150,6 +164,7 @@ def change_own_password(request):
                     request.user.username
                 )
                 _aggiorna_stato_password_locale(request.user)
+                _aggiorna_scadenze_dopo_password(request.user)
                 messages.success(request, "Password aggiornata correttamente.")
                 return redirect("my_account")
             except Exception as exc:

@@ -1,4 +1,4 @@
-from datetime import timezone as datetime_timezone
+from datetime import timezone as datetime_timezone, timedelta
 from django.conf import settings
 from django.utils import timezone
 from ldap3 import MODIFY_ADD, MODIFY_DELETE, MODIFY_REPLACE
@@ -90,6 +90,16 @@ class DirectoryAdminService(ActiveDirectoryService):
                 self._ok(conn, "Aggiornamento scadenza account")
         finally:
             conn.unbind()
+
+    def allinea_account_a_scadenza_password(self, username):
+        """Imposta accountExpires a 30 giorni dalla scadenza password AD."""
+        dettaglio = self.dettaglio(username)
+        password_expiry = dettaglio.get("password_expiry")
+        if not password_expiry:
+            raise DirectoryAdminException("Scadenza password AD non disponibile.")
+        account_expiry = password_expiry + timedelta(days=30)
+        self.imposta_scadenza_account(username, account_expiry)
+        return password_expiry, account_expiry
 
     def aggiorna_anagrafica(self, username, first_name, last_name, personal_email, mobile):
         self._require_writes(); conn, entry = self._user(username)
