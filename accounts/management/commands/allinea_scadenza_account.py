@@ -81,6 +81,13 @@ class Command(BaseCommand):
             password_mai = password_expiry is None
             nuova_password = adesso if password_mai else password_expiry
             nuova_account = adesso + timedelta(days=30) if password_mai else password_expiry + timedelta(days=30)
+            # Dopo pwdLastSet=0 AD può non restituire una data di scadenza
+            # password. Se accountExpires è già stato impostato dal comando
+            # alla finestra di 30 giorni, non va spostato ad ogni esecuzione.
+            if password_mai and account_attuale:
+                differenza = abs((account_attuale - nuova_account).total_seconds())
+                if differenza <= 86400:
+                    nuova_account = account_attuale
             riga = {"username": user.username, "active": account_attivo, "password": password_expiry, "nuova_password": nuova_password, "account": account_attuale, "nuova": nuova_account}
             destinazione = politici if gruppi.intersection({"consigliere", "assessore"}) else ordinari
             destinazione.append(riga)
