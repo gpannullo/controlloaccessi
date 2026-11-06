@@ -27,7 +27,6 @@ class ReadOnlyAdmin(admin.ModelAdmin):
 @admin.register(Timbratura)
 class TimbraturaAdmin(admin.ModelAdmin):
     list_display = ('utente', 'registrata_il', 'verso', 'origine', 'badge', 'causale', 'verso_originale', 'postazione')
-    list_editable = ('verso',)
     list_filter = ('origine', 'verso', 'postazione')
     search_fields = ('utente__username',)
     readonly_fields = ('utente', 'registrata_il', 'origine', 'badge', 'causale', 'verso_originale', 'ip', 'postazione')
