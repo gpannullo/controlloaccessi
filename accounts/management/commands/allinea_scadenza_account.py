@@ -45,10 +45,12 @@ class Command(BaseCommand):
         utenti_ad = DirectoryFactory.get_service().get_users()
         mappa = {str(u.get("username", "")).casefold(): u for u in utenti_ad}
         da_modificare = []
+        politici = []
         gia_allineati = []
         non_attivi = []
         non_presenti = []
         scadenza_non_attivo = datetime(2026, 11, 1, tzinfo=ZoneInfo("Europe/Rome"))
+        adesso = timezone.now()
 
         for user in CustomUser.objects.all().order_by("username"):
             dato = mappa.get(user.username.casefold())
@@ -64,6 +66,18 @@ class Command(BaseCommand):
                     with transaction.atomic():
                         DirectoryAdminService().imposta_scadenza_account(user.username, scadenza_non_attivo)
                         user.scadenza_account = scadenza_non_attivo
+                        user.save(update_fields=["scadenza_account"])
+                continue
+            gruppi = {str(g).casefold() for g in dato.get("groups", [])}
+            if gruppi.intersection({"consigliere", "assessore"}):
+                nuova_password = adesso + timedelta(days=30)
+                nuova = adesso + timedelta(days=60)
+                riga = {"username": user.username, "active": True, "password": nuova_password, "account": account_attuale, "nuova": nuova}
+                politici.append(riga)
+                if applica and account_attuale != nuova:
+                    with transaction.atomic():
+                        DirectoryAdminService().imposta_scadenza_account(user.username, nuova)
+                        user.scadenza_account = nuova
                         user.save(update_fields=["scadenza_account"])
                 continue
             password_expiry = dato.get("password_expiry")
@@ -84,6 +98,9 @@ class Command(BaseCommand):
         modalita = "APPLICATA" if applica else "SIMULAZIONE"
         self.stdout.write(self.style.SUCCESS(f"\n{modalita} - DA MODIFICARE ({len(da_modificare)})"))
         self._tabella(da_modificare) if da_modificare else self.stdout.write("Nessun account da modificare.")
+        self.stdout.write(self.style.SUCCESS(f"\nCLASSE POLITICA - CONSIGLIERE/ASSESSORE ({len(politici)})"))
+        self.stdout.write("Obiettivo: password tra 30 giorni, account tra 60 giorni.")
+        self._tabella(politici) if politici else self.stdout.write("Nessun account della classe politica da aggiornare.")
         self.stdout.write(self.style.SUCCESS(f"\nNON MODIFICATI ({len(gia_allineati)})"))
         self._tabella(gia_allineati) if gia_allineati else self.stdout.write("Nessun account già allineato.")
         self.stdout.write(self.style.WARNING(f"\nNON ATTIVI - SCADENZA IMPOSTATA AL 01/11/2026 ({len(non_attivi)})"))
