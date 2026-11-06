@@ -3,6 +3,8 @@ from django.db import transaction
 
 from accounts.models import CustomUser
 from accounts.services.factory import DirectoryFactory
+from accounts.services.directory_admin_service import DirectoryAdminService
+from datetime import timedelta
 
 
 class Command(BaseCommand):
@@ -24,13 +26,15 @@ class Command(BaseCommand):
             if dato is None:
                 mancanti += 1
                 continue
-            nuova = dato.get("account_expiry")
+            password_expiry = dato.get("password_expiry")
+            nuova = password_expiry + timedelta(days=30) if password_expiry else None
             if user.scadenza_account == nuova:
                 invariati += 1
                 continue
             self.stdout.write(f"{user.username}: {user.scadenza_account or 'Mai'} -> {nuova or 'Mai'}")
             if applica:
                 with transaction.atomic():
+                    DirectoryAdminService().imposta_scadenza_account(user.username, nuova)
                     user.scadenza_account = nuova
                     user.save(update_fields=["scadenza_account"])
             aggiornati += 1

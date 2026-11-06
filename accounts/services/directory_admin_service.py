@@ -76,6 +76,21 @@ class DirectoryAdminService(ActiveDirectoryService):
         finally:
             conn.unbind()
 
+    def imposta_scadenza_account(self, username, scadenza):
+        """Imposta in AD ``accountExpires`` usando una data UTC-aware."""
+        self._require_writes()
+        if scadenza is None:
+            raise DirectoryAdminException("La scadenza account non può essere vuota.")
+        if scadenza.tzinfo is None:
+            scadenza = scadenza.replace(tzinfo=datetime_timezone.utc)
+        filetime = int((scadenza.astimezone(datetime_timezone.utc).timestamp() + 11644473600) * 10000000)
+        conn, entry = self._user(username)
+        try:
+            if not conn.modify(entry.entry_dn, {"accountExpires": [(MODIFY_REPLACE, [str(filetime)])]}):
+                self._ok(conn, "Aggiornamento scadenza account")
+        finally:
+            conn.unbind()
+
     def aggiorna_anagrafica(self, username, first_name, last_name, personal_email, mobile):
         self._require_writes(); conn, entry = self._user(username)
         try:
