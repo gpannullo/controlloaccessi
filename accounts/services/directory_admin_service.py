@@ -164,6 +164,16 @@ class DirectoryAdminService(ActiveDirectoryService):
         finally:
             conn.unbind()
 
+    def imposta_password_scaduta(self, username):
+        """Forza AD a richiedere il cambio password al prossimo accesso."""
+        self._require_writes()
+        conn, entry = self._user(username)
+        try:
+            if not conn.modify(entry.entry_dn, {"pwdLastSet": [(MODIFY_REPLACE, ["0"])]}):
+                self._ok(conn, "Scadenza password")
+        finally:
+            conn.unbind()
+
     def cambia_password_iniziale(self, username, password):
         """Imposta la password e abilita la sua normale scadenza AD.
 

@@ -24,17 +24,17 @@ class Command(BaseCommand):
         return timezone.localtime(value).strftime("%d/%m/%Y %H:%M")
 
     def _tabella(self, righe):
-        headers = ("Login", "Attivo", "Scadenza password", "Scadenza account", "Nuova scadenza account")
+        headers = ("Login", "Attivo", "Scadenza password", "Nuova scadenza password", "Scadenza account", "Nuova scadenza account")
         values = [headers] + [
-            (r["username"], "SI" if r["active"] else "NO", self._data(r["password"]), self._data(r["account"]), self._data(r["nuova"]))
+            (r["username"], "SI" if r["active"] else "NO", self._data(r["password"]), self._data(r.get("nuova_password")), self._data(r["account"]), self._data(r["nuova"]))
             for r in righe
         ]
-        widths = [max(len(str(row[i])) for row in values) for i in range(5)]
+        widths = [max(len(str(row[i])) for row in values) for i in range(6)]
         line = "  ".join("-" * width for width in widths)
-        self.stdout.write("  ".join(headers[i].ljust(widths[i]) for i in range(5)))
+        self.stdout.write("  ".join(headers[i].ljust(widths[i]) for i in range(6)))
         self.stdout.write(line)
         for r, row in zip(righe, values[1:]):
-            text = "  ".join(str(row[i]).ljust(widths[i]) for i in range(5))
+            text = "  ".join(str(row[i]).ljust(widths[i]) for i in range(6))
             # Blu: l'account scade prima della password.
             if r["account"] and r["password"] and r["account"] < r["password"]:
                 text = f"\033[94m{text}\033[0m"
@@ -45,17 +45,23 @@ class Command(BaseCommand):
         utenti_ad = DirectoryFactory.get_service().get_users()
         mappa = {str(u.get("username", "")).casefold(): u for u in utenti_ad}
         da_modificare = []
+        ordinari = []
+        servizi = []
         politici = []
         gia_allineati = []
         non_attivi = []
         non_presenti = []
         scadenza_non_attivo = datetime(2026, 11, 1, tzinfo=ZoneInfo("Europe/Rome"))
         adesso = timezone.now()
+        scadenza_ordinari = adesso + timedelta(days=30)
 
         for user in CustomUser.objects.all().order_by("username"):
             dato = mappa.get(user.username.casefold())
             if dato is None:
                 non_presenti.append(user.username)
+                continue
+            if "." not in user.username or user.username.casefold() == "g.pannullo":
+                servizi.append(user.username)
                 continue
             account_attivo = bool(dato.get("active"))
             account_attuale = user.scadenza_account
@@ -72,7 +78,7 @@ class Command(BaseCommand):
             if gruppi.intersection({"consigliere", "assessore"}):
                 nuova_password = adesso + timedelta(days=30)
                 nuova = adesso + timedelta(days=60)
-                riga = {"username": user.username, "active": True, "password": nuova_password, "account": account_attuale, "nuova": nuova}
+                riga = {"username": user.username, "active": True, "password": dato.get("password_expiry"), "nuova_password": nuova_password, "account": account_attuale, "nuova": nuova}
                 politici.append(riga)
                 if applica and account_attuale != nuova:
                     with transaction.atomic():
@@ -80,20 +86,15 @@ class Command(BaseCommand):
                         user.scadenza_account = nuova
                         user.save(update_fields=["scadenza_account"])
                 continue
-            password_expiry = dato.get("password_expiry")
-            if not password_expiry:
-                gia_allineati.append({"username": user.username, "active": True, "password": None, "account": user.scadenza_account, "nuova": user.scadenza_account})
-                continue
-            nuova = password_expiry + timedelta(days=30)
-            riga = {"username": user.username, "active": True, "password": password_expiry, "account": user.scadenza_account, "nuova": nuova}
-            destinazione = gia_allineati if user.scadenza_account == nuova else da_modificare
-            destinazione.append(riga)
+            riga = {"username": user.username, "active": account_attivo, "password": dato.get("password_expiry"), "nuova_password": adesso, "account": account_attuale, "nuova": scadenza_ordinari}
+            ordinari.append(riga)
             if applica:
                 with transaction.atomic():
-                    if destinazione is da_modificare:
-                        DirectoryAdminService().imposta_scadenza_account(user.username, nuova)
-                        user.scadenza_account = nuova
-                        user.save(update_fields=["scadenza_account"])
+                    DirectoryAdminService().imposta_password_scaduta(user.username)
+                    DirectoryAdminService().imposta_scadenza_account(user.username, scadenza_ordinari)
+                    user.scadenza_account = scadenza_ordinari
+                    user.save(update_fields=["scadenza_account"])
+            continue
 
         modalita = "APPLICATA" if applica else "SIMULAZIONE"
         self.stdout.write(self.style.SUCCESS(f"\n{modalita} - DA MODIFICARE ({len(da_modificare)})"))
@@ -105,6 +106,11 @@ class Command(BaseCommand):
         self._tabella(gia_allineati) if gia_allineati else self.stdout.write("Nessun account già allineato.")
         self.stdout.write(self.style.WARNING(f"\nNON ATTIVI - SCADENZA IMPOSTATA AL 01/11/2026 ({len(non_attivi)})"))
         self._tabella(non_attivi) if non_attivi else self.stdout.write("Nessun account non attivo da aggiornare.")
+        self.stdout.write(self.style.WARNING(f"\nACCOUNT ORDINARI - PASSWORD SCADUTA OGGI / ACCOUNT +30 GIORNI ({len(ordinari)})"))
+        self._tabella(ordinari) if ordinari else self.stdout.write("Nessun account ordinario.")
+        self.stdout.write(self.style.SUCCESS(f"\nACCOUNT DI SERVIZIO - NON MODIFICATI ({len(servizi)})"))
+        for username in servizi:
+            self.stdout.write(username)
         self.stdout.write(self.style.WARNING(f"\nNON PRESENTI IN AD ({len(non_presenti)})"))
         for username in non_presenti:
             self.stdout.write(username)
