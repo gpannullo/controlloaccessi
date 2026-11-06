@@ -81,6 +81,15 @@ class DirectoryAdminService(ActiveDirectoryService):
                     (int(expiry.value) - 116444736000000000) / 10000000,
                     tz=datetime_timezone.utc,
                 )
+            scadenza_account = None
+            account_expires = getattr(entry, "accountExpires", None)
+            if account_expires and account_expires.value:
+                valore = int(account_expires.value)
+                if valore not in {0, 9223372036854775807}:
+                    scadenza_account = timezone.datetime.fromtimestamp(
+                        (valore - 116444736000000000) / 10000000,
+                        tz=datetime_timezone.utc,
+                    )
             uac = int(entry.userAccountControl.value or 0)
             return {
                 "first_name": str(entry.givenName or ""),
@@ -91,6 +100,7 @@ class DirectoryAdminService(ActiveDirectoryService):
                 "badge": str(entry.employeeID.value or "") if getattr(entry, "employeeID", None) else "",
                 "active": not bool(uac & 2),
                 "password_expiry": scadenza_password,
+                "account_expiry": scadenza_account,
                 "password_never_expires": bool(uac & 0x10000),
                 "groups": sorted([dn.split(",", 1)[0][3:] for dn in entry.memberOf.values], key=str.casefold) if hasattr(entry, "memberOf") else [],
             }
