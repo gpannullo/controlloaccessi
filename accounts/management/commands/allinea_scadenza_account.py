@@ -18,6 +18,8 @@ class Command(BaseCommand):
     def _data(value):
         if not value:
             return "Mai"
+        if value.year >= 9999:
+            return "Mai"
         return timezone.localtime(value).strftime("%d/%m/%Y %H:%M")
 
     def _tabella(self, righe):
