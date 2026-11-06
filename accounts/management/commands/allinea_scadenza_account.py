@@ -60,7 +60,7 @@ class Command(BaseCommand):
             if dato is None:
                 non_presenti.append(user.username)
                 continue
-            if "." not in user.username or user.username.casefold() == "g.pannullo":
+            if ("." not in user.username and "_" not in user.username) or user.username.casefold() == "g.pannullo":
                 servizi.append(user.username)
                 continue
             account_attivo = bool(dato.get("active"))
