@@ -84,12 +84,18 @@ class DirectoryAdminService(ActiveDirectoryService):
             scadenza_account = None
             account_expires = getattr(entry, "accountExpires", None)
             if account_expires and account_expires.value:
-                valore = int(account_expires.value)
-                if valore not in {0, 9223372036854775807}:
-                    scadenza_account = timezone.datetime.fromtimestamp(
-                        (valore - 116444736000000000) / 10000000,
-                        tz=datetime_timezone.utc,
+                valore = account_expires.value
+                if hasattr(valore, "tzinfo"):
+                    scadenza_account = (
+                        valore if valore.tzinfo else valore.replace(tzinfo=datetime_timezone.utc)
                     )
+                else:
+                    valore = int(valore)
+                    if valore not in {0, 9223372036854775807}:
+                        scadenza_account = timezone.datetime.fromtimestamp(
+                            (valore - 116444736000000000) / 10000000,
+                            tz=datetime_timezone.utc,
+                        )
             uac = int(entry.userAccountControl.value or 0)
             return {
                 "first_name": str(entry.givenName or ""),
