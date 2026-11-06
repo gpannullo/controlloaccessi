@@ -27,7 +27,11 @@ class Command(BaseCommand):
                 mancanti += 1
                 continue
             password_expiry = dato.get("password_expiry")
-            nuova = password_expiry + timedelta(days=30) if password_expiry else None
+            if not password_expiry:
+                self.stdout.write(f"{user.username}: scadenza password non disponibile, saltato")
+                invariati += 1
+                continue
+            nuova = password_expiry + timedelta(days=30)
             if user.scadenza_account == nuova:
                 invariati += 1
                 continue
