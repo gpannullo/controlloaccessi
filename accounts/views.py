@@ -132,6 +132,14 @@ def my_account(request):
         dettaglio = None; messages.warning(request, "Dati directory non disponibili: %s" % exc)
     uffici = AssegnazioneUfficio.objects.filter(utente=request.user, attiva=True).select_related("ufficio", "ufficio__gruppo_operativo").order_by("ufficio__nome")
     uffici_responsabili = request.user.uffici_responsabili.filter(attivo=True).order_by("nome")
+    # accountExpires può contenere sentinelle AD o date fuori dall'intervallo
+    # gestibile dal timezone locale: non devono rompere il rendering del profilo.
+    def data_visualizzabile(value):
+        try:
+            return value if value is not None and 1 <= value.year <= 9990 else None
+        except (AttributeError, OverflowError, ValueError):
+            return None
+
     return render(request, "accounts/my_account.html", {
         "dettaglio": dettaglio,
         "timbrature": storico_personale(request.user) if tab == 'presenza' else [],
@@ -141,6 +149,8 @@ def my_account(request):
         "tab": tab if tab in {"anagrafica", "uffici", "abilitazioni", "presenza"} else "anagrafica",
         "account_update_contact_email": settings.ACCOUNT_UPDATE_CONTACT_EMAIL,
         "is_public_account": request.get_host().split(":", 1)[0].lower() == settings.PUBLIC_ACCOUNT_HOST,
+        "scadenza_password_account": data_visualizzabile(request.user.scadenza_password),
+        "scadenza_account_account": data_visualizzabile(request.user.scadenza_account),
     })
 
 
