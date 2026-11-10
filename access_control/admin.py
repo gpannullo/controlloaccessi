@@ -406,10 +406,10 @@ class UfficioAdmin(admin.ModelAdmin):
     def imposta_orari_ricevimento_predefiniti(self, request, queryset):
         """Aggiunge il calendario standard senza sovrascrivere quello esistente."""
         intervalli = [
-            (giorno, time(8, 30), time(13, 30)) for giorno in range(5)
+            (giorno, time(9, 0), time(13, 0)) for giorno in range(5)
         ] + [
-            (CalendarioApertura.Giorno.MARTEDI, time(14, 30), time(17, 30)),
-            (CalendarioApertura.Giorno.GIOVEDI, time(14, 30), time(17, 30)),
+            (CalendarioApertura.Giorno.MARTEDI, time(15, 0), time(17, 0)),
+            (CalendarioApertura.Giorno.GIOVEDI, time(15, 0), time(17, 0)),
         ]
         creati = gia_presenti = 0
         for ufficio in queryset:

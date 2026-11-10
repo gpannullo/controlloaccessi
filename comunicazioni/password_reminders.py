@@ -35,10 +35,18 @@ def queue_reminders(dry_run=False):
             current = timezone.now()
             if not eligible(user, current):
                 continue
-            address = (user.email or '').strip()  # Indirizzo istituzionale, mai personale.
-            try:
-                validate_email(address)
-            except ValidationError:
+            addresses = []
+            for candidate in (user.email, user.email_personale, user.email_aggiuntiva):
+                address = (candidate or '').strip()
+                if not address:
+                    continue
+                try:
+                    validate_email(address)
+                except ValidationError:
+                    continue
+                if address.casefold() not in {item.casefold() for item in addresses}:
+                    addresses.append(address)
+            if not addresses:
                 stats['senza_email_valida'] += 1
                 continue
             if PromemoriaPassword.objects.filter(utente=user, giorno=day).exists():
@@ -52,10 +60,15 @@ def queue_reminders(dry_run=False):
                        'scadenza': expiry.strftime('%d/%m/%Y alle %H:%M'),
                        'url': 'https://account.comune.aversa.ce.it/account/change-password/'}
             mail.send(
-                recipients=[address], sender=settings.DEFAULT_FROM_EMAIL,
+                recipients=addresses, sender=settings.DEFAULT_FROM_EMAIL,
                 template='password_in_scadenza', context=context,
                 priority='medium', expires_at=user.scadenza_password,
             )
-            PromemoriaPassword.objects.create(utente=user, giorno=day, scadenza=user.scadenza_password, destinatario=address)
+            PromemoriaPassword.objects.bulk_create([
+                PromemoriaPassword(
+                    utente=user, giorno=day, scadenza=user.scadenza_password,
+                    destinatario=address,
+                ) for address in addresses
+            ])
             stats['accodati'] += 1
     return stats

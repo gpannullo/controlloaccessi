@@ -14,7 +14,7 @@ from dashboard.live_views import (
     stato_dashboard_portineria,
 )
 from dashboard.statistiche_views import statistiche_uffici
-from dashboard.views import dashboard_home
+from dashboard.views import dashboard_home, elenco_uffici_stampabile
 from dashboard.directory_admin_views import (
     directory_action,
     directory_bulk_action,
@@ -53,6 +53,7 @@ urlpatterns = [
 
     path("dirigenza/amministratori/<int:pk>/", log_amministratore, name="log_amministratore"),
     path("gestione-account/", directory_home, name="directory_home"),
+    path("gestione-account/uffici/stampa/", elenco_uffici_stampabile, name="elenco_uffici_stampabile"),
     path("gestione-account/users/", directory_users, name="directory_users"),
     path("gestione-account/users/new/", directory_user_create, name="directory_user_create"),
     path("gestione-account/users/new/create/", directory_user_create_submit, name="directory_user_create_submit"),

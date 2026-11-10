@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Elenco uffici{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3">Elenco uffici</h1>
+    <div><a class="btn btn-danger" href="?formato=pdf">Scarica PDF</a> <button class="btn btn-outline-secondary" onclick="window.print()">Stampa</button></div>
+  </div>
+  <table class="table table-bordered table-striped">
+    <thead><tr><th>Ufficio</th><th>Piano</th><th>Stanza</th><th>Codice</th><th>Prefisso coda</th></tr></thead>
+    <tbody>{% for ufficio in uffici %}<tr><td>{{ ufficio.nome }}</td><td>{{ ufficio.piano|default:"—" }}</td><td>{{ ufficio.stanza|default:"—" }}</td><td>{{ ufficio.codice|default:"—" }}</td><td>{{ ufficio.prefisso_coda|default:"—" }}</td></tr>{% empty %}<tr><td colspan="5">Nessun ufficio attivo.</td></tr>{% endfor %}</tbody>
+  </table>
+</div>
+<style>@media print{.btn{display:none!important}body{font-size:11pt}.container{max-width:none}}</style>
+{% endblock %}

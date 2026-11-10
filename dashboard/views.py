@@ -4,6 +4,12 @@ from common.module_access import PortineriaAccessMixin, module_required
 from django.db.models import Count, Prefetch, Q
 from django.shortcuts import render
 from django.utils import timezone
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+from dashboard.permissions import directory_admin_required
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from io import BytesIO
 
 from access_control.models import CalendarioApertura, Ufficio
 from access_control.services.office_service import OfficeService
@@ -14,6 +20,33 @@ from visitors.models import (
 
 
 User = get_user_model()
+
+
+@directory_admin_required
+def elenco_uffici_stampabile(request):
+    uffici = Ufficio.objects.filter(attivo=True).order_by("piano", "nome")
+    if request.GET.get("formato") == "pdf":
+        buffer = BytesIO()
+        pdf = canvas.Canvas(buffer, pagesize=A4)
+        width, height = A4
+        y = height - 50
+        pdf.setFont("Helvetica-Bold", 16)
+        pdf.drawString(45, y, "Elenco uffici - Comune di Aversa")
+        y -= 30
+        pdf.setFont("Helvetica", 9)
+        for ufficio in uffici:
+            riga = "%s | Piano: %s | Stanza: %s | Codice: %s | Coda: %s" % (
+                ufficio.nome, ufficio.piano or "-", ufficio.stanza or "-",
+                ufficio.codice or "-", ufficio.prefisso_coda or "-",
+            )
+            if y < 45:
+                pdf.showPage(); y = height - 45; pdf.setFont("Helvetica", 9)
+            pdf.drawString(45, y, riga[:125]); y -= 16
+        pdf.save(); buffer.seek(0)
+        response = HttpResponse(buffer.getvalue(), content_type="application/pdf")
+        response["Content-Disposition"] = 'attachment; filename="elenco-uffici.pdf"'
+        return response
+    return render(request, "dashboard/elenco_uffici_stampabile.html", {"uffici": uffici})
 
 
 GIORNI_SETTIMANA = [
