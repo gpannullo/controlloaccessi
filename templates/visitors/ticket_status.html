@@ -21,7 +21,11 @@
     <p class="state">{{ stato }}</p>
     <p>{{ istruzione }}</p>
     <section class="details">
-        <p><strong>Destinazione:</strong> {{ accesso.ufficio_destinazione.nome }}</p>
+        <p><strong>Ufficio:</strong> {{ accesso.ufficio_destinazione.nome }}</p>
+        {% if accesso.ufficio_destinazione.piano %}<p><strong>Piano:</strong> {{ accesso.ufficio_destinazione.piano }}</p>{% endif %}
+        {% if accesso.ufficio_destinazione.stanza %}<p><strong>Stanza:</strong> {{ accesso.ufficio_destinazione.stanza }}</p>{% endif %}
+        <p><strong>Ingresso:</strong> {{ accesso.ingresso|date:"d/m/Y H:i" }}</p>
+        <p><strong>Tipo di coda:</strong> {% if accesso.appuntamento_id %}Prioritaria{% else %}Ordinaria{% endif %}</p>
         {% if persone_davanti %}
             <p>Persone davanti a lei: <strong>{{ persone_davanti }}</strong></p>
             <p class="muted">Attesa stimata: circa {{ attesa_stimata }} minuti.</p>
