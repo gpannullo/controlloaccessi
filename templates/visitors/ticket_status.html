@@ -12,6 +12,9 @@
         .state { font-size: 1.5rem; font-weight: 700; }
         .muted { color: #5d6a75; }
         .details { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #dce3e8; }
+        .info-row { display: flex; justify-content: space-between; gap: 1rem; text-align: left; border-bottom: 1px solid #edf1f4; padding: .45rem 0; }
+        .info-row strong { text-align: left; }
+        .info-row span { text-align: right; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -21,11 +24,11 @@
     <p class="state">{{ stato }}</p>
     <p>{{ istruzione }}</p>
     <section class="details">
-        <p><strong>Ufficio:</strong> {{ accesso.ufficio_destinazione.nome }}</p>
-        {% if accesso.ufficio_destinazione.piano %}<p><strong>Piano:</strong> {{ accesso.ufficio_destinazione.piano }}</p>{% endif %}
-        {% if accesso.ufficio_destinazione.stanza %}<p><strong>Stanza:</strong> {{ accesso.ufficio_destinazione.stanza }}</p>{% endif %}
-        <p><strong>Ingresso:</strong> {{ accesso.ingresso|date:"d/m/Y H:i" }}</p>
-        <p><strong>Tipo di coda:</strong> {% if accesso.appuntamento_id %}Prioritaria{% else %}Ordinaria{% endif %}</p>
+        <p class="info-row"><strong>Ufficio</strong><span>{{ accesso.ufficio_destinazione.nome }}</span></p>
+        {% if accesso.ufficio_destinazione.piano %}<p class="info-row"><strong>Piano</strong><span>{{ accesso.ufficio_destinazione.piano }}</span></p>{% endif %}
+        {% if accesso.ufficio_destinazione.stanza %}<p class="info-row"><strong>Stanza</strong><span>{{ accesso.ufficio_destinazione.stanza }}</span></p>{% endif %}
+        <p class="info-row"><strong>Ingresso</strong><span>{{ accesso.ingresso|date:"d/m/Y H:i" }}</span></p>
+        <p class="info-row"><strong>Tipo di coda</strong><span>{% if accesso.appuntamento_id %}Prioritaria{% else %}Ordinaria{% endif %}</span></p>
         {% if persone_davanti %}
             <p>Persone davanti a lei: <strong>{{ persone_davanti }}</strong></p>
             <p class="muted">Attesa stimata: circa {{ attesa_stimata }} minuti.</p>
