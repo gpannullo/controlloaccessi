@@ -146,10 +146,9 @@ class TicketPrinterService:
                 '<text align="center">Numero di attesa</text><feed line="2"/>'
                 + riga_dato("Ufficio", ufficio.nome)
                 + (riga_dato("Piano", ufficio.piano) if ufficio.piano else "")
-                + (riga_dato("Porta", ufficio.stanza) if ufficio.stanza else "")
+                + (riga_dato("Stanza", ufficio.stanza) if ufficio.stanza else "")
                 + (riga_dato("Badge", accesso.badge.codice) if accesso.badge else "")
-                + riga_dato("Data", f"{data_ingresso:%d/%m/%Y}")
-                + riga_dato("Ora", f"{data_ingresso:%H:%M}")
+                + riga_dato("Data e Ora", f"{data_ingresso:%d/%m/%Y - %H:%M}")
                 + riga_dato(
                     "Coda",
                     "Prioritaria" if accesso.appuntamento_id else "Ordinaria",
