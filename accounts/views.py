@@ -7,6 +7,9 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods
+from datetime import datetime
+from post_office import mail
+from presenze_qr.models import GruppoPresenze, GiustificativoPresenza, AutodichiarazioneTimbratura
 
 from accounts.services.active_directory_service import ActiveDirectoryService
 from accounts.services.directory_admin_service import DirectoryAdminException, DirectoryAdminService
@@ -121,6 +124,24 @@ def my_account(request):
     from presenze_qr.services import storico_personale, abilitato
     tab = request.GET.get("tab", "anagrafica")
     if request.method == "POST":
+        azione = request.POST.get("azione")
+        gruppo = GruppoPresenze.objects.filter(utenti=request.user, attivo=True).select_related("referente").first()
+        if azione in {"giustificativo", "autodichiarazione"}:
+            if not gruppo:
+                messages.error(request, "Non appartieni a un gruppo presenze attivo.")
+                return redirect("my_account")
+            if azione == "giustificativo":
+                dal = datetime.strptime(request.POST["dal"], "%Y-%m-%d").date()
+                al = datetime.strptime(request.POST["al"], "%Y-%m-%d").date()
+                GiustificativoPresenza.objects.create(gruppo=gruppo, utente=request.user, dal=dal, al=al, causale=request.POST.get("causale", "").strip(), note=request.POST.get("note", "").strip())
+                messages.success(request, "Giustificativo inviato al referente.")
+            else:
+                dichiarazione = AutodichiarazioneTimbratura.objects.create(gruppo=gruppo, utente=request.user, registrata_il=datetime.fromisoformat(request.POST["registrata_il"]), verso=request.POST["verso"], motivazione=request.POST.get("motivazione", "").strip())
+                if gruppo.referente.email:
+                    link = request.build_absolute_uri(reverse("presenze_qr:referente"))
+                    mail.send(recipients=[gruppo.referente.email], sender=settings.DEFAULT_FROM_EMAIL, subject="Autodichiarazione presenza da approvare", message=f"È disponibile una nuova autodichiarazione di presenza da approvare nella piattaforma IRIS.\n\nApri: {link}")
+                messages.success(request, "Autodichiarazione inviata al referente per approvazione.")
+            return redirect("my_account")
         request.user.email_aggiuntiva = request.POST.get("email_aggiuntiva", "").strip()
         request.user.telefono_aggiuntivo = request.POST.get("telefono_aggiuntivo", "").strip()
         request.user.save(update_fields=["email_aggiuntiva", "telefono_aggiuntivo"])
@@ -132,6 +153,7 @@ def my_account(request):
         dettaglio = None; messages.warning(request, "Dati directory non disponibili: %s" % exc)
     uffici = AssegnazioneUfficio.objects.filter(utente=request.user, attiva=True).select_related("ufficio", "ufficio__gruppo_operativo").order_by("ufficio__nome")
     uffici_responsabili = request.user.uffici_responsabili.filter(attivo=True).order_by("nome")
+    referente_presenze = GruppoPresenze.objects.filter(referente=request.user, attivo=True).exists()
     # accountExpires può contenere sentinelle AD o date fuori dall'intervallo
     # gestibile dal timezone locale: non devono rompere il rendering del profilo.
     def data_visualizzabile(value):
@@ -151,6 +173,7 @@ def my_account(request):
         "is_public_account": request.get_host().split(":", 1)[0].lower() == settings.PUBLIC_ACCOUNT_HOST,
         "scadenza_password_account": data_visualizzabile(request.user.scadenza_password),
         "scadenza_account_account": data_visualizzabile(request.user.scadenza_account),
+        "referente_presenze": referente_presenze,
     })
 
 

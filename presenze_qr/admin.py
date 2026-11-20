@@ -1,7 +1,23 @@
 from django.contrib import admin
 from django.urls import reverse
 from django.utils.html import format_html
-from .models import Postazione, Timbratura, Attivita, GruppoPresenze
+from .models import Postazione, Timbratura, Attivita, GruppoPresenze, GiustificativoPresenza, AutodichiarazioneTimbratura
+
+
+@admin.register(GiustificativoPresenza)
+class GiustificativoPresenzaAdmin(admin.ModelAdmin):
+    list_display = ('utente', 'gruppo', 'dal', 'al', 'causale', 'stato', 'creato_il')
+    list_filter = ('stato', 'gruppo')
+    search_fields = ('utente__username', 'utente__last_name', 'causale')
+    readonly_fields = ('creato_il', 'approvato_il', 'approvato_da')
+
+
+@admin.register(AutodichiarazioneTimbratura)
+class AutodichiarazioneTimbraturaAdmin(admin.ModelAdmin):
+    list_display = ('utente', 'gruppo', 'registrata_il', 'verso', 'stato', 'creata_il')
+    list_filter = ('stato', 'verso', 'gruppo')
+    search_fields = ('utente__username', 'utente__last_name')
+    readonly_fields = ('token_approvazione', 'creata_il', 'approvata_il', 'approvata_da', 'timbratura')
 
 
 @admin.register(GruppoPresenze)

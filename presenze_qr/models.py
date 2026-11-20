@@ -53,6 +53,47 @@ class GruppoPresenze(models.Model):
         return utenti.count()
 
 
+class GiustificativoPresenza(models.Model):
+    class Stato(models.TextChoices):
+        IN_ATTESA = "ATTESA", "In attesa"
+        APPROVATO = "APPROVATO", "Approvato"
+        RIFIUTATO = "RIFIUTATO", "Rifiutato"
+
+    gruppo = models.ForeignKey(GruppoPresenze, on_delete=models.PROTECT, related_name="giustificativi")
+    utente = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="giustificativi_presenza")
+    dal = models.DateField()
+    al = models.DateField()
+    causale = models.CharField(max_length=120)
+    note = models.TextField(blank=True)
+    allegato = models.FileField(upload_to="presenze/giustificativi/", blank=True)
+    stato = models.CharField(max_length=10, choices=Stato.choices, default=Stato.IN_ATTESA)
+    creato_il = models.DateTimeField(auto_now_add=True)
+    approvato_il = models.DateTimeField(null=True, blank=True)
+    approvato_da = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="giustificativi_approvati")
+    class Meta:
+        ordering = ["-creato_il"]
+    def __str__(self):
+        return f"{self.utente} {self.dal} - {self.al}"
+
+
+class AutodichiarazioneTimbratura(models.Model):
+    class Stato(models.TextChoices):
+        IN_ATTESA = "ATTESA", "In attesa"
+        APPROVATA = "APPROVATA", "Approvata"
+        RIFIUTATA = "RIFIUTATA", "Rifiutata"
+    gruppo = models.ForeignKey(GruppoPresenze, on_delete=models.PROTECT, related_name="autodichiarazioni")
+    utente = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="autodichiarazioni_presenza")
+    registrata_il = models.DateTimeField()
+    verso = models.CharField(max_length=1, choices=[("I", "Entrata"), ("U", "Uscita")])
+    motivazione = models.TextField()
+    token_approvazione = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    stato = models.CharField(max_length=10, choices=Stato.choices, default=Stato.IN_ATTESA)
+    creata_il = models.DateTimeField(auto_now_add=True)
+    approvata_il = models.DateTimeField(null=True, blank=True)
+    approvata_da = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="autodichiarazioni_approvate")
+    timbratura = models.OneToOneField("Timbratura", null=True, blank=True, on_delete=models.SET_NULL, related_name="autodichiarazione")
+
+
 class Timbratura(models.Model):
     utente = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     postazione = models.ForeignKey(Postazione, on_delete=models.PROTECT, null=True, blank=True)
