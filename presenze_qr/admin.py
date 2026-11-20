@@ -1,7 +1,25 @@
 from django.contrib import admin
 from django.urls import reverse
 from django.utils.html import format_html
-from .models import Postazione, Timbratura, Attivita
+from .models import Postazione, Timbratura, Attivita, GruppoPresenze
+
+
+@admin.register(GruppoPresenze)
+class GruppoPresenzeAdmin(admin.ModelAdmin):
+    list_display = ('nome', 'gruppo_ad', 'referente', 'numero_utenti', 'attivo')
+    list_filter = ('attivo', 'gruppo_ad')
+    search_fields = ('nome', 'gruppo_ad__name', 'referente__username', 'referente__last_name')
+    filter_horizontal = ('utenti',)
+    actions = ('sincronizza_utenti',)
+
+    @admin.display(description='Utenti proposti')
+    def numero_utenti(self, obj):
+        return obj.utenti.count()
+
+    @admin.action(description='Sincronizza utenti dal gruppo AD/Django')
+    def sincronizza_utenti(self, request, queryset):
+        totale = sum(gruppo.sincronizza_utenti() for gruppo in queryset)
+        self.message_user(request, f'Utenti proposti sincronizzati: {totale}.')
 
 
 @admin.register(Postazione)

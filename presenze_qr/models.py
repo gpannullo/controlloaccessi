@@ -1,6 +1,7 @@
 import uuid
 from django.conf import settings
 from django.db import models
+from django.contrib.auth.models import Group
 
 
 class Postazione(models.Model):
@@ -16,6 +17,40 @@ class Postazione(models.Model):
 
     def __str__(self):
         return self.nome
+
+
+class GruppoPresenze(models.Model):
+    """Gruppo interno per la gestione delle presenze di un gruppo AD."""
+
+    nome = models.CharField(max_length=150, unique=True)
+    gruppo_ad = models.OneToOneField(
+        Group, on_delete=models.PROTECT, related_name="gruppo_presenze",
+        verbose_name="Gruppo AD/Django",
+    )
+    referente = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name="gruppi_presenze_referente",
+        verbose_name="Referente presenze",
+    )
+    utenti = models.ManyToManyField(
+        settings.AUTH_USER_MODEL, blank=True, related_name="gruppi_presenze",
+        verbose_name="Utenti proposti",
+    )
+    attivo = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["nome"]
+        verbose_name = "Gruppo presenze"
+        verbose_name_plural = "Gruppi presenze"
+
+    def __str__(self):
+        return self.nome
+
+    def sincronizza_utenti(self):
+        """Propone gli utenti appartenenti al gruppo AD/Django collegato."""
+        utenti = self.gruppo_ad.user_set.all()
+        self.utenti.set(utenti)
+        return utenti.count()
 
 
 class Timbratura(models.Model):

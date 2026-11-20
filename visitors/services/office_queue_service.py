@@ -122,7 +122,8 @@ class OfficeQueueService:
 
     @staticmethod
     def coda_prioritaria(ufficio):
-        """Rientri prioritari e appuntamenti ancora nella hall."""
+        """Rientri prioritari e appuntamenti il cui orario è arrivato."""
+        adesso = timezone.now()
         return (
             AccessoVisitatore.objects
             .filter(
@@ -132,10 +133,7 @@ class OfficeQueueService:
                 ingresso_ufficio_il__isnull=True,
                 visita_conclusa_il__isnull=True,
             )
-            .filter(
-                Q(rientro_prioritario=True)
-                | Q(appuntamento__isnull=False)
-            )
+            .filter(Q(rientro_prioritario=True) | Q(appuntamento__data_ora__lte=adesso))
             .select_related("visitatore", "badge", "appuntamento")
             .order_by(
                 "-rientro_prioritario",
@@ -156,12 +154,15 @@ class OfficeQueueService:
             .filter(
                 ufficio_destinazione=ufficio,
                 uscita__isnull=True,
-                appuntamento__isnull=True,
                 rientro_prioritario=False,
+                # Gli appuntamenti futuri restano nella coda ordinaria fino
+                # al raggiungimento dell'orario prenotato.
+
                 spostato_fuori_ufficio_il__isnull=True,
                 ingresso_ufficio_il__isnull=True,
                 visita_conclusa_il__isnull=True,
             )
+            .filter(Q(appuntamento__isnull=True) | Q(appuntamento__data_ora__gt=timezone.now()))
             .select_related(
                 "visitatore",
                 "badge",
@@ -235,6 +236,7 @@ class OfficeQueueService:
         posti_residui = numero_posti - len(rientri)
         prioritari = []
         if posti_residui > 0:
+            adesso = timezone.now()
             prioritari = list(
                 AccessoVisitatore.objects
                 .select_for_update(of=('self',))
@@ -243,6 +245,7 @@ class OfficeQueueService:
                     uscita__isnull=True,
                     rientro_prioritario=False,
                     appuntamento__isnull=False,
+                    appuntamento__data_ora__lte=adesso,
                     tipo_accesso=AccessoVisitatore.TipoAccesso.RICEVIMENTO,
                     spostato_fuori_ufficio_il__isnull=True,
                     ingresso_ufficio_il__isnull=True,
@@ -264,12 +267,12 @@ class OfficeQueueService:
                     ufficio_destinazione=ufficio,
                     uscita__isnull=True,
                     rientro_prioritario=False,
-                    appuntamento__isnull=True,
                     tipo_accesso=AccessoVisitatore.TipoAccesso.RICEVIMENTO,
                     spostato_fuori_ufficio_il__isnull=True,
                     ingresso_ufficio_il__isnull=True,
                     visita_conclusa_il__isnull=True,
                 )
+                .filter(Q(appuntamento__isnull=True) | Q(appuntamento__data_ora__gt=timezone.now()))
                 .exclude(pk=escludi_accesso)
                 .order_by(cls._ordine_hall(), "numero_coda", "pk")[:posti_residui]
             )
