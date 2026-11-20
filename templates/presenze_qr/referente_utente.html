@@ -1,1 +1,21 @@
-{% extends "base.html" %}{% block title %}Dettaglio presenze{% endblock %}{% block content %}<div class="container py-4"><a href="{% url 'presenze_qr:referente' %}">← Torna al gruppo</a><h1 class="h3 mt-3">{{ utente.get_full_name|default:utente.username }}</h1><p>Stato: {% if utente.stato_presenza == 'PRE' %}<span class="badge text-bg-success">Presente</span>{% elif utente.stato_presenza == 'ASS' %}<span class="badge text-bg-danger">Assente</span>{% else %}<span class="badge text-bg-secondary">Non verificato</span>{% endif %}</p><div class="card mb-4"><div class="card-body"><h2 class="h5">Anteprima statino {{ mese_label }}</h2><table class="table table-sm"><thead><tr><th>Data e ora</th><th>Verso</th><th>Origine</th><th>Badge</th></tr></thead><tbody>{% for item in mese %}<tr><td>{{ item.registrata_il|date:"d/m/Y H:i:s" }}</td><td>{{ item.get_verso_display }}</td><td>{{ item.get_origine_display }}</td><td>{{ item.badge|default:"—" }}</td></tr>{% empty %}<tr><td colspan="4">Nessuna timbratura nel mese corrente.</td></tr>{% endfor %}</tbody></table></div></div><div class="card"><div class="card-body"><h2 class="h5">Ultime timbrature</h2><ul class="list-group list-group-flush">{% for item in timbrature %}<li class="list-group-item d-flex justify-content-between"><span>{{ item.registrata_il|date:"d/m/Y H:i:s" }}</span><span>{{ item.get_verso_display }} · {{ item.get_origine_display }}</span></li>{% empty %}<li class="list-group-item">Nessuna timbratura.</li>{% endfor %}</ul></div></div></div>{% endblock %}
+{% extends "base.html" %}
+{% block title %}Dettaglio presenze{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <a href="{% url 'presenze_qr:referente' %}">← Torna al gruppo</a>
+  <h1 class="h3 mt-3">{{ utente.get_full_name|default:utente.username }}</h1>
+  <p>Stato: {% if utente.stato_presenza == 'PRE' %}<span class="badge text-bg-success">Presente</span>{% elif utente.stato_presenza == 'ASS' %}<span class="badge text-bg-danger">Assente</span>{% else %}<span class="badge text-bg-secondary">Non verificato</span>{% endif %}</p>
+  <div class="card mb-4"><div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <a class="btn btn-outline-secondary btn-sm" href="?anno={{ mese_precedente.year }}&mese={{ mese_precedente.month }}">← Mese precedente</a>
+      <h2 class="h5 mb-0">Statino presenze — {{ mese_label }}</h2>
+      <a class="btn btn-outline-secondary btn-sm" href="?anno={{ mese_successivo.year }}&mese={{ mese_successivo.month }}">Mese successivo →</a>
+    </div>
+    <div class="table-responsive"><table class="table table-sm align-middle">
+      <thead><tr><th>Data</th><th>Giorno</th><th>Ingressi / uscite</th><th class="text-end">Ore del giorno</th></tr></thead><tbody>
+      {% for riga in righe_mese %}<tr{% if riga.data.weekday == 5 or riga.data.weekday == 6 %} class="table-light"{% endif %}><td>{{ riga.data|date:"d/m/Y" }}</td><td>{{ riga.giorno_settimana }}</td><td>{% for entrata, uscita in riga.coppie %}E {{ entrata|date:"H:i" }} – U {{ uscita|date:"H:i" }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td><td class="text-end">{% if riga.coppie %}{{ riga.ore }}h {{ riga.minuti|stringformat:"02d" }}m{% else %}—{% endif %}</td></tr>{% endfor %}
+      </tbody></table></div>
+  </div></div>
+  <div class="card"><div class="card-body"><h2 class="h5">Ultime timbrature</h2><ul class="list-group list-group-flush">{% for item in timbrature %}<li class="list-group-item d-flex justify-content-between"><span>{{ item.registrata_il|date:"d/m/Y H:i:s" }}</span><span>{{ item.get_verso_display }} · {{ item.get_origine_display }}</span></li>{% empty %}<li class="list-group-item">Nessuna timbratura.</li>{% endfor %}</ul></div></div>
+</div>
+{% endblock %}

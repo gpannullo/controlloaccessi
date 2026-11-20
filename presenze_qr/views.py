@@ -1,5 +1,6 @@
 import base64
-from datetime import timedelta
+from datetime import timedelta, date
+import calendar
 from functools import wraps
 from django.conf import settings
 from django.contrib import messages
@@ -150,9 +151,37 @@ def referente_utente(request, pk):
     user = get_object_or_404(User.objects.filter(pk=pk, gruppi_presenze__in=gruppi).distinct(), pk=pk)
     timbrature = Timbratura.objects.filter(utente=user).order_by('-registrata_il')[:100]
     oggi = timezone.localdate()
-    primo = oggi.replace(day=1)
-    mese = Timbratura.objects.filter(utente=user, registrata_il__date__gte=primo, registrata_il__date__lte=oggi).order_by('registrata_il')
-    return render(request, 'presenze_qr/referente_utente.html', {'utente': user, 'timbrature': timbrature, 'mese': mese, 'mese_label': oggi.strftime('%m/%Y')})
+    try:
+        anno = int(request.GET.get('anno', oggi.year)); mese_num = int(request.GET.get('mese', oggi.month))
+        if not 1 <= mese_num <= 12: raise ValueError
+    except (TypeError, ValueError):
+        anno, mese_num = oggi.year, oggi.month
+    primo = date(anno, mese_num, 1)
+    ultimo = date(anno, mese_num, calendar.monthrange(anno, mese_num)[1])
+    passaggi = list(Timbratura.objects.filter(utente=user, registrata_il__date__gte=primo, registrata_il__date__lte=ultimo).order_by('registrata_il'))
+    giorni_it = ('Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica')
+    per_giorno = {giorno: [] for giorno in range(1, ultimo.day + 1)}
+    for item in passaggi:
+        giorno = timezone.localtime(item.registrata_il).day
+        per_giorno[giorno].append(item)
+    righe = []
+    for giorno in range(1, ultimo.day + 1):
+        data_giorno = date(anno, mese_num, giorno)
+        eventi = per_giorno[giorno]
+        coppie = []
+        ingresso = None
+        for evento in eventi:
+            quando = timezone.localtime(evento.registrata_il)
+            if evento.verso == 'I':
+                ingresso = quando
+            elif evento.verso == 'U' and ingresso:
+                coppie.append((ingresso, quando)); ingresso = None
+        totale = sum((uscita - entrata).total_seconds() for entrata, uscita in coppie)
+        righe.append({'data': data_giorno, 'giorno_settimana': giorni_it[data_giorno.weekday()], 'eventi': eventi, 'coppie': coppie, 'ore': int(totale // 3600), 'minuti': int((totale % 3600) // 60)})
+    precedente = primo.replace(day=1) - timedelta(days=1)
+    successivo = ultimo + timedelta(days=1)
+    mesi_it = ('Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre')
+    return render(request, 'presenze_qr/referente_utente.html', {'utente': user, 'timbrature': timbrature, 'righe_mese': righe, 'mese_label': f'{mesi_it[mese_num - 1]} {anno}', 'mese_precedente': precedente, 'mese_successivo': successivo})
 
 
 @protetta()
