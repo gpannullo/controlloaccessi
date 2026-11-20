@@ -22,9 +22,10 @@ class AutodichiarazioneTimbraturaAdmin(admin.ModelAdmin):
 
 @admin.register(GruppoPresenze)
 class GruppoPresenzeAdmin(admin.ModelAdmin):
-    list_display = ('nome', 'gruppo_ad', 'referente', 'numero_utenti', 'attivo')
+    list_display = ('gruppo_ad', 'referente', 'numero_utenti', 'attivo')
     list_filter = ('attivo', 'gruppo_ad')
-    search_fields = ('nome', 'gruppo_ad__name', 'referente__username', 'referente__last_name')
+    search_fields = ('gruppo_ad__name', 'referente__username', 'referente__first_name', 'referente__last_name')
+    autocomplete_fields = ('gruppo_ad', 'referente')
     filter_horizontal = ('utenti',)
     actions = ('sincronizza_utenti',)
 

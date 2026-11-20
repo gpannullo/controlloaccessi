@@ -22,7 +22,6 @@ class Postazione(models.Model):
 class GruppoPresenze(models.Model):
     """Gruppo interno per la gestione delle presenze di un gruppo AD."""
 
-    nome = models.CharField(max_length=150, unique=True)
     gruppo_ad = models.OneToOneField(
         Group, on_delete=models.PROTECT, related_name="gruppo_presenze",
         verbose_name="Gruppo AD/Django",
@@ -39,12 +38,17 @@ class GruppoPresenze(models.Model):
     attivo = models.BooleanField(default=True)
 
     class Meta:
-        ordering = ["nome"]
+        ordering = ["gruppo_ad__name", "referente__last_name", "referente__first_name"]
         verbose_name = "Gruppo presenze"
         verbose_name_plural = "Gruppi presenze"
+        constraints = [models.UniqueConstraint(fields=["gruppo_ad", "referente"], name="gruppo_presenze_ad_referente_unico")]
 
     def __str__(self):
-        return self.nome
+        return f"{self.gruppo_ad.name} - {self.referente.get_full_name() or self.referente.username}"
+
+    @property
+    def nome(self):
+        return str(self)
 
     def sincronizza_utenti(self):
         """Propone gli utenti appartenenti al gruppo AD/Django collegato."""
