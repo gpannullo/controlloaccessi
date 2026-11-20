@@ -29,6 +29,31 @@ class GruppoPresenzeAdmin(admin.ModelAdmin):
     filter_horizontal = ('utenti',)
     actions = ('sincronizza_utenti',)
 
+    def get_exclude(self, request, obj=None):
+        return ('utenti',) if obj is None else ()
+
+    def get_form(self, request, obj=None, **kwargs):
+        """In modifica propone esclusivamente gli utenti del gruppo selezionato."""
+        form = super().get_form(request, obj, **kwargs)
+        if obj is not None and obj.gruppo_ad_id:
+            form.base_fields['utenti'].queryset = obj.gruppo_ad.user_set.all().order_by(
+                'last_name', 'first_name', 'username'
+            )
+        return form
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if not change:
+            obj.sincronizza_utenti()
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        # Anche se arrivasse una richiesta manipolata, non conserviamo utenti
+        # che non appartengono al gruppo AD/Django collegato.
+        obj = form.instance
+        appartenenti = obj.gruppo_ad.user_set.all()
+        obj.utenti.set(obj.utenti.filter(pk__in=appartenenti.values('pk')))
+
     @admin.display(description='Utenti proposti')
     def numero_utenti(self, obj):
         return obj.utenti.count()
