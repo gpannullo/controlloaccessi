@@ -23,7 +23,7 @@ def mask(value):
 
 def main():
     cityware_settings.USERNAME = 'wsuser_iris'
-    cityware_settings.PASSWORD = 'Ye6B^#U#UiVHk-t'
+    cityware_settings.PASSWORD = 'stH$!kt^BtBh38'
     config = {
         'ENDPOINT': cityware_settings.ENDPOINT,
         'SOAP_ACTION_BASE': cityware_settings.SOAP_ACTION_BASE,

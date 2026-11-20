@@ -1,13 +1,23 @@
 import os
+import urllib
+from pprint import pprint
+
 import requests
-from zeep import Client
+from zeep import Client, Settings
 from zeep.transports import Transport
 from zeep.exceptions import Fault
 
 WSDL_URL = ("https://boaversa.nuvolapalitalsoft.it/ws/Protocollo/proWsProtocollo.php?wsdl")
 
+wsdl =  urllib.request.urlopen(WSDL_URL).read().decode('utf-8')
+
+# client = Client(wsdl)
+client = Client(wsdl=WSDL_URL)
+
+print("PRIMO CLIENT")
+
 USERNAME = 'wsuser_iris'
-PASSWORD = 'Ye6B^#U#UiVHk-t'
+PASSWORD = 'stH$!kt^BtBh38'
 DOMAIN_CODE = "01"
 
 session = requests.Session()
@@ -19,9 +29,12 @@ transport = Transport(
     operation_timeout=60,
 )
 
+settings = Settings(strict=False, xml_huge_tree=True)
+
 client = Client(
     wsdl=WSDL_URL,
     transport=transport,
+    settings=settings,
 )
 
 try:

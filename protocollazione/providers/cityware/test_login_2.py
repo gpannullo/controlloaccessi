@@ -3,7 +3,7 @@ from protocollazione.providers.cityware.soap import envelope
 from protocollazione.providers.cityware import settings as s
 
 s.USERNAME = 'wsuser_iris'
-s.PASSWORD = 'Ye6B^#U#UiVHk-t'
+s.PASSWORD = 'stH$!kt^BtBh38'
 
 body = envelope(
     "GetItaEngineContextToken",
