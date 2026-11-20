@@ -11,7 +11,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 from django.views.decorators.cache import never_cache
-from .models import Postazione, Timbratura, AutodichiarazioneTimbratura
+from .models import Postazione, Timbratura, GruppoPresenze, AutodichiarazioneTimbratura
 from .services import abilitato, automatico, emetti, timbra, correggi, log, TimbraturaError
 from .security import controlla_rete, client_ip
 
