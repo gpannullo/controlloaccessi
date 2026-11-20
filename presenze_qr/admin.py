@@ -36,7 +36,7 @@ class GruppoPresenzeAdmin(admin.ModelAdmin):
         """In modifica propone esclusivamente gli utenti del gruppo selezionato."""
         form = super().get_form(request, obj, **kwargs)
         if obj is not None and obj.gruppo_ad_id:
-            form.base_fields['utenti'].queryset = obj.gruppo_ad.user_set.all().order_by(
+            form.base_fields['utenti'].queryset = obj.gruppo_ad.user_set.filter(active=True).order_by(
                 'last_name', 'first_name', 'username'
             )
         return form
