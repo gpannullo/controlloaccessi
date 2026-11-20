@@ -23,7 +23,6 @@
     <li class="nav-item"><a class="nav-link {% if tab == 'anagrafica' %}active{% endif %}" href="{% url 'my_account' %}?tab=anagrafica">Anagrafica e recapiti</a></li>
     <li class="nav-item"><a class="nav-link {% if tab == 'presenza' %}active{% endif %}" href="{% url 'my_account' %}?tab=presenza">Presenze</a></li>
     {% if uffici_responsabili %}<li class="nav-item"><a class="nav-link {% if tab == 'uffici' %}active{% endif %}" href="{% url 'my_account' %}?tab=uffici">Uffici</a></li>{% endif %}
-    <li class="nav-item"><a class="nav-link {% if tab == 'abilitazioni' %}active{% endif %}" href="{% url 'my_account' %}?tab=abilitazioni">Abilitazioni</a></li>
   </ul>
 
   {% if tab == 'anagrafica' %}
@@ -77,8 +76,6 @@
       <p class="text-muted">Sei responsabile dei seguenti uffici. Puoi comunicare ferie, chiusure o altri periodi nei quali non sarà possibile ricevere pubblico.</p>
       <div class="list-group">{% for ufficio in uffici_responsabili %}<div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2"><span>{{ ufficio.nome }}</span><a class="btn btn-sm btn-outline-danger" href="{% url 'uffici:indisponibilita' ufficio.pk %}">Gestisci disponibilità</a></div>{% endfor %}</div>
     </div></div>
-  {% else %}
-    <div class="card"><div class="card-body"><h2 class="h5">Abilitazioni</h2><ul class="mb-0"><li>Desktop remoto: {% if 'ACCESSO-RDP' in dettaglio.groups %}abilitato{% else %}non abilitato{% endif %}</li><li>Accesso Remoto (VPN): {% if 'VPN_COMMON_RULES' in dettaglio.groups %}abilitato{% else %}non abilitato{% endif %}</li></ul></div></div>
   {% endif %}
 </div>
 {% endblock %}
