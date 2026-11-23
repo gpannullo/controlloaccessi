@@ -22,7 +22,7 @@ ROME = ZoneInfo('Europe/Rome')
 def report_rows(start, end, generated):
     begin = datetime.combine(start, time.min, tzinfo=ROME)
     finish = datetime.combine(end + timedelta(days=1), time.min, tzinfo=ROME)
-    return Timbratura.objects.filter(origine='QR', registrata_il__gte=begin,
+    return Timbratura.objects.filter(origine='QR', annullata=False, registrata_il__gte=begin,
         registrata_il__lt=finish, registrata_il__lte=generated).select_related('utente', 'postazione').prefetch_related(
             Prefetch('attivita_set', queryset=Attivita.objects.filter(azione='CORREZIONE', registrata_il__lte=generated).order_by('registrata_il', 'pk'))
         ).order_by('registrata_il', 'pk')

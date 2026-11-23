@@ -149,7 +149,7 @@ def referente_utente(request, pk):
     User = get_user_model()
     gruppi = GruppoPresenze.objects.filter(referente=request.user, attivo=True)
     user = get_object_or_404(User.objects.filter(pk=pk, gruppi_presenze__in=gruppi).distinct(), pk=pk)
-    timbrature = Timbratura.objects.filter(utente=user).order_by('-registrata_il')[:100]
+    timbrature = Timbratura.objects.filter(utente=user, annullata=False).order_by('-registrata_il')[:100]
     oggi = timezone.localdate()
     try:
         anno = int(request.GET.get('anno', oggi.year)); mese_num = int(request.GET.get('mese', oggi.month))
@@ -158,7 +158,7 @@ def referente_utente(request, pk):
         anno, mese_num = oggi.year, oggi.month
     primo = date(anno, mese_num, 1)
     ultimo = date(anno, mese_num, calendar.monthrange(anno, mese_num)[1])
-    passaggi = list(Timbratura.objects.filter(utente=user, registrata_il__date__gte=primo, registrata_il__date__lte=ultimo).order_by('registrata_il'))
+    passaggi = list(Timbratura.objects.filter(utente=user, annullata=False, registrata_il__date__gte=primo, registrata_il__date__lte=ultimo).order_by('registrata_il'))
     giorni_it = ('Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica')
     per_giorno = {giorno: [] for giorno in range(1, ultimo.day + 1)}
     for item in passaggi:

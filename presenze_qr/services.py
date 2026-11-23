@@ -30,8 +30,8 @@ def automatico(now):
 
 def storico_personale(user):
     origine = 'AUTOMATICO' if (user.badge or '').strip('0') else 'QR'
-    rows = list(Timbratura.objects.filter(utente=user, origine=origine)[:10])
-    latest = Timbratura.objects.filter(utente=user).values_list('pk', flat=True).first()
+    rows = list(Timbratura.objects.filter(utente=user, origine=origine, annullata=False)[:10])
+    latest = Timbratura.objects.filter(utente=user, annullata=False).values_list('pk', flat=True).first()
     now = timezone.now()
     for row in rows:
         row.modificabile = (row.pk == latest and row.origine == 'QR' and abilitato(user)
@@ -92,7 +92,7 @@ def timbra(user, token, verso, ip):
     if station.generazione != generation or station.consumato_il or not station.scade_il or station.scade_il <= now:
         raise TimbraturaError('QR scaduto o già utilizzato. Inquadra il nuovo codice.')
     minuto = now.replace(second=0, microsecond=0)
-    if Timbratura.objects.filter(utente=user, registrata_il__gte=minuto,
+    if Timbratura.objects.filter(utente=user, annullata=False, registrata_il__gte=minuto,
                                 registrata_il__lt=minuto + timedelta(minutes=1)).exists():
         raise TimbraturaError('Hai già registrato un passaggio in questo minuto. Attendi il minuto successivo.')
     if verso == 'auto':

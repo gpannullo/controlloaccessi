@@ -86,10 +86,17 @@ class ReadOnlyAdmin(admin.ModelAdmin):
 
 @admin.register(Timbratura)
 class TimbraturaAdmin(admin.ModelAdmin):
-    list_display = ('utente', 'registrata_il', 'verso', 'origine', 'badge', 'causale', 'verso_originale', 'postazione')
+    list_display = ('utente', 'registrata_il', 'verso', 'origine', 'badge', 'causale', 'verso_originale', 'postazione', 'annullata')
     list_filter = ('origine', 'verso', 'postazione')
     search_fields = ('utente__username',)
-    readonly_fields = ('utente', 'registrata_il', 'origine', 'badge', 'causale', 'verso_originale', 'ip', 'postazione')
+    readonly_fields = ('utente', 'registrata_il', 'origine', 'badge', 'causale', 'verso_originale', 'ip', 'postazione', 'annullata', 'annullata_il', 'annullata_da')
+    actions = ('annulla_timbratura',)
+
+    @admin.action(description='Annulla le timbrature selezionate')
+    def annulla_timbratura(self, request, queryset):
+        from django.utils import timezone
+        aggiornate = queryset.filter(annullata=False).update(annullata=True, annullata_il=timezone.now(), annullata_da=request.user)
+        self.message_user(request, f'{aggiornate} timbrature annullate.')
 
 
 @admin.register(Attivita)

@@ -110,6 +110,9 @@ class Timbratura(models.Model):
     verso = models.CharField(max_length=1, choices=[('I', 'Entrata'), ('U', 'Uscita')])
     verso_originale = models.CharField(max_length=1, editable=False)
     ip = models.GenericIPAddressField(null=True, editable=False)
+    annullata = models.BooleanField(default=False, editable=False)
+    annullata_il = models.DateTimeField(null=True, blank=True, editable=False)
+    annullata_da = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='timbrature_annullate', editable=False)
 
     class Meta:
         ordering = ['-registrata_il', '-pk']
