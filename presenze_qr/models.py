@@ -22,7 +22,7 @@ class Postazione(models.Model):
 class GruppoPresenze(models.Model):
     """Gruppo interno per la gestione delle presenze di un gruppo AD."""
 
-    gruppo_ad = models.OneToOneField(
+    gruppo_ad = models.ForeignKey(
         Group, on_delete=models.PROTECT, related_name="gruppo_presenze",
         verbose_name="Gruppo AD/Django",
     )
@@ -41,7 +41,6 @@ class GruppoPresenze(models.Model):
         ordering = ["gruppo_ad__name", "referente__last_name", "referente__first_name"]
         verbose_name = "Gruppo presenze"
         verbose_name_plural = "Gruppi presenze"
-        constraints = [models.UniqueConstraint(fields=["gruppo_ad", "referente"], name="gruppo_presenze_ad_referente_unico")]
 
     def __str__(self):
         return f"{self.gruppo_ad.name} - {self.referente.get_full_name() or self.referente.username}"
