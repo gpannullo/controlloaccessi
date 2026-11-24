@@ -101,6 +101,13 @@ class TicketPrinterService:
         non viene stampato sul ticket.
         """
 
+        # Ricarica sempre l'accesso con il badge corrente dal database. In
+        # questo modo la stampa segue anche eventuali rettifiche effettuate
+        # subito prima della ristampa e non un oggetto rimasto in cache.
+        from visitors.models import AccessoVisitatore
+        accesso = AccessoVisitatore.objects.select_related(
+            "badge", "ufficio_destinazione", "appuntamento"
+        ).get(pk=accesso.pk)
         config = cls._get_config()
 
         if not config.get("ENABLED", False):
@@ -121,6 +128,7 @@ class TicketPrinterService:
                 accesso.ingresso
             )
             ufficio = accesso.ufficio_destinazione
+            logger.info("Preparazione ticket accesso %s: badge=%s", accesso.pk, accesso.badge.codice if accesso.badge else None)
             def testo(valore, align="left"):
                 return (
                     f'<text align="{align}">{cls._xml_text(valore)}</text>'
