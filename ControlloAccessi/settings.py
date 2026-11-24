@@ -317,6 +317,15 @@ SESSION_COOKIE_SECURE = os.getenv(
 CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
+# Condivisione della sessione tra account e controlloaccessi. Il dominio con
+# il punto iniziale vale per tutti i sottodomini HTTPS del Comune.
+SESSION_COOKIE_DOMAIN = os.getenv(
+    "DJANGO_SESSION_COOKIE_DOMAIN", ".comune.aversa.ce.it"
+)
+SESSION_COOKIE_NAME = os.getenv("DJANGO_SESSION_COOKIE_NAME", "iris_sessionid")
+CSRF_COOKIE_DOMAIN = os.getenv(
+    "DJANGO_CSRF_COOKIE_DOMAIN", SESSION_COOKIE_DOMAIN
+)
 
 
 PRESENCE_CHECK_ENABLED = os.getenv(
