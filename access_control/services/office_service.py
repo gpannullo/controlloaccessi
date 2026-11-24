@@ -197,6 +197,7 @@ class OfficeService:
             Ufficio.objects
             .filter(
                 attivo=True,
+                riceve_pubblico=True,
                 assegnazioni_personale__attiva=True,
                 assegnazioni_personale__utente__is_active=True,
                 assegnazioni_personale__utente__stato_presenza=(
