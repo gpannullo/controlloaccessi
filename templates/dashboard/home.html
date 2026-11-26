@@ -590,8 +590,10 @@
                                                                     <a
                                                                             href="{% url 'portineria:chiudi_accesso' accesso.pk %}"
                                                                             class="btn btn-sm btn-danger"
+                                                                            title="Registra uscita"
+                                                                            aria-label="Registra uscita"
                                                                     >
-                                                                        Registra uscita
+                                                                        <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
                                                                     </a>
 
                                                                     <form
@@ -603,8 +605,10 @@
                                                                         <button
                                                                                 type="submit"
                                                                                 class="btn btn-sm btn-outline-primary"
+                                                                                title="Ristampa ticket"
+                                                                                aria-label="Ristampa ticket"
                                                                         >
-                                                                            Ristampa
+                                                                            <i class="bi bi-printer" aria-hidden="true"></i>
                                                                         </button>
                                                                     </form>
 
