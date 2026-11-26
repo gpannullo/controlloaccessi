@@ -1663,12 +1663,13 @@ document.addEventListener("DOMContentLoaded", function () {
             const nuovaIntestazione = nuovoModal.querySelector(
                 ".modal-header"
             );
-            const corpo = visitatoriModal.querySelector(
-                ".modal-body"
-            );
-            const nuovoCorpo = nuovoModal.querySelector(
-                ".modal-body"
-            );
+            const corpo = visitatoriModal.querySelector(".modal-body");
+            const nuovoCorpo = nuovoModal.querySelector(".modal-body");
+            const accordion = corpo && corpo.querySelector("#visitatoriUfficiAccordion");
+            const nuovoAccordion = nuovoCorpo && nuovoCorpo.querySelector("#visitatoriUfficiAccordion");
+            const ricerca = corpo && corpo.querySelector("#ricerca-visitatori");
+            const valoreRicerca = ricerca ? ricerca.value : "";
+            const scrollTop = corpo ? corpo.scrollTop : 0;
 
             if (intestazione && nuovaIntestazione) {
                 intestazione.replaceWith(
@@ -1676,8 +1677,18 @@ document.addEventListener("DOMContentLoaded", function () {
                 );
             }
 
-            if (corpo && nuovoCorpo) {
-                corpo.replaceWith(nuovoCorpo.cloneNode(true));
+            // Aggiorna solo il contenitore degli uffici: il campo di ricerca,
+            // il focus e lo scroll del modal non vengono ricreati.
+            if (accordion && nuovoAccordion) {
+                accordion.replaceWith(nuovoAccordion.cloneNode(true));
+            } else if (corpo && nuovoCorpo && !nuovoAccordion) {
+                const nuovoContenuto = nuovoCorpo.querySelector(".accordion") || nuovoCorpo.querySelector(".text-muted");
+                if (nuovoContenuto && accordion) accordion.replaceWith(nuovoContenuto.cloneNode(true));
+            }
+            if (corpo) {
+                const nuovaRicerca = corpo.querySelector("#ricerca-visitatori");
+                if (nuovaRicerca) nuovaRicerca.value = valoreRicerca;
+                corpo.scrollTop = scrollTop;
             }
         } catch (error) {
             console.error(
