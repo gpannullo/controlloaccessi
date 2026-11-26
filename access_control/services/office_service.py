@@ -192,6 +192,7 @@ class OfficeService:
         """
 
         User = get_user_model()
+        uffici_in_ricevimento = cls.get_offices_receiving_today()
 
         return (
             Ufficio.objects
@@ -204,6 +205,7 @@ class OfficeService:
                     User.StatoPresenza.PRESENTE
                 ),
             )
+            .exclude(pk__in=uffici_in_ricevimento.values('pk'))
             .distinct()
             .order_by("nome")
         )
