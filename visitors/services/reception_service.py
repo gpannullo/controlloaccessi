@@ -53,8 +53,12 @@ class ReceptionService:
                 ufficio
             )
 
+            # Se non c'è personale presente la registrazione è comunque
+            # consentita: il visitatore resta nella coda hall. Il blocco per
+            # capacità si applica solo quando l'ufficio ha operatori attivi.
             if (
                 appuntamento is None
+                and capacita["operatori"] > 0
                 and not capacita["accetta_non_prenotati"]
             ):
                 raise BusinessException(
