@@ -468,6 +468,7 @@
                         <div class="mb-3">
                             <label for="ricerca-visitatori" class="form-label fw-semibold">Cerca per numero di coda o badge</label>
                             <input id="ricerca-visitatori" type="search" class="form-control" placeholder="Es. AM001 o 0000000036" autocomplete="off">
+                            <div class="form-text"><span class="badge bg-success">A001</span> Visita&nbsp;&nbsp; <span class="badge bg-primary">B001</span> Ricevimento&nbsp;&nbsp; <strong>+</strong> Priorità</div>
                         </div>
 
                         <div
@@ -534,9 +535,11 @@
                                                         <tr>
 
                                                             <td>
-                                                                <strong>
-                                                                    {{ accesso.numero_coda_formattato }}
-                                                                </strong>
+                                                                {% if accesso.tipo_accesso == 'VIS' %}
+                                                                    <span class="badge bg-success" title="Visita">{% if accesso.appuntamento_id or accesso.rientro_prioritario %}+{% endif %}{{ accesso.numero_coda_formattato }}</span>
+                                                                {% else %}
+                                                                    <span class="badge bg-primary" title="Ricevimento">{% if accesso.appuntamento_id or accesso.rientro_prioritario %}+{% endif %}{{ accesso.numero_coda_formattato }}</span>
+                                                                {% endif %}
                                                             </td>
 
                                                             <td>
