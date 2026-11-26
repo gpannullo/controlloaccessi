@@ -465,6 +465,11 @@
 
                     {% if visitatori_per_ufficio %}
 
+                        <div class="mb-3">
+                            <label for="ricerca-visitatori" class="form-label fw-semibold">Cerca per numero di coda o badge</label>
+                            <input id="ricerca-visitatori" type="search" class="form-control" placeholder="Es. AM001 o 0000000036" autocomplete="off">
+                        </div>
+
                         <div
                                 class="accordion"
                                 id="visitatoriUfficiAccordion"
@@ -1691,5 +1696,52 @@ document.addEventListener("DOMContentLoaded", function () {
         );
     }
 });
+</script>
+<script>
+(() => {
+    const cookieName = 'visitatori_uffici_collassati';
+    const readCollapsed = () => {
+        const item = document.cookie.split('; ').find(row => row.startsWith(cookieName + '='));
+        try { return item ? JSON.parse(decodeURIComponent(item.split('=')[1])) : []; } catch (_) { return []; }
+    };
+    const writeCollapsed = (ids) => {
+        document.cookie = cookieName + '=' + encodeURIComponent(JSON.stringify(ids)) + '; path=/; max-age=31536000; SameSite=Lax';
+    };
+    const initVisitatoriFiltri = () => {
+        const modal = document.getElementById('visitatoriPresentiModal');
+        if (!modal) return;
+        const search = modal.querySelector('#ricerca-visitatori');
+        const collapsed = readCollapsed();
+        modal.querySelectorAll('.accordion-collapse').forEach(panel => {
+            if (collapsed.includes(panel.id)) panel.classList.remove('show');
+            const button = modal.querySelector('[data-bs-target="#' + panel.id + '"]');
+            if (button) button.setAttribute('aria-expanded', String(panel.classList.contains('show')));
+        });
+        if (search && !document.body.dataset.visitatoriSearchBound) {
+            document.body.dataset.visitatoriSearchBound = '1';
+            document.addEventListener('input', (event) => {
+                if (event.target.id !== 'ricerca-visitatori') return;
+                const search = event.target;
+                const query = search.value.trim().toLowerCase();
+                modal.querySelectorAll('.accordion-item').forEach(item => {
+                    const rows = item.querySelectorAll('tbody tr');
+                    let visible = 0;
+                    rows.forEach(row => { const show = !query || row.textContent.toLowerCase().includes(query); row.hidden = !show; if (show) visible++; });
+                    item.hidden = Boolean(query) && visible === 0;
+                });
+            });
+        }
+    };
+    document.addEventListener('shown.bs.collapse', event => {
+        if (!event.target.closest('#visitatoriPresentiModal')) return;
+        writeCollapsed(readCollapsed().filter(id => id !== event.target.id));
+    });
+    document.addEventListener('hidden.bs.collapse', event => {
+        if (!event.target.closest('#visitatoriPresentiModal')) return;
+        const ids = readCollapsed(); if (!ids.includes(event.target.id)) ids.push(event.target.id); writeCollapsed(ids);
+    });
+    document.addEventListener('shown.bs.modal', event => { if (event.target.id === 'visitatoriPresentiModal') initVisitatoriFiltri(); });
+    initVisitatoriFiltri();
+})();
 </script>
 {% endblock %}
