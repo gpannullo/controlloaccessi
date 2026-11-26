@@ -180,13 +180,6 @@ def appuntamenti_oggi(request):
             )
         appuntamenti_per_ufficio[-1]["appuntamenti"].append(appuntamento)
 
-    uffici_posti_esauriti = []
-    if not is_visita:
-        for ufficio in form.fields["ufficio"].queryset:
-            capacita = CapacityService.capacita_residua(ufficio)
-            if capacita["operatori"] > 0 and not capacita["accetta_non_prenotati"]:
-                uffici_posti_esauriti.append(ufficio.pk)
-
     return render(
         request,
         "visitors/appuntamenti_oggi.html",
@@ -416,6 +409,13 @@ def _nuovo_accesso(request, tipo_accesso):
 
         except BusinessException as exc:
             form.add_error(None, str(exc))
+
+    uffici_posti_esauriti = []
+    if not is_visita:
+        for ufficio in form.fields["ufficio"].queryset:
+            capacita = CapacityService.capacita_residua(ufficio)
+            if capacita["operatori"] > 0 and not capacita["accetta_non_prenotati"]:
+                uffici_posti_esauriti.append(ufficio.pk)
 
     return render(
         request,
