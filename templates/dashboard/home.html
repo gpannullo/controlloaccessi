@@ -763,6 +763,17 @@
 
                                             <!-- CONTATORI -->
 
+                                            <div class="alert alert-light border small mb-3">
+                                                <strong>Capacità coda:</strong>
+                                                {% if ufficio.capacita_coda.operatori %}
+                                                    {{ ufficio.capacita_coda.operatori }} operatori ·
+                                                    {{ ufficio.capacita_coda.posti_disponibili_ordinari }} posti ordinari disponibili ·
+                                                    {{ ufficio.capacita_coda.prenotazioni_riservate }} prenotazioni riservate
+                                                {% else %}
+                                                    nessun operatore presente: i nuovi visitatori restano in hall
+                                                {% endif %}
+                                            </div>
+
                                             <div class="row text-center g-2 mb-3">
 
                                                 <div class="col-6">

@@ -13,6 +13,7 @@ from io import BytesIO
 
 from access_control.models import CalendarioApertura, Ufficio
 from access_control.services.office_service import OfficeService
+from visitors.services.capacity_service import CapacityService
 from visitors.models import (
     AccessoVisitatore,
     SessioneRicevimento,
@@ -229,6 +230,7 @@ def dashboard_home(request):
         ufficio.numero_dipendenti_presenti = len(
             ufficio.dipendenti_presenti
         )
+        ufficio.capacita_coda = CapacityService.capacita_residua(ufficio)
 
         uffici_oggi.append(ufficio)
 
