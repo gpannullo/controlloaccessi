@@ -101,7 +101,7 @@ class Timbratura(models.Model):
     utente = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     postazione = models.ForeignKey(Postazione, on_delete=models.PROTECT, null=True, blank=True)
     generazione = models.UUIDField(unique=True, editable=False, null=True)
-    origine = models.CharField(max_length=12, choices=[('QR', 'QR'), ('AUTOMATICO', 'Sistema automatico')], default='QR', editable=False)
+    origine = models.CharField(max_length=24, choices=[('QR', 'QR'), ('AUTOMATICO', 'Sistema automatico'), ('MANUALE_DA_PORTINERIA', 'Manuale da portineria')], default='QR', editable=False)
     chiave_importazione = models.CharField(max_length=64, unique=True, null=True, editable=False)
     badge = models.CharField(max_length=10, blank=True, editable=False)
     causale = models.CharField(max_length=4, blank=True, editable=False)

@@ -45,6 +45,7 @@ from visitors.services.ticket_printer_service import (
 from visitors.permissions import portineria_required
 from visitors.services.continuity_service import ContinuitaAccessoService
 from visitors.services.badge_service import BadgeService
+from presenze_qr.models import Timbratura
 
 def _normalizza_testo(value):
     return " ".join(
@@ -819,6 +820,7 @@ def registra_transito_amministratore(request, pk):
     ingresso oppure uscita. Nessun calcolo di stato viene eseguito
     nella pagina di portineria.
     """
+    User = get_user_model()
     persona = get_object_or_404(
         AmministratoreEnte.objects.select_related("utente"),
         pk=pk,
@@ -845,6 +847,29 @@ def registra_transito_amministratore(request, pk):
         tipo=tipo,
         operatore=request.user,
     )
+    # Allinea il transito manuale al registro presenze comune.
+    utente = persona.utente
+    adesso = timezone.now()
+    Timbratura.objects.create(
+        utente=utente,
+        origine="MANUALE_DA_PORTINERIA",
+        badge=utente.badge or "",
+        causale="PORT",
+        registrata_il=transito.timestamp,
+        verso=tipo,
+        verso_originale=tipo,
+        ip=request.META.get("REMOTE_ADDR"),
+    )
+    utente.stato_presenza = (
+        User.StatoPresenza.PRESENTE if tipo == TransitoAmministratore.Tipo.INGRESSO
+        else User.StatoPresenza.ASSENTE
+    )
+    utente.presenza_verificata_il = adesso
+    utente.presenza_fonte = "MANUALE_DA_PORTINERIA"
+    utente.ultima_timbratura_il = transito.timestamp
+    utente.ultima_timbratura_verso = tipo
+    utente.ultima_timbratura_causale = "PORT"
+    utente.save(update_fields=["stato_presenza", "presenza_verificata_il", "presenza_fonte", "ultima_timbratura_il", "ultima_timbratura_verso", "ultima_timbratura_causale"])
 
     nome = (
         persona.utente.get_full_name()
