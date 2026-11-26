@@ -880,6 +880,7 @@
                                                                            align-items-center gap-2"
                                                                 >
                                                                     <span>
+                                                                        {% if dipendente.tipo_attivita == "AMM" %}<i class="bi bi-mortarboard-fill text-primary me-1" title="Amministrativista" aria-label="Amministrativista"></i>{% elif dipendente.tipo_attivita == "SPO" %}<i class="bi bi-person-fill text-success me-1" title="Sportellista" aria-label="Sportellista"></i>{% elif dipendente.tipo_attivita == "TEC" %}<i class="bi bi-wrench-adjustable text-warning me-1" title="Tecnico" aria-label="Tecnico"></i>{% endif %}
                                                                         {% firstof dipendente.get_full_name dipendente.username %}
                                                                     </span>
 
@@ -1182,6 +1183,7 @@
                                                                            align-items-center gap-2"
                                                                 >
                                                                     <span>
+                                                                        {% if dipendente.tipo_attivita == "AMM" %}<i class="bi bi-mortarboard-fill text-primary me-1" title="Amministrativista" aria-label="Amministrativista"></i>{% elif dipendente.tipo_attivita == "SPO" %}<i class="bi bi-person-fill text-success me-1" title="Sportellista" aria-label="Sportellista"></i>{% elif dipendente.tipo_attivita == "TEC" %}<i class="bi bi-wrench-adjustable text-warning me-1" title="Tecnico" aria-label="Tecnico"></i>{% endif %}
                                                                         {% firstof dipendente.get_full_name dipendente.username %}
                                                                     </span>
 
