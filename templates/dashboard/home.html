@@ -766,11 +766,13 @@
                                             <div class="alert alert-light border small mb-3">
                                                 <strong>Capacità coda:</strong>
                                                 {% if ufficio.capacita_coda.operatori %}
-                                                    {{ ufficio.capacita_coda.operatori }} operatori ·
-                                                    {{ ufficio.capacita_coda.posti_disponibili_ordinari }} posti ordinari disponibili ·
-                                                    {{ ufficio.capacita_coda.prenotazioni_riservate }} prenotazioni riservate
+                                                    <span class="d-block">In coda: <strong>{{ ufficio.visitatori_in_coda }}</strong></span>
+                                                    <span class="d-block">Capacità stimata fino a chiusura: <strong>{{ ufficio.capacita_coda.capacita_teorica }}</strong> persone</span>
+                                                    <span class="d-block">Posti ordinari ancora disponibili: <strong>{{ ufficio.capacita_coda.posti_disponibili_ordinari }}</strong></span>
+                                                    <span class="d-block">Prenotazioni riservate: <strong>{{ ufficio.capacita_coda.prenotazioni_riservate }}</strong></span>
                                                 {% else %}
-                                                    nessun operatore presente: i nuovi visitatori restano in hall
+                                                    <span class="d-block">In coda: <strong>{{ ufficio.visitatori_in_coda }}</strong></span>
+                                                    <span class="d-block">Nessun operatore presente: i nuovi visitatori restano in hall.</span>
                                                 {% endif %}
                                             </div>
 
