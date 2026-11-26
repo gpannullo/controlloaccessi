@@ -768,6 +768,7 @@
                                                 {% if ufficio.capacita_coda.operatori %}
                                                     <span class="d-block">In coda: <strong>{{ ufficio.visitatori_in_coda }}</strong></span>
                                                     <span class="d-block">Capacità stimata fino a chiusura: <strong>{{ ufficio.capacita_coda.capacita_teorica }}</strong> persone</span>
+                                                    <span class="d-block">Tempo medio di ricevimento: <strong>{{ ufficio.capacita_coda.tempo_medio }} minuti</strong></span>
                                                     <span class="d-block">Posti ordinari ancora disponibili: <strong>{{ ufficio.capacita_coda.posti_disponibili_ordinari }}</strong></span>
                                                     <span class="d-block">Prenotazioni riservate: <strong>{{ ufficio.capacita_coda.prenotazioni_riservate }}</strong></span>
                                                 {% else %}
