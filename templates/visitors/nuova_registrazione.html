@@ -52,6 +52,21 @@
         </div>
     {% endif %}
 
+    {% if not is_visita %}
+        <div id="avviso-capacita-coda" class="alert alert-warning d-none" role="alert">
+            L’ufficio selezionato non ha posti ordinari disponibili. La registrazione potrebbe essere rifiutata se non esiste un appuntamento riservato.
+        </div>
+        <script>
+        (() => {
+            const esauriti = new Set({{ uffici_posti_esauriti|default:'[]'|safe }});
+            const select = document.getElementById('id_ufficio');
+            const avviso = document.getElementById('avviso-capacita-coda');
+            const aggiorna = () => avviso.classList.toggle('d-none', !select || !esauriti.has(Number(select.value)));
+            if (select) { select.addEventListener('change', aggiorna); aggiorna(); }
+        })();
+        </script>
+    {% endif %}
+
     {% if is_visita %}
         <div class="alert alert-success">
             <strong>Visita:</strong> vengono mostrati solo gli uffici

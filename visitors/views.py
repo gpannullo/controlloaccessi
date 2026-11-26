@@ -45,6 +45,7 @@ from visitors.services.ticket_printer_service import (
 from visitors.permissions import portineria_required
 from visitors.services.continuity_service import ContinuitaAccessoService
 from visitors.services.badge_service import BadgeService
+from visitors.services.capacity_service import CapacityService
 from presenze_qr.models import Timbratura
 
 def _normalizza_testo(value):
@@ -178,6 +179,13 @@ def appuntamenti_oggi(request):
                 {"ufficio": appuntamento.ufficio, "appuntamenti": []}
             )
         appuntamenti_per_ufficio[-1]["appuntamenti"].append(appuntamento)
+
+    uffici_posti_esauriti = []
+    if not is_visita:
+        for ufficio in form.fields["ufficio"].queryset:
+            capacita = CapacityService.capacita_residua(ufficio)
+            if capacita["operatori"] > 0 and not capacita["accetta_non_prenotati"]:
+                uffici_posti_esauriti.append(ufficio.pk)
 
     return render(
         request,
@@ -418,6 +426,7 @@ def _nuovo_accesso(request, tipo_accesso):
             "tipo_accesso": tipo_accesso,
             "is_visita": is_visita,
             "appuntamento_selezionato": appuntamento_selezionato,
+            "uffici_posti_esauriti": uffici_posti_esauriti,
             "titolo_registrazione": (
                 "Nuova visita"
                 if is_visita
