@@ -510,10 +510,11 @@
 
                                             <div class="table-responsive">
 
-                                                <table
-                                                        class="table table-hover
-                                                       align-middle mb-0"
-                                                >
+                                                <table class="table table-hover align-middle mb-0 visita-sede-table">
+                                                    <colgroup>
+                                                        <col class="col-coda"><col class="col-visitatore"><col class="col-badge">
+                                                        <col class="col-ingresso"><col class="col-motivo"><col class="col-stato"><col class="col-azioni">
+                                                    </colgroup>
                                                     <thead>
                                                     <tr>
                                                         <th>Coda</th>
@@ -1748,4 +1749,15 @@ document.addEventListener("DOMContentLoaded", function () {
     initVisitatoriFiltri();
 })();
 </script>
+<style>
+  .visita-sede-table { table-layout: fixed; min-width: 900px; }
+  .visita-sede-table .col-coda { width: 90px; }
+  .visita-sede-table .col-badge { width: 100px; }
+  .visita-sede-table .col-ingresso { width: 82px; }
+  .visita-sede-table .col-stato { width: 150px; }
+  .visita-sede-table .col-azioni { width: 92px; }
+  .visita-sede-table .col-visitatore,
+  .visita-sede-table .col-motivo { width: calc((100% - 514px) / 2); }
+  .visita-sede-table td { overflow-wrap: anywhere; }
+</style>
 {% endblock %}
